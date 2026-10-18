@@ -4,6 +4,8 @@ extends Resource
 # A place on a hex map the player can enter (planet, comet, base...). Ported from Unity's
 # Enterable component, as data rather than behavior: the scene decides when to offer entry.
 
+## Stable unique key (e.g. &"planet_a"), used to remember per-location state like tile grids.
+@export var id: StringName = &""
 @export var display_name: String = ""
 ## Destination id understood by the Game autoload (e.g. "planet"), not a scene path.
 @export var destination: String = ""

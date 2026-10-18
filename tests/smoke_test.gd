@@ -72,6 +72,28 @@ func _test_core_logic() -> void:
 	_check(Enterable.find_at(list, Vector2i(1, 1)) == a and Enterable.find_at(list, Vector2i.ZERO) == null,
 		"core: Enterable.find_at")
 
+	# Generation (seeded so results are reproducible).
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 42
+	var g1 := TileGridGenerator.generate(5, 0.15, rng)
+	rng.seed = 42
+	var g2 := TileGridGenerator.generate(5, 0.15, rng)
+	_check(g1.tiles == g2.tiles, "gen: same seed gives same grid")
+	var counts := {}
+	for t in g1.tiles.values():
+		counts[t] = counts.get(t, 0) + 1
+	_check(counts.size() == TileGrid.TileType.size(), "gen: every tile type appears (%s)" % counts)
+	var no_empty := TileGridGenerator.generate(5, 0.0, rng)
+	_check(not no_empty.tiles.values().has(TileGrid.TileType.EMPTY), "gen: probability 0 gives no Empty")
+	var all_empty := TileGridGenerator.generate(5, 1.0, rng)
+	_check(all_empty.tiles.values().all(func(t: int) -> bool: return t == TileGrid.TileType.EMPTY),
+		"gen: probability 1 gives all Empty")
+
+	var state := GameState.new()
+	var first := state.get_or_generate_grid(&"x", 5, 0.15)
+	_check(state.get_or_generate_grid(&"x", 5, 0.15) == first, "state: same id returns the stored grid")
+	_check(state.get_or_generate_grid(&"y", 5, 0.15) != first, "state: different id gets its own grid")
+
 
 # Runs the Play scene with the board forced to the given orientation (regardless of what the
 # scene file is set to) and drives it with simulated key presses.
@@ -175,6 +197,9 @@ func _test_enter_planet() -> void:
 	var tiles: TileGridView = current_scene.get_node("HexBoard/TileGridView")
 	var bg: ColorRect = current_scene.get_node("Background/ColorRect")
 	_check(tiles.grid.tiles.size() == 91, "planet: 91 tiles")
+	_check(tiles.grid.tiles.values().any(func(t: int) -> bool: return t != TileGrid.TileType.EMPTY),
+		"planet: tiles are generated, not all Empty")
+	var tiles_snapshot := tiles.grid.tiles.duplicate()
 	_check(bg.color.is_equal_approx(Color(0.19215687, 0.3019608, 0.4745098)), "planet: blue background")
 	_check(not (current_scene.get_node("HexBoard") as HexBoard).draw_outlines, "planet: no outlines")
 
@@ -185,6 +210,14 @@ func _test_enter_planet() -> void:
 	var wizard: HexPlayerController = current_scene.get_node("HexBoard/Wizard")
 	_check(wizard.mover.coord == planet_a.coord, "planet: back on the planet's tile (got %s)" % wizard.mover.coord)
 	_check((current_scene.get_node("EnterPrompt") as CanvasLayer).is_showing(), "planet: prompt shows again on return")
+
+	# Re-enter: the planet should look exactly the same.
+	var first_visit := tiles_snapshot
+	_press(KEY_ENTER)
+	await process_frame
+	await process_frame
+	var revisit: TileGridView = current_scene.get_node("HexBoard/TileGridView")
+	_check(revisit.grid.tiles == first_visit, "planet: revisit shows the same tiles")
 	current_scene.queue_free()
 	await process_frame
 

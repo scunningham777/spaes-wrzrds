@@ -9,6 +9,7 @@
 
 [sub_resource type="Resource" id="Resource_planet_a"]
 script = ExtResource("5_enterable")
+id = &"planet_a"
 display_name = "Planet A"
 destination = "planet"
 coord = Vector2i(1, 1)
