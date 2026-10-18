@@ -1,0 +1,25 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/play.gd" id="1_play"]
+[ext_resource type="Script" path="res://scripts/hex_board.gd" id="2_board"]
+[ext_resource type="Script" path="res://scripts/hex_player_controller.gd" id="3_player"]
+[ext_resource type="Script" path="res://scripts/hex_facing_rotator.gd" id="4_rotator"]
+[ext_resource type="Texture2D" path="res://art/urizen_onebit_tileset__v1d1_trans.png" id="5_tiles"]
+
+[node name="Play" type="Node2D"]
+script = ExtResource("1_play")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+
+[node name="HexBoard" type="Node2D" parent="."]
+script = ExtResource("2_board")
+
+[node name="Wizard" type="Node2D" parent="HexBoard"]
+script = ExtResource("3_player")
+
+[node name="Sprite2D" type="Sprite2D" parent="HexBoard/Wizard"]
+scale = Vector2(4, 4)
+texture = ExtResource("5_tiles")
+region_enabled = true
+region_rect = Rect2(378, 1, 12, 12)
+script = ExtResource("4_rotator")
