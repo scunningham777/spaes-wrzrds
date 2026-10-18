@@ -1,23 +1,24 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://tcvikig18bss"]
 
-[ext_resource type="Script" path="res://scripts/play.gd" id="1_play"]
-[ext_resource type="Script" path="res://scripts/hex_board.gd" id="2_board"]
-[ext_resource type="Script" path="res://scripts/hex_player_controller.gd" id="3_player"]
-[ext_resource type="Script" path="res://scripts/hex_facing_rotator.gd" id="4_rotator"]
-[ext_resource type="Texture2D" path="res://art/urizen_onebit_tileset__v1d1_trans.png" id="5_tiles"]
+[ext_resource type="Script" uid="uid://dyf2a5r5pgkua" path="res://scripts/play.gd" id="1_play"]
+[ext_resource type="Script" uid="uid://cv5u5ib10wwx7" path="res://scripts/hex_board.gd" id="2_board"]
+[ext_resource type="Script" uid="uid://bw02urklfm3qn" path="res://scripts/hex_player_controller.gd" id="3_player"]
+[ext_resource type="Script" uid="uid://bxs3lrlk06p2o" path="res://scripts/hex_facing_rotator.gd" id="4_rotator"]
+[ext_resource type="Texture2D" uid="uid://c5vjocj1uk3l1" path="res://art/urizen_onebit_tileset__v1d1_trans.png" id="5_tiles"]
 
-[node name="Play" type="Node2D"]
+[node name="Play" type="Node2D" unique_id=1874703422]
 script = ExtResource("1_play")
 
-[node name="Camera2D" type="Camera2D" parent="."]
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1344401465]
 
-[node name="HexBoard" type="Node2D" parent="."]
+[node name="HexBoard" type="Node2D" parent="." unique_id=2116367548]
 script = ExtResource("2_board")
+pointy_top = false
 
-[node name="Wizard" type="Node2D" parent="HexBoard"]
+[node name="Wizard" type="Node2D" parent="HexBoard" unique_id=1532436726]
 script = ExtResource("3_player")
 
-[node name="Sprite2D" type="Sprite2D" parent="HexBoard/Wizard"]
+[node name="Sprite2D" type="Sprite2D" parent="HexBoard/Wizard" unique_id=2056292433]
 scale = Vector2(4, 4)
 texture = ExtResource("5_tiles")
 region_enabled = true
