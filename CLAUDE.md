@@ -14,5 +14,5 @@ Godot **4.7** project, **GDScript only** (no C#). Binary: `C:\Tools\Godot_v4.7.2
   - Logic works in grid/game units (axial hex coords, facings), never pixels; converting to screen space is the view layer's job.
   - Keep tunable data (stats, levels, balance numbers) in data files/resources, not hard-coded in scripts.
   - Logic should be testable headless without instantiating a scene.
-  - Note: the ported `HexPlayerController` still mixes input, state, and positioning in one node – split it along these lines when it next grows.
+  - Portable logic lives in `scripts/core/` (`Hex`, `HexLayout`, `HexMover`); node adapters live in `scripts/`. Example split: `HexMover` holds coord/facing, `HexPlayerController` maps keys to mover calls and mirrors its state into a position.
 - Smoke test: `godot_console.exe --headless --path . -s res://tests/smoke_test.gd`

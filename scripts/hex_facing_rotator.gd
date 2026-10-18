@@ -19,6 +19,6 @@ func _ready() -> void:
 
 
 func _on_facing_changed(_facing: Vector2i) -> void:
-	var angle := controller.get_facing_angle_degrees()
+	var angle := controller.mover.facing_angle_degrees()
 	# Godot rotation is clockwise-positive (y-down), so the CCW difference is negated.
 	rotation_degrees = sprite_rest_angle_degrees - angle
