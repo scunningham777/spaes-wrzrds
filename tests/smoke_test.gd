@@ -26,6 +26,7 @@ func _run() -> void:
 
 	await _test_play_scene(true)
 	await _test_play_scene(false)
+	await _test_enter_planet()
 
 	print("SMOKE TEST %s (%d failures)" % ["PASSED" if _failures == 0 else "FAILED", _failures])
 	quit(1 if _failures else 0)
@@ -60,11 +61,23 @@ func _test_core_logic() -> void:
 			_check(sum == Vector2i.ZERO, "core: %s opposite of %s cancels" % [
 				"pointy" if pt else "flat", Hex.Compass.keys()[order[i]]])
 
+	_check(Hex.hexagon(5).size() == 91, "core: radius-5 hexagon has 91 hexes")
+	var grid := TileGrid.new(5)
+	_check(grid.tiles.size() == 91 and grid.has_tile(Vector2i(5, -5)) and not grid.has_tile(Vector2i(5, 1)),
+		"core: TileGrid covers exactly the hexagon")
+
+	var a := Enterable.new()
+	a.coord = Vector2i(1, 1)
+	var list: Array[Enterable] = [a]
+	_check(Enterable.find_at(list, Vector2i(1, 1)) == a and Enterable.find_at(list, Vector2i.ZERO) == null,
+		"core: Enterable.find_at")
+
 
 # Runs the Play scene with the board forced to the given orientation (regardless of what the
 # scene file is set to) and drives it with simulated key presses.
 func _test_play_scene(pointy_top: bool) -> void:
 	var tag := "pointy" if pointy_top else "flat"
+	_game().state = GameState.new()
 	var play: Node = load("res://scenes/play.tscn").instantiate()
 	var board: HexBoard = play.get_node("HexBoard")
 	board.pointy_top = pointy_top
@@ -122,8 +135,63 @@ func _test_play_scene(pointy_top: bool) -> void:
 	await process_frame
 
 
+# Walk onto Planet A in space, enter it, check the planet scene, then Esc back out.
+func _test_enter_planet() -> void:
+	_game().state = GameState.new()
+	var play: Node = load("res://scenes/play.tscn").instantiate()
+	root.add_child(play)
+	current_scene = play
+	await process_frame
+
+	var prompt: CanvasLayer = play.get_node("EnterPrompt")
+	var planet_a: Enterable = (play.get_node("HexBoard/PlanetA") as EnterableMarker).enterable
+	_check(not prompt.is_showing(), "enter: no prompt at start")
+	_press(KEY_ENTER)
+	await process_frame
+	_check(current_scene == play, "enter: Enter does nothing away from a planet")
+
+	# Planet A sits at (1, 1); route depends on the scene's orientation.
+	var board: HexBoard = play.get_node("HexBoard")
+	if board.pointy_top:
+		_press(KEY_E)  # NE -> (0, 1)
+		_press(KEY_D)  # E  -> (1, 1)
+	else:
+		_press(KEY_W)  # N  -> (0, 1)
+		_press(KEY_E)  # NE -> (1, 1)
+	_check(prompt.is_showing(), "enter: prompt shows on Planet A")
+	var label: String = (prompt.get_node("Button") as Button).text
+	_check(label.contains(planet_a.display_name), "enter: prompt names the planet (%s)" % label)
+	_check(_game().state.space_coord == planet_a.coord, "enter: space position tracked")
+
+	_press(KEY_ENTER)
+	await process_frame
+	await process_frame
+	_check(current_scene != null and current_scene.scene_file_path == "res://scenes/planet.tscn",
+		"enter: Enter loads the planet scene")
+	_check(_game().state.current_location == planet_a, "enter: current location recorded")
+	if current_scene == null or current_scene.scene_file_path != "res://scenes/planet.tscn":
+		return
+
+	var tiles: TileGridView = current_scene.get_node("HexBoard/TileGridView")
+	var bg: ColorRect = current_scene.get_node("Background/ColorRect")
+	_check(tiles.grid.tiles.size() == 91, "planet: 91 tiles")
+	_check(bg.color.is_equal_approx(Color(0.19215687, 0.3019608, 0.4745098)), "planet: blue background")
+	_check(not (current_scene.get_node("HexBoard") as HexBoard).draw_outlines, "planet: no outlines")
+
+	_press(KEY_ESCAPE)
+	await process_frame
+	await process_frame
+	_check(current_scene.scene_file_path == "res://scenes/play.tscn", "planet: Esc returns to space")
+	var wizard: HexPlayerController = current_scene.get_node("HexBoard/Wizard")
+	_check(wizard.mover.coord == planet_a.coord, "planet: back on the planet's tile (got %s)" % wizard.mover.coord)
+	_check((current_scene.get_node("EnterPrompt") as CanvasLayer).is_showing(), "planet: prompt shows again on return")
+	current_scene.queue_free()
+	await process_frame
+
+
 func _press(keycode: Key) -> void:
 	var ev := InputEventKey.new()
+	ev.keycode = keycode
 	ev.physical_keycode = keycode
 	ev.pressed = true
 	root.push_input(ev)
@@ -145,3 +213,8 @@ func _check(cond: bool, label: String) -> void:
 	if not cond:
 		_failures += 1
 	print(("  ok   " if cond else "  FAIL ") + label)
+
+
+# The Game autoload can't be referenced by name from a -s script, so look it up at runtime.
+func _game() -> Node:
+	return root.get_node("Game")

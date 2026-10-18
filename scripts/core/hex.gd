@@ -45,6 +45,15 @@ static func delta(dir: Compass, pointy_top: bool) -> Vector2i:
 	return Vector2i.ZERO
 
 
+# Every coord within `radius` steps of the origin, i.e. a hexagon-shaped board.
+static func hexagon(radius: int) -> Array[Vector2i]:
+	var coords: Array[Vector2i] = []
+	for q in range(-radius, radius + 1):
+		for r in range(maxi(-radius, -q - radius), mini(radius, -q + radius) + 1):
+			coords.append(Vector2i(q, r))
+	return coords
+
+
 # Angle (degrees, standard math convention: 0 = +X, CCW positive, y-up) of an axial direction.
 # Only depends on orientation – size doesn't affect a direction's angle.
 static func direction_angle_degrees(direction: Vector2i, pointy_top: bool) -> float:

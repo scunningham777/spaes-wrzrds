@@ -2,9 +2,17 @@
 
 [ext_resource type="Script" uid="uid://dyf2a5r5pgkua" path="res://scripts/play.gd" id="1_play"]
 [ext_resource type="Script" uid="uid://cv5u5ib10wwx7" path="res://scripts/hex_board.gd" id="2_board"]
-[ext_resource type="Script" uid="uid://bw02urklfm3qn" path="res://scripts/hex_player_controller.gd" id="3_player"]
-[ext_resource type="Script" uid="uid://bxs3lrlk06p2o" path="res://scripts/hex_facing_rotator.gd" id="4_rotator"]
-[ext_resource type="Texture2D" uid="uid://c5vjocj1uk3l1" path="res://art/urizen_onebit_tileset__v1d1_trans.png" id="5_tiles"]
+[ext_resource type="PackedScene" path="res://scenes/wizard.tscn" id="3_wizard"]
+[ext_resource type="Script" path="res://scripts/enterable_marker.gd" id="4_marker"]
+[ext_resource type="Script" path="res://scripts/core/enterable.gd" id="5_enterable"]
+[ext_resource type="PackedScene" path="res://scenes/enter_prompt.tscn" id="6_prompt"]
+
+[sub_resource type="Resource" id="Resource_planet_a"]
+script = ExtResource("5_enterable")
+display_name = "Planet A"
+destination = "planet"
+coord = Vector2i(1, 1)
+color = Color(1, 0, 0, 1)
 
 [node name="Play" type="Node2D" unique_id=1874703422]
 script = ExtResource("1_play")
@@ -15,12 +23,10 @@ script = ExtResource("1_play")
 script = ExtResource("2_board")
 pointy_top = false
 
-[node name="Wizard" type="Node2D" parent="HexBoard" unique_id=1532436726]
-script = ExtResource("3_player")
+[node name="PlanetA" type="Node2D" parent="HexBoard"]
+script = ExtResource("4_marker")
+enterable = SubResource("Resource_planet_a")
 
-[node name="Sprite2D" type="Sprite2D" parent="HexBoard/Wizard" unique_id=2056292433]
-scale = Vector2(4, 4)
-texture = ExtResource("5_tiles")
-region_enabled = true
-region_rect = Rect2(378, 1, 12, 12)
-script = ExtResource("4_rotator")
+[node name="Wizard" parent="HexBoard" unique_id=1532436726 instance=ExtResource("3_wizard")]
+
+[node name="EnterPrompt" parent="." instance=ExtResource("6_prompt")]

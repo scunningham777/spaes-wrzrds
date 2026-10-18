@@ -15,4 +15,5 @@ Godot **4.7** project, **GDScript only** (no C#). Binary: `C:\Tools\Godot_v4.7.2
   - Keep tunable data (stats, levels, balance numbers) in data files/resources, not hard-coded in scripts.
   - Logic should be testable headless without instantiating a scene.
   - Portable logic lives in `scripts/core/` (`Hex`, `HexLayout`, `HexMover`); node adapters live in `scripts/`. Example split: `HexMover` holds coord/facing, `HexPlayerController` maps keys to mover calls and mirrors its state into a position.
+- `Game` autoload (`scripts/game.gd`) holds the cross-scene `GameState` and switches scenes by destination id (`Game.go_to("planet")`); core data uses those ids, never scene paths. Scripts run with `-s` (tests) can't reference autoloads by name – use `root.get_node("Game")`.
 - Smoke test: `godot_console.exe --headless --path . -s res://tests/smoke_test.gd`

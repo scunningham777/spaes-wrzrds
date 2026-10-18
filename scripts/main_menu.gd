@@ -1,7 +1,5 @@
 extends Control
 
-const PLAY_SCENE := "res://scenes/play.tscn"
-
 @onready var quit_button: Button = %QuitButton
 
 
@@ -12,7 +10,7 @@ func _ready() -> void:
 
 
 func _on_play_pressed() -> void:
-	get_tree().change_scene_to_file(PLAY_SCENE)
+	Game.new_game()
 
 
 func _on_quit_pressed() -> void:

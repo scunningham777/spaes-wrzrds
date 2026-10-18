@@ -17,6 +17,7 @@ extends Node2D
 		if layout:
 			layout.size = value
 		queue_redraw()
+@export var draw_outlines: bool = true
 @export var line_color: Color = Color.WHITE
 @export var line_width: float = 1.0
 
@@ -41,6 +42,8 @@ func hex_to_local(coord: Vector2i) -> Vector2:
 
 
 func _draw() -> void:
+	if not draw_outlines:
+		return
 	# Draw every hex whose center falls within the visible area (plus a margin), assuming the
 	# board's origin is at the screen center (the Play scene's Camera2D sits at the origin).
 	var half := get_viewport_rect().size / 2.0 + Vector2(hex_size, hex_size)
