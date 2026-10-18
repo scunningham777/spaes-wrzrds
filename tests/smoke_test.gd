@@ -89,6 +89,30 @@ func _test_core_logic() -> void:
 	_check(all_empty.tiles.values().all(func(t: int) -> bool: return t == TileGrid.TileType.EMPTY),
 		"gen: probability 1 gives all Empty")
 
+	# Push (TileGrid.try_push_tile, ported from Unity).
+	var T := TileGrid.TileType
+	var pg := TileGrid.new(2)
+	var changes: Array[Vector2i] = []
+	pg.tile_changed.connect(func(c: Vector2i, _t: int) -> void: changes.append(c))
+	pg.set_tile(Vector2i(0, 1), T.GOLD_ORE)
+	changes.clear()
+	_check(pg.try_push_in_front(Vector2i.ZERO, Vector2i(0, 1)), "push: tile in front moves")
+	_check(pg.get_tile(Vector2i(0, 1)) == T.EMPTY and pg.get_tile(Vector2i(0, 2)) == T.GOLD_ORE,
+		"push: Gold moved from (0,1) to (0,2)")
+	_check(changes.size() == 2, "push: tile_changed fires for both hexes")
+	_check(not pg.try_push_tile(Vector2i(0, 1), Vector2i(0, 2)), "push: nothing to push from Empty")
+	_check(not pg.try_push_tile(Vector2i(0, 2), Vector2i(0, 3)) and pg.get_tile(Vector2i(0, 2)) == T.GOLD_ORE,
+		"push: can't push off the grid, no change")
+	pg.set_tile(Vector2i(1, 0), T.GOLD_ORE)
+	pg.set_tile(Vector2i(2, 0), T.WATER_SPRING)
+	pg.try_push_tile(Vector2i(1, 0), Vector2i(2, 0))
+	_check(pg.get_tile(Vector2i(1, 0)) == T.EMPTY and pg.get_tile(Vector2i(2, 0)) == T.WATER_SPRING,
+		"push: Gold + Water combines to Water (placeholder)")
+	pg.set_tile(Vector2i(-1, 0), T.TIMBER)
+	pg.set_tile(Vector2i(-2, 0), T.STONE_OUTCROP)
+	pg.try_push_tile(Vector2i(-1, 0), Vector2i(-2, 0))
+	_check(pg.get_tile(Vector2i(-2, 0)) == T.IRON_DEPOSIT, "push: Timber + Stone combines to Iron (placeholder)")
+
 	var state := GameState.new()
 	var first := state.get_or_generate_grid(&"x", 5, 0.15)
 	_check(state.get_or_generate_grid(&"x", 5, 0.15) == first, "state: same id returns the stored grid")
@@ -202,6 +226,14 @@ func _test_enter_planet() -> void:
 	var tiles_snapshot := tiles.grid.tiles.duplicate()
 	_check(bg.color.is_equal_approx(Color(0.19215687, 0.3019608, 0.4745098)), "planet: blue background")
 	_check(not (current_scene.get_node("HexBoard") as HexBoard).draw_outlines, "planet: no outlines")
+
+	# Push with F: wizard at (0,0) faces N on the flat-top planet, so (0,1) -> (0,2).
+	tiles.grid.set_tile(Vector2i(0, 1), TileGrid.TileType.GOLD_ORE)
+	tiles.grid.set_tile(Vector2i(0, 2), TileGrid.TileType.EMPTY)
+	_press(KEY_F)
+	_check(tiles.grid.get_tile(Vector2i(0, 1)) == TileGrid.TileType.EMPTY
+		and tiles.grid.get_tile(Vector2i(0, 2)) == TileGrid.TileType.GOLD_ORE, "planet: F pushes the tile in front")
+	tiles_snapshot = tiles.grid.tiles.duplicate()  # pushed state should survive a revisit
 
 	_press(KEY_ESCAPE)
 	await process_frame

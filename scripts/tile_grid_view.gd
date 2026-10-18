@@ -19,7 +19,11 @@ const TILE_COLORS: Dictionary[TileGrid.TileType, Color] = {
 
 var grid: TileGrid:
 	set(value):
+		if grid != null and grid.tile_changed.is_connected(_on_tile_changed):
+			grid.tile_changed.disconnect(_on_tile_changed)
 		grid = value
+		if grid != null:
+			grid.tile_changed.connect(_on_tile_changed)
 		queue_redraw()
 
 @onready var board: HexBoard = get_parent() as HexBoard
@@ -27,6 +31,10 @@ var grid: TileGrid:
 
 func color_for(type: TileGrid.TileType) -> Color:
 	return TILE_COLORS.get(type, Color.WHITE)
+
+
+func _on_tile_changed(_coord: Vector2i, _type: TileGrid.TileType) -> void:
+	queue_redraw()
 
 
 func _draw() -> void:
