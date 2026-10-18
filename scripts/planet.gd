@@ -7,6 +7,7 @@ extends Node2D
 @export_range(0.0, 1.0) var empty_tile_probability: float = 0.15
 
 @onready var _tiles: TileGridView = $HexBoard/TileGridView
+@onready var _wizard: HexPlayerController = $HexBoard/Wizard
 
 
 func _ready() -> void:
@@ -16,6 +17,9 @@ func _ready() -> void:
 	else:
 		# Scene run directly from the editor (F6): nothing to remember it under.
 		_tiles.grid = TileGridGenerator.generate(grid_radius, empty_tile_probability)
+
+	# Keep the wizard on the planet's tiles.
+	_wizard.mover.can_enter = _tiles.grid.has_tile
 
 
 func _unhandled_input(event: InputEvent) -> void:

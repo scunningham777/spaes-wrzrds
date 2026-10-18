@@ -49,6 +49,12 @@ func _test_core_logic() -> void:
 	var flat := HexMover.new(HexLayout.new(false))
 	_check(flat.facing_compass() == Hex.Compass.N, "core: flat default facing N")
 	_check(not flat.move(Hex.Compass.E), "core: flat has no E neighbor")
+	var bounded := HexMover.new(HexLayout.new(false))
+	bounded.can_enter = func(c: Vector2i) -> bool: return c.y <= 1
+	_check(bounded.move(Hex.Compass.N) and not bounded.move(Hex.Compass.N) and bounded.coord == Vector2i(0, 1),
+		"core: can_enter blocks moves")
+	bounded.turn(1)
+	_check(bounded.facing_compass() == Hex.Compass.NE, "core: turning still works when blocked")
 	_check(is_equal_approx(flat.facing_angle_degrees(), 90.0), "core: flat N angle is 90")
 	flat.turn(1)
 	_check(is_equal_approx(flat.facing_angle_degrees(), 30.0), "core: flat NE angle is 30")
@@ -234,6 +240,14 @@ func _test_enter_planet() -> void:
 	_check(tiles.grid.get_tile(Vector2i(0, 1)) == TileGrid.TileType.EMPTY
 		and tiles.grid.get_tile(Vector2i(0, 2)) == TileGrid.TileType.GOLD_ORE, "planet: F pushes the tile in front")
 	tiles_snapshot = tiles.grid.tiles.duplicate()  # pushed state should survive a revisit
+
+	# Boundary: walking N from (0,0) stops at the radius-5 edge.
+	var planet_wizard: HexPlayerController = current_scene.get_node("HexBoard/Wizard")
+	for i in 8:
+		_press(KEY_W)
+	_check(planet_wizard.mover.coord == Vector2i(0, 5), "planet: wizard stops at the grid edge (got %s)" % planet_wizard.mover.coord)
+	_check(planet_wizard.position == (current_scene.get_node("HexBoard") as HexBoard).hex_to_local(Vector2i(0, 5)),
+		"planet: wizard drawn on the edge hex")
 
 	_press(KEY_ESCAPE)
 	await process_frame

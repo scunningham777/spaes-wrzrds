@@ -12,6 +12,9 @@ var layout: HexLayout
 var coord: Vector2i
 var facing: Vector2i
 
+## Optional (Vector2i) -> bool; moves into coords it rejects are refused. Unset = unbounded.
+var can_enter: Callable
+
 var _facing_index: int = 0
 
 
@@ -25,10 +28,13 @@ func facing_compass() -> Hex.Compass:
 	return _clockwise_order()[_facing_index]
 
 
-# Returns false (and does nothing) if the direction doesn't exist in this orientation.
+# Returns false (and does nothing) if the direction doesn't exist in this orientation, or the
+# target is rejected by can_enter.
 func move(dir: Hex.Compass) -> bool:
 	var d := Hex.delta(dir, layout.pointy_top)
 	if d == Vector2i.ZERO:
+		return false
+	if can_enter.is_valid() and not can_enter.call(coord + d):
 		return false
 	coord += d
 	moved.emit(coord)
