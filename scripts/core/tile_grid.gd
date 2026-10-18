@@ -39,6 +39,16 @@ func set_tile(coord: Vector2i, type: TileType) -> void:
 	tile_changed.emit(coord, type)
 
 
+# Empties the tile at coord and returns the type it held, or EMPTY if there was nothing to
+# extract (no tile, or already Empty). Ported from TileGridManager.TryExtractResource.
+func try_extract(coord: Vector2i) -> TileType:
+	if not tiles.has(coord) or tiles[coord] == TileType.EMPTY:
+		return TileType.EMPTY
+	var extracted := tiles[coord]
+	set_tile(coord, TileType.EMPTY)
+	return extracted
+
+
 # Pushes the tile at from_coord into to_coord. If to_coord is Empty, the tile simply moves.
 # If to_coord already holds something, the two combine (placeholder rule) into to_coord.
 # Returns false (no change) if from_coord has nothing to push, or to_coord isn't part of the grid.

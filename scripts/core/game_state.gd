@@ -9,6 +9,7 @@ var space_coord: Vector2i = Vector2i.ZERO
 var current_location: Enterable = null
 ## Tile grids by Enterable.id, generated on first visit so revisits look the same.
 var location_grids: Dictionary[StringName, TileGrid] = {}
+var inventory := Inventory.new()
 
 
 func get_or_generate_grid(location_id: StringName, radius: int, empty_probability: float) -> TileGrid:

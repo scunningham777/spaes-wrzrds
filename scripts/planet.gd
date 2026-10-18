@@ -11,6 +11,7 @@ extends Node2D
 
 
 func _ready() -> void:
+	($UI/InventoryPanel as InventoryPanel).inventory = Game.state.inventory
 	var location := Game.state.current_location
 	if location != null:
 		_tiles.grid = Game.state.get_or_generate_grid(location.id, grid_radius, empty_tile_probability)

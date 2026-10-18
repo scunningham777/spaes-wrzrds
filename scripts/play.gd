@@ -17,6 +17,7 @@ func _enter_tree() -> void:
 
 
 func _ready() -> void:
+	($UI/InventoryPanel as InventoryPanel).inventory = Game.state.inventory
 	for child in _board.get_children():
 		if child is EnterableMarker:
 			_enterables.append(child.enterable)

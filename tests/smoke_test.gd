@@ -4,6 +4,7 @@ extends SceneTree
 #   godot_console.exe --headless --path . -s res://tests/smoke_test.gd
 
 var _failures := 0
+var _finished: Array[String] = []
 
 
 func _initialize() -> void:
@@ -27,6 +28,9 @@ func _run() -> void:
 	await _test_play_scene(true)
 	await _test_play_scene(false)
 	await _test_enter_planet()
+	# A script error aborts a test function silently, so make sure each one ran to the end.
+	for t in ["play_pointy", "play_flat", "enter_planet"]:
+		_check(t in _finished, "test %s ran to completion" % t)
 
 	print("SMOKE TEST %s (%d failures)" % ["PASSED" if _failures == 0 else "FAILED", _failures])
 	quit(1 if _failures else 0)
@@ -119,6 +123,24 @@ func _test_core_logic() -> void:
 	pg.try_push_tile(Vector2i(-1, 0), Vector2i(-2, 0))
 	_check(pg.get_tile(Vector2i(-2, 0)) == T.IRON_DEPOSIT, "push: Timber + Stone combines to Iron (placeholder)")
 
+	# Extract + inventory.
+	var eg := TileGrid.new(1)
+	eg.set_tile(Vector2i.ZERO, T.TIMBER)
+	_check(eg.try_extract(Vector2i.ZERO) == T.TIMBER and eg.get_tile(Vector2i.ZERO) == T.EMPTY,
+		"extract: returns the type and empties the tile")
+	_check(eg.try_extract(Vector2i.ZERO) == T.EMPTY, "extract: Empty tile yields nothing")
+	_check(eg.try_extract(Vector2i(9, 9)) == T.EMPTY, "extract: off-grid yields nothing")
+	_check(Items.from_tile(T.GOLD_ORE) == &"gold" and Items.from_tile(T.EMPTY) == &"",
+		"items: tile -> item mapping")
+	var inv := Inventory.new()
+	var inv_changes := [0]
+	inv.changed.connect(func() -> void: inv_changes[0] += 1)
+	inv.add(&"stone")
+	inv.add(&"gold", 2)
+	_check(inv.owned() == [&"gold", &"stone"], "inventory: owned() follows Items.ORDER")
+	_check(inv.spend(&"gold") and inv.count(&"gold") == 1 and not inv.spend(&"water"), "inventory: spend")
+	_check(inv_changes[0] == 3, "inventory: changed fires on add/spend")
+
 	var state := GameState.new()
 	var first := state.get_or_generate_grid(&"x", 5, 0.15)
 	_check(state.get_or_generate_grid(&"x", 5, 0.15) == first, "state: same id returns the stored grid")
@@ -185,6 +207,7 @@ func _test_play_scene(pointy_top: bool) -> void:
 
 	play.queue_free()
 	await process_frame
+	_finished.append("play_pointy" if pointy_top else "play_flat")
 
 
 # Walk onto Planet A in space, enter it, check the planet scene, then Esc back out.
@@ -239,7 +262,35 @@ func _test_enter_planet() -> void:
 	_press(KEY_F)
 	_check(tiles.grid.get_tile(Vector2i(0, 1)) == TileGrid.TileType.EMPTY
 		and tiles.grid.get_tile(Vector2i(0, 2)) == TileGrid.TileType.GOLD_ORE, "planet: F pushes the tile in front")
-	tiles_snapshot = tiles.grid.tiles.duplicate()  # pushed state should survive a revisit
+	# Extract with R: the wizard's own tile is emptied into the inventory.
+	var inv: Inventory = _game().state.inventory
+	tiles.grid.set_tile(Vector2i.ZERO, TileGrid.TileType.IRON_DEPOSIT)
+	_press(KEY_R)
+	_check(tiles.grid.get_tile(Vector2i.ZERO) == TileGrid.TileType.EMPTY and inv.count(&"iron") == 1,
+		"planet: R extracts Iron into the inventory")
+	_press(KEY_R)
+	_check(inv.count(&"iron") == 1, "planet: R on an Empty tile adds nothing")
+
+	# Inventory panel: I opens and pauses; Esc closes without leaving the planet.
+	var panel: InventoryPanel = current_scene.get_node("UI/InventoryPanel")
+	_check(not panel.visible, "inventory: hidden at start")
+	_press(KEY_I)
+	_check(panel.visible and paused, "inventory: I opens it and pauses")
+	_check(panel.shown_items() == [&"iron"], "inventory: grid shows owned items (%s)" % [panel.shown_items()])
+	var planet_wizard_coord: Vector2i = (current_scene.get_node("HexBoard/Wizard") as HexPlayerController).mover.coord
+	_press(KEY_W)
+	_check((current_scene.get_node("HexBoard/Wizard") as HexPlayerController).mover.coord == planet_wizard_coord,
+		"inventory: wizard can't move while it's open")
+	panel.select(&"iron")
+	_check((panel.get_node("%NameLabel") as Label).text == "Iron"
+		and (panel.get_node("%DescriptionLabel") as Label).text == Items.description(&"iron"),
+		"inventory: selecting shows name and description")
+	_press(KEY_ESCAPE)
+	await process_frame
+	_check(not panel.visible and not paused, "inventory: Esc closes it and unpauses")
+	_check(current_scene.scene_file_path == "res://scenes/planet.tscn", "inventory: Esc didn't also leave the planet")
+
+	tiles_snapshot = tiles.grid.tiles.duplicate()  # pushed/extracted state should survive a revisit
 
 	# Boundary: walking N from (0,0) stops at the radius-5 edge.
 	var planet_wizard: HexPlayerController = current_scene.get_node("HexBoard/Wizard")
@@ -266,6 +317,7 @@ func _test_enter_planet() -> void:
 	_check(revisit.grid.tiles == first_visit, "planet: revisit shows the same tiles")
 	current_scene.queue_free()
 	await process_frame
+	_finished.append("enter_planet")
 
 
 func _press(keycode: Key) -> void:
