@@ -164,6 +164,18 @@ func _test_play_scene(pointy_top: bool) -> void:
 		"%s: layout matches board settings" % tag)
 	_check(wizard.position == Vector2.ZERO, "%s: wizard starts at origin" % tag)
 
+	# Inventory default selection: nothing when empty, the first item once there is one.
+	var panel: InventoryPanel = play.get_node("UI/InventoryPanel")
+	var name_label: Label = panel.get_node("%NameLabel")
+	_check(panel.selected_item == &"" and name_label.text == "Nothing selected",
+		"%s: empty inventory shows Nothing selected" % tag)
+	_game().state.inventory.add(&"stone")
+	_game().state.inventory.add(&"gold")
+	_check(panel.selected_item == &"stone" and name_label.text == "Stone",
+		"%s: first item gained is selected, and stays selected" % tag)
+	_game().state.inventory.spend(&"stone")
+	_check(panel.selected_item == &"gold", "%s: selection falls back to the first item" % tag)
+
 	if pointy_top:
 		# Default facing is E; art faces up, so rotated +90 (clockwise) on screen.
 		_check_rot(sprite, 90.0, "%s: initial sprite faces E" % tag)
@@ -281,6 +293,8 @@ func _test_enter_planet() -> void:
 	_press(KEY_W)
 	_check((current_scene.get_node("HexBoard/Wizard") as HexPlayerController).mover.coord == planet_wizard_coord,
 		"inventory: wizard can't move while it's open")
+	_check(panel.selected_item == &"iron" and (panel.get_node("%NameLabel") as Label).text == "Iron",
+		"inventory: first item selected by default")
 	panel.select(&"iron")
 	_check((panel.get_node("%NameLabel") as Label).text == "Iron"
 		and (panel.get_node("%DescriptionLabel") as Label).text == Items.description(&"iron"),

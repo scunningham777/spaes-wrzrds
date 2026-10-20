@@ -125,6 +125,9 @@ func _refresh() -> void:
 	var owned: Array[StringName] = []
 	if inventory:
 		owned = inventory.owned()
+	# Keep a valid selection: default to the first item, or nothing if the inventory is empty.
+	if selected_item not in owned:
+		selected_item = owned[0] if not owned.is_empty() else &""
 	for i in _slots.size():
 		var slot := _slots[i]
 		var item: StringName = owned[i] if i < owned.size() else &""
@@ -137,8 +140,6 @@ func _refresh() -> void:
 		var count := inventory.count(item) if inventory else 0
 		(slot.get_node(^"Count") as Label).text = str(count) if count > 1 else ""
 
-	if not selected_item.is_empty() and selected_item not in owned:
-		selected_item = &""
 	_show_details()
 
 

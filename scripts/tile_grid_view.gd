@@ -9,7 +9,7 @@ extends Node2D
 
 # Colors from Unity's TileVisual.GetColorForType.
 const TILE_COLORS: Dictionary[TileGrid.TileType, Color] = {
-	TileGrid.TileType.EMPTY: Color(0.8, 0.8, 0.8, 0.5),  # Transparent gray
+	TileGrid.TileType.EMPTY: Color(0.8, 0.8, 0.8, 0.35),  # Transparent gray
 	TileGrid.TileType.GOLD_ORE: Color(1.0, 0.84, 0.0),  # Gold
 	TileGrid.TileType.WATER_SPRING: Color(0.3, 0.6, 1.0),  # Blue
 	TileGrid.TileType.IRON_DEPOSIT: Color(0.65, 0.35, 0.3),  # Rust

@@ -1,19 +1,19 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://dt50n3tn3woy2"]
 
-[ext_resource type="Script" path="res://scripts/planet.gd" id="1_planet"]
+[ext_resource type="Script" uid="uid://hyrqespwgkf8" path="res://scripts/planet.gd" id="1_planet"]
 [ext_resource type="Script" uid="uid://cv5u5ib10wwx7" path="res://scripts/hex_board.gd" id="2_board"]
-[ext_resource type="Script" path="res://scripts/tile_grid_view.gd" id="3_tiles"]
+[ext_resource type="Script" uid="uid://bv7ivphiugkfm" path="res://scripts/tile_grid_view.gd" id="3_tiles"]
 [ext_resource type="PackedScene" path="res://scenes/wizard.tscn" id="4_wizard"]
-[ext_resource type="Script" path="res://scripts/tile_interaction.gd" id="5_interaction"]
+[ext_resource type="Script" uid="uid://byp11b1kcnhb6" path="res://scripts/tile_interaction.gd" id="5_interaction"]
 [ext_resource type="PackedScene" path="res://scenes/ui/inventory_panel.tscn" id="6_inventory"]
 
-[node name="Planet" type="Node2D"]
+[node name="Planet" type="Node2D" unique_id=73139735]
 script = ExtResource("1_planet")
 
-[node name="Background" type="CanvasLayer" parent="."]
+[node name="Background" type="CanvasLayer" parent="." unique_id=1797849295]
 layer = -1
 
-[node name="ColorRect" type="ColorRect" parent="Background"]
+[node name="ColorRect" type="ColorRect" parent="Background" unique_id=1440812043]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -22,24 +22,23 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.19215687, 0.3019608, 0.4745098, 1)
 
-[node name="Camera2D" type="Camera2D" parent="."]
+[node name="Camera2D" type="Camera2D" parent="." unique_id=159357361]
 
-[node name="HexBoard" type="Node2D" parent="."]
+[node name="HexBoard" type="Node2D" parent="." unique_id=401960176]
 script = ExtResource("2_board")
 pointy_top = false
-hex_size = 36.0
 draw_outlines = false
 
-[node name="TileGridView" type="Node2D" parent="HexBoard"]
+[node name="TileGridView" type="Node2D" parent="HexBoard" unique_id=1952379980]
 script = ExtResource("3_tiles")
 
-[node name="Wizard" parent="HexBoard" instance=ExtResource("4_wizard")]
+[node name="Wizard" parent="HexBoard" unique_id=1758725873 instance=ExtResource("4_wizard")]
 
-[node name="TileInteraction" type="Node" parent="." node_paths=PackedStringArray("player", "tiles")]
+[node name="TileInteraction" type="Node" parent="." unique_id=677987109 node_paths=PackedStringArray("player", "tiles")]
 script = ExtResource("5_interaction")
 player = NodePath("../HexBoard/Wizard")
 tiles = NodePath("../HexBoard/TileGridView")
 
-[node name="UI" type="CanvasLayer" parent="."]
+[node name="UI" type="CanvasLayer" parent="." unique_id=194394638]
 
-[node name="InventoryPanel" parent="UI" instance=ExtResource("6_inventory")]
+[node name="InventoryPanel" parent="UI" unique_id=189433725 instance=ExtResource("6_inventory")]
