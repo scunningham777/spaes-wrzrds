@@ -2,4 +2,9 @@
 .godot/
 /android/
 *.translation
-export_presets.cfg
+
+# Exports
+/builds/*
+!/builds/.gdignore
+*.pck
+*.zip
