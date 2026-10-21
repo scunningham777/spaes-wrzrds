@@ -271,14 +271,23 @@ func _test_enter_planet() -> void:
 		_check(tiles.has_icon(type) and tiles.color_for(type) == Color.BLACK,
 			"planet: %s draws an icon on a black hex" % TileGrid.TileType.keys()[type])
 	_check(not tiles.has_icon(TileGrid.TileType.EMPTY), "planet: Empty is a plain hex")
-	# Icon bob: 0, up, 0, down, one sprite pixel (icon_scale screen px) per step.
-	tiles.bob_step = 0
-	var bob_ys: Array[float] = []
-	for i in 4:
-		tiles._process(tiles.bob_step_seconds)
-		bob_ys.append(tiles.bob_offset().y)
-	var px := tiles.icon_scale
-	_check(bob_ys == [-px, 0.0, px, 0.0], "planet: icons bob up, center, down, center (%s)" % [bob_ys])
+	# Icon animations: [type, channel, seconds between samples, expected values]. Samples are taken
+	# mid-step, starting at half the interval.
+	for case: Array in [
+		[TileGrid.TileType.WATER_SPRING, &"y", 0.5, [0.0, -1.0, 0.0, 1.0, 0.0]],
+		[TileGrid.TileType.IRON_DEPOSIT, &"x", 0.5, [0.0, 1.0, 0.0, -1.0, 0.0]],
+		[TileGrid.TileType.STONE_OUTCROP, &"scale_y", 0.5, [1.0, 0.9, 1.0, 0.9]],
+		[TileGrid.TileType.GOLD_ORE, &"alpha", 0.125, [0.3, 1.0, 0.3, 1.0, 1.0, 1.0, 1.0, 1.0, 0.3]],
+		[TileGrid.TileType.TIMBER, &"rotation", 0.5, [0.0, 10.0, 0.0, -10.0, 0.0]],
+	]:
+		var got: Array = []
+		for i in (case[3] as Array).size():
+			tiles.anim_time = case[2] * (i + 0.5)
+			got.append(tiles.anim_value(case[0], case[1]))
+		_check(got == case[3], "planet: %s %s animation (%s)" % [TileGrid.TileType.keys()[case[0]], case[1], got])
+	tiles.anim_time = 1.6  # gold holds full alpha for the last 0.5 s of its 1 s cycle
+	_check(tiles.anim_value(TileGrid.TileType.GOLD_ORE, &"alpha") == 1.0
+		and tiles.anim_value(TileGrid.TileType.GOLD_ORE, &"y") == 0.0, "planet: gold rests at full alpha, no drift")
 	var side_panel: Control = current_scene.get_node("%SidePanel")
 	_check((current_scene.get_node("%PlanetName") as Label).text == planet_a.display_name,
 		"planet: side panel names the planet")

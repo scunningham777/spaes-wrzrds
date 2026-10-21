@@ -3,7 +3,8 @@ extends Node2D
 
 # Draws a TileGrid as filled hexes, ported from Unity's TileVisualManager/TileVisual. Must be a
 # child of a HexBoard. Draws nothing until a grid is assigned. Types with an entry in TILE_ICONS
-# draw that sprite-sheet icon over an Empty-colored hex; the rest are plain colored hexes.
+# draw that sprite-sheet icon over an Empty-colored hex; the rest are plain colored hexes. Icons
+# with an entry in TILE_ANIMS step through it, all in sync off one clock.
 
 ## Tile size relative to the hex cell; < 1 leaves gaps between tiles (Unity's sprite was 1/1.1).
 @export var tile_scale: float = 1.0 / 1.1
@@ -11,10 +12,8 @@ extends Node2D
 @export var icon_sheet: Texture2D
 ## Icon pixel scale; matches the wizard sprite's.
 @export var icon_scale: float = 4.0
-## Seconds per step of the icon bob (0, up, 0, down). 0 turns the bob off.
-@export var bob_step_seconds: float = 0.5
-## Bob height in sprite pixels (scaled by icon_scale, so it stays on the art's pixel grid).
-@export var bob_pixels: float = 1.0
+## Play the TILE_ANIMS icon animations.
+@export var animate_icons: bool = true
 
 # Colors from Unity's TileVisual.GetColorForType.
 const TILE_COLORS: Dictionary[TileGrid.TileType, Color] = {
@@ -35,8 +34,23 @@ const TILE_ICONS: Dictionary[TileGrid.TileType, Rect2] = {
 	TileGrid.TileType.STONE_OUTCROP: Rect2(92, 183, 12, 12),  # Cell (7, 14)
 }
 
-# Icon y offsets per bob step, in sprite pixels (screen y-down, so -1 is up).
-const BOB_STEPS: Array[float] = [0.0, -1.0, 0.0, 1.0]
+# Per-type icon animation: one channel stepped through `values`, `step` seconds per value.
+# Channels: x / y (sprite pixels, y-down), scale_y (height factor), alpha, rotation (degrees,
+# clockwise). Transforms pivot on the icon's bottom center.
+const TILE_ANIMS: Dictionary[TileGrid.TileType, Dictionary] = {
+	TileGrid.TileType.WATER_SPRING: {"channel": &"y", "step": 0.5, "values": [0.0, -1.0, 0.0, 1.0]},
+	TileGrid.TileType.IRON_DEPOSIT: {"channel": &"x", "step": 0.5, "values": [0.0, 1.0, 0.0, -1.0]},
+	TileGrid.TileType.STONE_OUTCROP: {"channel": &"scale_y", "step": 0.5, "values": [1.0, 0.9]},
+	# Two quick flashes, then full alpha for the last 0.5 s.
+	TileGrid.TileType.GOLD_ORE: {"channel": &"alpha", "step": 0.125,
+		"values": [0.3, 1.0, 0.3, 1.0, 1.0, 1.0, 1.0, 1.0]},
+	TileGrid.TileType.TIMBER: {"channel": &"rotation", "step": 0.5, "values": [0.0, 10.0, 0.0, -10.0]},
+}
+
+# Channel values when a type has no animation for that channel.
+const ANIM_DEFAULTS: Dictionary[StringName, float] = {
+	&"x": 0.0, &"y": 0.0, &"scale_y": 1.0, &"alpha": 1.0, &"rotation": 0.0,
+}
 
 var grid: TileGrid:
 	set(value):
@@ -46,11 +60,10 @@ var grid: TileGrid:
 		if grid != null:
 			grid.tile_changed.connect(_on_tile_changed)
 		queue_redraw()
+## Seconds since the animations started.
+var anim_time: float = 0.0
 
 @onready var board: HexBoard = get_parent() as HexBoard
-
-var bob_step: int = 0
-var _bob_elapsed: float = 0.0
 
 
 func has_icon(type: TileGrid.TileType) -> bool:
@@ -64,18 +77,34 @@ func color_for(type: TileGrid.TileType) -> Color:
 	return TILE_COLORS.get(type, Color.WHITE)
 
 
+# Current value of one animation channel for a type, or the channel's default.
+func anim_value(type: TileGrid.TileType, channel: StringName) -> float:
+	var anim: Dictionary = TILE_ANIMS.get(type, {})
+	if not animate_icons or anim.get("channel") != channel:
+		return ANIM_DEFAULTS[channel]
+	var values: Array = anim["values"]
+	return values[_anim_frame(anim)]
+
+
+func _anim_frame(anim: Dictionary) -> int:
+	var values: Array = anim["values"]
+	return floori(anim_time / anim["step"]) % values.size()
+
+
 func _process(delta: float) -> void:
-	if bob_step_seconds <= 0.0:
+	if not animate_icons:
 		return
-	_bob_elapsed += delta
-	if _bob_elapsed >= bob_step_seconds:
-		_bob_elapsed = fmod(_bob_elapsed, bob_step_seconds)
-		bob_step = (bob_step + 1) % BOB_STEPS.size()
+	var before := _anim_frames()
+	anim_time += delta
+	if _anim_frames() != before:
 		queue_redraw()
 
 
-func bob_offset() -> Vector2:
-	return Vector2(0.0, BOB_STEPS[bob_step] * bob_pixels * icon_scale)
+func _anim_frames() -> Array[int]:
+	var frames: Array[int] = []
+	for anim: Dictionary in TILE_ANIMS.values():
+		frames.append(_anim_frame(anim))
+	return frames
 
 
 func _on_tile_changed(_coord: Vector2i, _type: TileGrid.TileType) -> void:
@@ -97,7 +126,15 @@ func _draw() -> void:
 		var type := grid.get_tile(coord)
 		draw_colored_polygon(points, color_for(type))
 		if has_icon(type):
-			var region := TILE_ICONS[type]
-			var icon_size := region.size * icon_scale
-			var icon_pos := center - icon_size / 2.0 + bob_offset()
-			draw_texture_rect_region(icon_sheet, Rect2(icon_pos, icon_size), region)
+			_draw_icon(type, center)
+
+
+func _draw_icon(type: TileGrid.TileType, center: Vector2) -> void:
+	var region := TILE_ICONS[type]
+	var icon_size := region.size * icon_scale
+	var shift := Vector2(anim_value(type, &"x"), anim_value(type, &"y")) * icon_scale
+	var pivot := center + Vector2(0.0, icon_size.y / 2.0) + shift  # bottom center
+	draw_set_transform(pivot, deg_to_rad(anim_value(type, &"rotation")), Vector2(1.0, anim_value(type, &"scale_y")))
+	draw_texture_rect_region(icon_sheet, Rect2(Vector2(-icon_size.x / 2.0, -icon_size.y), icon_size), region,
+		Color(1.0, 1.0, 1.0, anim_value(type, &"alpha")))
+	draw_set_transform(Vector2.ZERO)
