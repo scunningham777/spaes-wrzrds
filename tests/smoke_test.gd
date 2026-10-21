@@ -271,6 +271,13 @@ func _test_enter_planet() -> void:
 		_check(tiles.has_icon(type) and tiles.color_for(type) == Color.BLACK,
 			"planet: %s draws an icon on a black hex" % TileGrid.TileType.keys()[type])
 	_check(not tiles.has_icon(TileGrid.TileType.EMPTY), "planet: Empty is a plain hex")
+	var side_panel: Control = current_scene.get_node("%SidePanel")
+	_check((current_scene.get_node("%PlanetName") as Label).text == planet_a.display_name,
+		"planet: side panel names the planet")
+	var board_screen_x := (current_scene.get_node("HexBoard") as Node2D).get_global_transform_with_canvas().origin.x
+	_check(is_equal_approx(board_screen_x, side_panel.get_global_rect().position.x / 2.0),
+		"planet: map centered left of the side panel (board at x=%s, panel at x=%s)"
+		% [board_screen_x, side_panel.get_global_rect().position.x])
 	_check(ItemIcon.color_for(&"wood") == Color(0.4, 0.6, 0.3), "inventory: wood is still a green square")
 
 	# Push with F: wizard at (0,0) faces N on the flat-top planet, so (0,1) -> (0,2).
@@ -318,6 +325,15 @@ func _test_enter_planet() -> void:
 	_check(planet_wizard.mover.coord == Vector2i(0, 5), "planet: wizard stops at the grid edge (got %s)" % planet_wizard.mover.coord)
 	_check(planet_wizard.position == (current_scene.get_node("HexBoard") as HexBoard).hex_to_local(Vector2i(0, 5)),
 		"planet: wizard drawn on the edge hex")
+	# Facing N on the flat-top planet: the marker's triangle sits on the top edge, tip pointing up.
+	var marker: HexFacingMarker = current_scene.get_node("HexBoard/Wizard/FacingMarker")
+	var tri := marker.triangle_points()
+	_check(not planet_wizard.has_node("Sprite2D"), "planet: wizard shown by a marker, not a sprite")
+	_check(is_zero_approx(tri[2].x) and tri[2].y < tri[0].y and tri[0].y < 0.0,
+		"planet: facing triangle points N from the top edge (%s)" % tri)
+	_press(KEY_D)  # turn clockwise to NE
+	tri = marker.triangle_points()
+	_check(tri[2].x > 0.0 and tri[2].y < 0.0, "planet: facing triangle follows a turn to NE (%s)" % tri)
 
 	_press(KEY_ESCAPE)
 	await process_frame
