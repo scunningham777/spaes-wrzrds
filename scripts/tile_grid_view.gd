@@ -2,10 +2,15 @@ class_name TileGridView
 extends Node2D
 
 # Draws a TileGrid as filled hexes, ported from Unity's TileVisualManager/TileVisual. Must be a
-# child of a HexBoard. Draws nothing until a grid is assigned.
+# child of a HexBoard. Draws nothing until a grid is assigned. Types with an entry in TILE_ICONS
+# draw that sprite-sheet icon over an Empty-colored hex; the rest are plain colored hexes.
 
 ## Tile size relative to the hex cell; < 1 leaves gaps between tiles (Unity's sprite was 1/1.1).
 @export var tile_scale: float = 1.0 / 1.1
+## Sprite sheet that TILE_ICONS regions are cut from.
+@export var icon_sheet: Texture2D
+## Icon pixel scale; matches the wizard sprite's.
+@export var icon_scale: float = 4.0
 
 # Colors from Unity's TileVisual.GetColorForType.
 const TILE_COLORS: Dictionary[TileGrid.TileType, Color] = {
@@ -15,6 +20,11 @@ const TILE_COLORS: Dictionary[TileGrid.TileType, Color] = {
 	TileGrid.TileType.IRON_DEPOSIT: Color(0.65, 0.35, 0.3),  # Rust
 	TileGrid.TileType.TIMBER: Color(0.4, 0.6, 0.3),  # Green-brown
 	TileGrid.TileType.STONE_OUTCROP: Color(0.6, 0.6, 0.6),  # Gray
+}
+
+# Regions in icon_sheet (12px cells, 1px gutters: cell (col, row) is at 1 + 13 * col/row).
+const TILE_ICONS: Dictionary[TileGrid.TileType, Rect2] = {
+	TileGrid.TileType.TIMBER: Rect2(144, 118, 12, 12),  # Cell (11, 9): sapling
 }
 
 var grid: TileGrid:
@@ -29,7 +39,14 @@ var grid: TileGrid:
 @onready var board: HexBoard = get_parent() as HexBoard
 
 
+func has_icon(type: TileGrid.TileType) -> bool:
+	return icon_sheet != null and TILE_ICONS.has(type)
+
+
+# Hex fill color; icon tiles sit on the Empty color so the icon stands out.
 func color_for(type: TileGrid.TileType) -> Color:
+	if has_icon(type):
+		return TILE_COLORS[TileGrid.TileType.EMPTY]
 	return TILE_COLORS.get(type, Color.WHITE)
 
 
@@ -49,4 +66,9 @@ func _draw() -> void:
 		var points := PackedVector2Array()
 		for p in tile:
 			points.append(center + p)
-		draw_colored_polygon(points, color_for(grid.get_tile(coord)))
+		var type := grid.get_tile(coord)
+		draw_colored_polygon(points, color_for(type))
+		if has_icon(type):
+			var region := TILE_ICONS[type]
+			var icon_size := region.size * icon_scale
+			draw_texture_rect_region(icon_sheet, Rect2(center - icon_size / 2.0, icon_size), region)

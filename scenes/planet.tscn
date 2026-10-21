@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://scenes/wizard.tscn" id="4_wizard"]
 [ext_resource type="Script" uid="uid://byp11b1kcnhb6" path="res://scripts/tile_interaction.gd" id="5_interaction"]
 [ext_resource type="PackedScene" path="res://scenes/ui/inventory_panel.tscn" id="6_inventory"]
+[ext_resource type="Texture2D" uid="uid://c5vjocj1uk3l1" path="res://art/urizen_onebit_tileset__v1d1_trans.png" id="7_icons"]
 
 [node name="Planet" type="Node2D" unique_id=73139735]
 script = ExtResource("1_planet")
@@ -31,6 +32,7 @@ draw_outlines = false
 
 [node name="TileGridView" type="Node2D" parent="HexBoard" unique_id=1952379980]
 script = ExtResource("3_tiles")
+icon_sheet = ExtResource("7_icons")
 
 [node name="Wizard" parent="HexBoard" unique_id=1758725873 instance=ExtResource("4_wizard")]
 

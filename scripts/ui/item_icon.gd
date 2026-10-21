@@ -1,8 +1,18 @@
 class_name ItemIcon
 extends Control
 
-# Placeholder icon for an inventory item: a square in the color of the tile it comes from.
-# Replace _draw() with a TextureRect lookup once item sprites exist. (From the Viking demo.)
+# Placeholder icon for an inventory item: a colored square. Replace _draw() with a TextureRect
+# lookup once item sprites exist. (From the Viking demo.) Colors are kept separate from
+# TileGridView's on purpose: an item needn't look like the map tile it was extracted from.
+
+# Started as copies of TileGridView.TILE_COLORS.
+const ITEM_COLORS: Dictionary[StringName, Color] = {
+	&"gold": Color(1.0, 0.84, 0.0),
+	&"water": Color(0.3, 0.6, 1.0),
+	&"iron": Color(0.65, 0.35, 0.3),
+	&"wood": Color(0.4, 0.6, 0.3),
+	&"stone": Color(0.6, 0.6, 0.6),
+}
 
 @export var item: StringName = &"":
 	set(value):
@@ -11,10 +21,7 @@ extends Control
 
 
 static func color_for(p_item: StringName) -> Color:
-	for type: TileGrid.TileType in Items.FROM_TILE:
-		if Items.FROM_TILE[type] == p_item:
-			return TileGridView.TILE_COLORS[type]
-	return Color.MAGENTA
+	return ITEM_COLORS.get(p_item, Color.MAGENTA)
 
 
 func _draw() -> void:
