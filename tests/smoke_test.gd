@@ -271,6 +271,14 @@ func _test_enter_planet() -> void:
 		_check(tiles.has_icon(type) and tiles.color_for(type) == Color.BLACK,
 			"planet: %s draws an icon on a black hex" % TileGrid.TileType.keys()[type])
 	_check(not tiles.has_icon(TileGrid.TileType.EMPTY), "planet: Empty is a plain hex")
+	# Icon bob: 0, up, 0, down, one sprite pixel (icon_scale screen px) per step.
+	tiles.bob_step = 0
+	var bob_ys: Array[float] = []
+	for i in 4:
+		tiles._process(tiles.bob_step_seconds)
+		bob_ys.append(tiles.bob_offset().y)
+	var px := tiles.icon_scale
+	_check(bob_ys == [-px, 0.0, px, 0.0], "planet: icons bob up, center, down, center (%s)" % [bob_ys])
 	var side_panel: Control = current_scene.get_node("%SidePanel")
 	_check((current_scene.get_node("%PlanetName") as Label).text == planet_a.display_name,
 		"planet: side panel names the planet")

@@ -11,6 +11,10 @@ extends Node2D
 @export var icon_sheet: Texture2D
 ## Icon pixel scale; matches the wizard sprite's.
 @export var icon_scale: float = 4.0
+## Seconds per step of the icon bob (0, up, 0, down). 0 turns the bob off.
+@export var bob_step_seconds: float = 0.5
+## Bob height in sprite pixels (scaled by icon_scale, so it stays on the art's pixel grid).
+@export var bob_pixels: float = 1.0
 
 # Colors from Unity's TileVisual.GetColorForType.
 const TILE_COLORS: Dictionary[TileGrid.TileType, Color] = {
@@ -31,6 +35,9 @@ const TILE_ICONS: Dictionary[TileGrid.TileType, Rect2] = {
 	TileGrid.TileType.STONE_OUTCROP: Rect2(92, 183, 12, 12),  # Cell (7, 14)
 }
 
+# Icon y offsets per bob step, in sprite pixels (screen y-down, so -1 is up).
+const BOB_STEPS: Array[float] = [0.0, -1.0, 0.0, 1.0]
+
 var grid: TileGrid:
 	set(value):
 		if grid != null and grid.tile_changed.is_connected(_on_tile_changed):
@@ -42,6 +49,9 @@ var grid: TileGrid:
 
 @onready var board: HexBoard = get_parent() as HexBoard
 
+var bob_step: int = 0
+var _bob_elapsed: float = 0.0
+
 
 func has_icon(type: TileGrid.TileType) -> bool:
 	return icon_sheet != null and TILE_ICONS.has(type)
@@ -52,6 +62,20 @@ func color_for(type: TileGrid.TileType) -> Color:
 	if has_icon(type):
 		return TILE_COLORS[TileGrid.TileType.EMPTY]
 	return TILE_COLORS.get(type, Color.WHITE)
+
+
+func _process(delta: float) -> void:
+	if bob_step_seconds <= 0.0:
+		return
+	_bob_elapsed += delta
+	if _bob_elapsed >= bob_step_seconds:
+		_bob_elapsed = fmod(_bob_elapsed, bob_step_seconds)
+		bob_step = (bob_step + 1) % BOB_STEPS.size()
+		queue_redraw()
+
+
+func bob_offset() -> Vector2:
+	return Vector2(0.0, BOB_STEPS[bob_step] * bob_pixels * icon_scale)
 
 
 func _on_tile_changed(_coord: Vector2i, _type: TileGrid.TileType) -> void:
@@ -75,4 +99,5 @@ func _draw() -> void:
 		if has_icon(type):
 			var region := TILE_ICONS[type]
 			var icon_size := region.size * icon_scale
-			draw_texture_rect_region(icon_sheet, Rect2(center - icon_size / 2.0, icon_size), region)
+			var icon_pos := center - icon_size / 2.0 + bob_offset()
+			draw_texture_rect_region(icon_sheet, Rect2(icon_pos, icon_size), region)
