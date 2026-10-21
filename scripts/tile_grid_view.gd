@@ -14,7 +14,7 @@ extends Node2D
 
 # Colors from Unity's TileVisual.GetColorForType.
 const TILE_COLORS: Dictionary[TileGrid.TileType, Color] = {
-	TileGrid.TileType.EMPTY: Color(0.8, 0.8, 0.8, 0.35),  # Transparent gray
+	TileGrid.TileType.EMPTY: Color.BLACK,  # Opaque so icons keep their contrast
 	TileGrid.TileType.GOLD_ORE: Color(1.0, 0.84, 0.0),  # Gold
 	TileGrid.TileType.WATER_SPRING: Color(0.3, 0.6, 1.0),  # Blue
 	TileGrid.TileType.IRON_DEPOSIT: Color(0.65, 0.35, 0.3),  # Rust
@@ -24,7 +24,11 @@ const TILE_COLORS: Dictionary[TileGrid.TileType, Color] = {
 
 # Regions in icon_sheet (12px cells, 1px gutters: cell (col, row) is at 1 + 13 * col/row).
 const TILE_ICONS: Dictionary[TileGrid.TileType, Rect2] = {
+	TileGrid.TileType.GOLD_ORE: Rect2(105, 612, 12, 12),  # Cell (8, 47)
+	TileGrid.TileType.WATER_SPRING: Rect2(378, 196, 12, 12),  # Cell (29, 15)
+	TileGrid.TileType.IRON_DEPOSIT: Rect2(378, 40, 12, 12),  # Cell (29, 3)
 	TileGrid.TileType.TIMBER: Rect2(144, 118, 12, 12),  # Cell (11, 9): sapling
+	TileGrid.TileType.STONE_OUTCROP: Rect2(92, 183, 12, 12),  # Cell (7, 14)
 }
 
 var grid: TileGrid:

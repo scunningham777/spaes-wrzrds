@@ -267,10 +267,10 @@ func _test_enter_planet() -> void:
 	var tiles_snapshot := tiles.grid.tiles.duplicate()
 	_check(bg.color.is_equal_approx(Color(0.19215687, 0.3019608, 0.4745098)), "planet: blue background")
 	_check(not (current_scene.get_node("HexBoard") as HexBoard).draw_outlines, "planet: no outlines")
-	_check(tiles.has_icon(TileGrid.TileType.TIMBER) and not tiles.has_icon(TileGrid.TileType.GOLD_ORE),
-		"planet: Timber draws an icon, Gold a plain color")
-	_check(tiles.color_for(TileGrid.TileType.TIMBER) == TileGridView.TILE_COLORS[TileGrid.TileType.EMPTY],
-		"planet: Timber icon sits on an Empty-colored hex")
+	for type: TileGrid.TileType in Items.FROM_TILE:
+		_check(tiles.has_icon(type) and tiles.color_for(type) == Color.BLACK,
+			"planet: %s draws an icon on a black hex" % TileGrid.TileType.keys()[type])
+	_check(not tiles.has_icon(TileGrid.TileType.EMPTY), "planet: Empty is a plain hex")
 	_check(ItemIcon.color_for(&"wood") == Color(0.4, 0.6, 0.3), "inventory: wood is still a green square")
 
 	# Push with F: wizard at (0,0) faces N on the flat-top planet, so (0,1) -> (0,2).
