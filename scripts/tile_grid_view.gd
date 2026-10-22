@@ -14,6 +14,9 @@ extends Node2D
 @export var icon_scale: float = 4.0
 ## Play the TILE_ANIMS icon animations.
 @export var animate_icons: bool = true
+## Tapped-tile cooldown number size, and its baseline's distance above the tile's bottom edge.
+@export var cooldown_font_size: int = 16
+@export var cooldown_margin: float = 6.0
 
 # Colors from Unity's TileVisual.GetColorForType.
 const TILE_COLORS: Dictionary[TileGrid.TileType, Color] = {
@@ -56,9 +59,11 @@ var grid: TileGrid:
 	set(value):
 		if grid != null and grid.tile_changed.is_connected(_on_tile_changed):
 			grid.tile_changed.disconnect(_on_tile_changed)
+			grid.tapped_changed.disconnect(_on_tapped_changed)
 		grid = value
 		if grid != null:
 			grid.tile_changed.connect(_on_tile_changed)
+			grid.tapped_changed.connect(_on_tapped_changed)
 		queue_redraw()
 ## Seconds since the animations started.
 var anim_time: float = 0.0
@@ -73,6 +78,8 @@ var swap_progress: float = 1.0:
 var _swapping := false
 var _swap_from: Vector2i
 var _swap_to: Vector2i
+# Greyscale copies of the icons, for tapped tiles; built on first use.
+var _grey_icons: Dictionary[TileGrid.TileType, Texture2D] = {}
 
 @onready var board: HexBoard = get_parent() as HexBoard
 
@@ -81,14 +88,31 @@ func has_icon(type: TileGrid.TileType) -> bool:
 	return icon_sheet != null and TILE_ICONS.has(type)
 
 
-# The type's icon as a standalone texture (for UI), or null if it has none.
-func icon_texture(type: TileGrid.TileType) -> Texture2D:
+# The type's icon as a standalone texture (also for UI), greyscale if tapped; null if it has none.
+func icon_texture(type: TileGrid.TileType, tapped: bool = false) -> Texture2D:
 	if not has_icon(type):
 		return null
+	if tapped:
+		return _grey_icon(type)
 	var atlas := AtlasTexture.new()
 	atlas.atlas = icon_sheet
 	atlas.region = TILE_ICONS[type]
 	return atlas
+
+
+func _grey_icon(type: TileGrid.TileType) -> Texture2D:
+	if not _grey_icons.has(type):
+		var image := icon_sheet.get_image()
+		if image.is_compressed():
+			image.decompress()
+		image = image.get_region(Rect2i(TILE_ICONS[type]))
+		for y in image.get_height():
+			for x in image.get_width():
+				var c := image.get_pixel(x, y)
+				var lum := c.get_luminance()
+				image.set_pixel(x, y, Color(lum, lum, lum, c.a))
+		_grey_icons[type] = ImageTexture.create_from_image(image)
+	return _grey_icons[type]
 
 
 # Hex fill color; icon tiles sit on the Empty color so the icon stands out.
@@ -147,6 +171,10 @@ func _on_tile_changed(_coord: Vector2i, _type: TileGrid.TileType) -> void:
 	queue_redraw()
 
 
+func _on_tapped_changed(_coord: Vector2i, _remaining: int) -> void:
+	queue_redraw()
+
+
 func _draw() -> void:
 	if grid == null:
 		return
@@ -161,24 +189,52 @@ func _draw() -> void:
 			points.append(center + p)
 		var type := grid.get_tile(coord)
 		draw_colored_polygon(points, color_for(type))
-		if has_icon(type) and not (_swapping and (coord == _swap_from or coord == _swap_to)):
-			_draw_icon(type, center)
+		if not (_swapping and (coord == _swap_from or coord == _swap_to)):
+			_draw_contents(coord, center)
 	if _swapping:
 		var from_pos := board.hex_to_local(_swap_from)
 		var to_pos := board.hex_to_local(_swap_to)
-		for pair: Array in [[_swap_from, to_pos.lerp(from_pos, swap_progress)],
-				[_swap_to, from_pos.lerp(to_pos, swap_progress)]]:  # last drawn is on top
-			var moving := grid.get_tile(pair[0])
-			if has_icon(moving):
-				_draw_icon(moving, pair[1])
+		# Last drawn is on top.
+		_draw_contents(_swap_from, to_pos.lerp(from_pos, swap_progress))
+		_draw_contents(_swap_to, from_pos.lerp(to_pos, swap_progress))
 
 
-func _draw_icon(type: TileGrid.TileType, center: Vector2) -> void:
+# Draws the icon (and tapped cooldown) of the tile at coord, centered on center.
+func _draw_contents(coord: Vector2i, center: Vector2) -> void:
+	var type := grid.get_tile(coord)
+	if not has_icon(type):
+		return
+	var tapped := grid.is_tapped(coord)
+	_draw_icon(type, center, tapped)
+	if tapped:
+		_draw_cooldown(grid.cooldown(coord), center)
+
+
+# Tapped icons are greyscale and hold still.
+func _draw_icon(type: TileGrid.TileType, center: Vector2, tapped: bool) -> void:
 	var region := TILE_ICONS[type]
 	var icon_size := region.size * icon_scale
-	var shift := Vector2(anim_value(type, &"x"), anim_value(type, &"y")) * icon_scale
+	var anim := func(channel: StringName) -> float:
+		return ANIM_DEFAULTS[channel] if tapped else anim_value(type, channel)
+	var shift := Vector2(anim.call(&"x"), anim.call(&"y")) * icon_scale
 	var pivot := center + Vector2(0.0, icon_size.y / 2.0) + shift  # bottom center
-	draw_set_transform(pivot, deg_to_rad(anim_value(type, &"rotation")), Vector2(1.0, anim_value(type, &"scale_y")))
-	draw_texture_rect_region(icon_sheet, Rect2(Vector2(-icon_size.x / 2.0, -icon_size.y), icon_size), region,
-		Color(1.0, 1.0, 1.0, anim_value(type, &"alpha")))
+	draw_set_transform(pivot, deg_to_rad(anim.call(&"rotation")), Vector2(1.0, anim.call(&"scale_y")))
+	var rect := Rect2(Vector2(-icon_size.x / 2.0, -icon_size.y), icon_size)
+	var modulate_color := Color(1.0, 1.0, 1.0, anim.call(&"alpha"))
+	if tapped:
+		draw_texture_rect(_grey_icon(type), rect, false, modulate_color)
+	else:
+		draw_texture_rect_region(icon_sheet, rect, region, modulate_color)
 	draw_set_transform(Vector2.ZERO)
+
+
+# Actions left, centered just inside the bottom edge: clear of the player outline and of a
+# facing triangle poking in from the hex below.
+func _draw_cooldown(remaining: int, center: Vector2) -> void:
+	var font := ThemeDB.fallback_font
+	var width := board.layout.size * 2.0
+	var baseline := center.y + board.layout.size * HexLayout.SQRT_3 / 2.0 * tile_scale - cooldown_margin
+	var pos := Vector2(center.x - width / 2.0, baseline)
+	var text := str(remaining)
+	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, width, cooldown_font_size, 4, Color.BLACK)
+	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, width, cooldown_font_size, Color.WHITE)

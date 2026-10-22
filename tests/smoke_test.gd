@@ -120,10 +120,22 @@ func _test_core_logic() -> void:
 	# Extract + inventory.
 	var eg := TileGrid.new(1)
 	eg.set_tile(Vector2i.ZERO, T.TIMBER)
-	_check(eg.try_extract(Vector2i.ZERO) == T.TIMBER and eg.get_tile(Vector2i.ZERO) == T.EMPTY,
-		"extract: returns the type and empties the tile")
-	_check(eg.try_extract(Vector2i.ZERO) == T.EMPTY, "extract: Empty tile yields nothing")
+	_check(eg.try_extract(Vector2i.ZERO) == T.TIMBER and eg.get_tile(Vector2i.ZERO) == T.TIMBER
+		and eg.cooldown(Vector2i.ZERO) == 5, "extract: returns the type and taps the tile for 5 actions")
+	_check(eg.try_extract(Vector2i.ZERO) == T.EMPTY, "extract: tapped tile yields nothing")
+	_check(eg.try_extract(Vector2i(1, 0)) == T.EMPTY, "extract: Empty tile yields nothing")
 	_check(eg.try_extract(Vector2i(9, 9)) == T.EMPTY, "extract: off-grid yields nothing")
+	eg.set_tile(Vector2i(1, 0), T.GOLD_ORE)
+	_check(eg.try_swap(Vector2i.ZERO, Vector2i(1, 0)) and eg.cooldown(Vector2i(1, 0)) == 5
+		and not eg.is_tapped(Vector2i.ZERO), "tapped: state moves with the tile on a swap")
+	for i in 4:
+		eg.tick_cooldowns()
+	_check(eg.cooldown(Vector2i(1, 0)) == 1 and not eg.can_extract(Vector2i(1, 0)), "tapped: 4 ticks leave 1")
+	var untapped: Array[Vector2i] = []
+	eg.tapped_changed.connect(func(c: Vector2i, left: int) -> void: if left == 0: untapped.append(c))
+	eg.tick_cooldowns()
+	_check(not eg.is_tapped(Vector2i(1, 0)) and untapped == [Vector2i(1, 0)]
+		and eg.try_extract(Vector2i(1, 0)) == T.TIMBER, "tapped: 5th tick untaps it, extractable again")
 	_check(Items.from_tile(T.GOLD_ORE) == &"gold" and Items.from_tile(T.EMPTY) == &"",
 		"items: tile -> item mapping")
 	var inv := Inventory.new()
@@ -321,7 +333,7 @@ func _test_enter_planet() -> void:
 	await create_timer(0.5).timeout
 	_check(tiles.grid.get_tile(Vector2i(0, 1)) == TileGrid.TileType.GOLD_ORE, "lock: F works again afterwards")
 	tiles.grid.set_tile(Vector2i(0, 1), TileGrid.TileType.EMPTY)
-	# Extract with R: the wizard's own tile is emptied into the inventory.
+	# Extract with R: the wizard's own tile goes into the inventory and is tapped.
 	var inv: Inventory = _game().state.inventory
 	tiles.grid.set_tile(Vector2i.ZERO, TileGrid.TileType.IRON_DEPOSIT)
 	var tile_info: TileInfo = current_scene.get_node("%TileInfo")
@@ -330,10 +342,18 @@ func _test_enter_planet() -> void:
 		and tile_icon.texture != null, "tile info: shows the tile under the wizard (%s / %s)"
 		% [tile_info.shown_name(), tile_info.shown_yield()])
 	_press(KEY_R)
-	_check(tiles.grid.get_tile(Vector2i.ZERO) == TileGrid.TileType.EMPTY and inv.count(&"iron") == 1,
-		"planet: R extracts Iron into the inventory")
-	_check(tile_info.shown_name() == "Empty" and tile_info.shown_yield() == "Nothing to extract"
-		and tile_icon.texture == null, "tile info: updates after extracting")
+	_check(tiles.grid.get_tile(Vector2i.ZERO) == TileGrid.TileType.IRON_DEPOSIT and inv.count(&"iron") == 1
+		and tiles.grid.cooldown(Vector2i.ZERO) == 5, "planet: R extracts Iron and taps the tile for 5 actions")
+	_check(tile_info.shown_name() == "Iron Deposit" and tile_info.shown_yield() == "Tapped – 5 actions"
+		and tile_icon.texture is ImageTexture, "tile info: shows the tapped state and a greyscale icon (%s)"
+		% tile_info.shown_yield())
+	var grey := (tile_icon.texture as ImageTexture).get_image()
+	var any_color := false
+	for y in grey.get_height():
+		for x in grey.get_width():
+			var c := grey.get_pixel(x, y)
+			any_color = any_color or (c.a > 0.0 and not (is_equal_approx(c.r, c.g) and is_equal_approx(c.g, c.b)))
+	_check(not any_color, "tapped: icon is greyscale")
 	# Lined up with the header: icon under the wizard icon, name centered under the planet name.
 	var wizard_icon: Control = current_scene.get_node("UI/SidePanel/Margin/Layout/Top/Header/WizardIcon")
 	var planet_name: Control = current_scene.get_node("%PlanetName")
@@ -344,7 +364,15 @@ func _test_enter_planet() -> void:
 		"tile info: name centered under the planet name")
 	_check(tile_info.global_position.y >= side_panel.size.y / 2.0 - 16.0, "tile info: in the panel's bottom half")
 	_press(KEY_R)
-	_check(inv.count(&"iron") == 1, "planet: R on an Empty tile adds nothing")
+	_check(inv.count(&"iron") == 1 and tiles.grid.cooldown(Vector2i.ZERO) == 5,
+		"planet: R on a tapped tile adds nothing and isn't an action")
+	# Turning doesn't count down; moving does (W to (0,1), X back to (0,0)).
+	_press(KEY_D)
+	_press(KEY_A)
+	_check(tiles.grid.cooldown(Vector2i.ZERO) == 5, "tapped: turning doesn't count down")
+	_press(KEY_W)
+	_press(KEY_X)
+	_check(tiles.grid.cooldown(Vector2i.ZERO) == 3, "tapped: each move counts down (%d)" % tiles.grid.cooldown(Vector2i.ZERO))
 
 	# Inventory panel: I opens and pauses; Esc closes without leaving the planet.
 	var panel: InventoryPanel = current_scene.get_node("UI/InventoryPanel")
