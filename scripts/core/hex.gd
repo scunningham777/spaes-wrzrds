@@ -45,6 +45,14 @@ static func delta(dir: Compass, pointy_top: bool) -> Vector2i:
 	return Vector2i.ZERO
 
 
+# start plus the next `steps` coords along direction (an axial delta), in order.
+static func line(start: Vector2i, direction: Vector2i, steps: int) -> Array[Vector2i]:
+	var coords: Array[Vector2i] = []
+	for i in steps + 1:
+		coords.append(start + direction * i)
+	return coords
+
+
 # Every coord within `radius` steps of the origin, i.e. a hexagon-shaped board.
 static func hexagon(radius: int) -> Array[Vector2i]:
 	var coords: Array[Vector2i] = []

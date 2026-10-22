@@ -16,6 +16,12 @@ const ACTIONS: Dictionary[StringName, Array] = {
 	STAFF: [&"extract"],
 }
 
+## Per-focus stats. distance: tiles ahead of the player that extraction also needs (all matching
+## the player's tile). extract_amount: items gained per successful extraction.
+const STATS: Dictionary[StringName, Dictionary] = {
+	STAFF: {"distance": 1, "extract_amount": 1},
+}
+
 
 static func display_name(focus: StringName) -> String:
 	return NAMES.get(focus, String(focus).capitalize())
@@ -29,3 +35,11 @@ static func actions(focus: StringName) -> Array[StringName]:
 
 static func grants(focus: StringName, action: StringName) -> bool:
 	return action in actions(focus)
+
+
+static func distance(focus: StringName) -> int:
+	return STATS.get(focus, {}).get("distance", 0)
+
+
+static func extract_amount(focus: StringName) -> int:
+	return STATS.get(focus, {}).get("extract_amount", 0)

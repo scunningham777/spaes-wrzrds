@@ -73,17 +73,26 @@ func cooldown(coord: Vector2i) -> int:
 	return cooldowns.get(coord, 0)
 
 
-func can_extract(coord: Vector2i) -> bool:
-	return tiles.has(coord) and tiles[coord] != TileType.EMPTY and not is_tapped(coord)
+# Whether the tiles at coords can be extracted together: all on the grid, untapped, and the same
+# non-Empty type.
+func can_extract(coords: Array[Vector2i]) -> bool:
+	if coords.is_empty() or not tiles.has(coords[0]):
+		return false
+	var type := tiles[coords[0]]
+	if type == TileType.EMPTY:
+		return false
+	return coords.all(func(c: Vector2i) -> bool:
+		return tiles.has(c) and tiles[c] == type and not is_tapped(c))
 
 
-# Taps the tile at coord and returns its type, or EMPTY if there was nothing to extract (no tile,
-# Empty, or already tapped). Ported from TileGridManager.TryExtractResource.
-func try_extract(coord: Vector2i) -> TileType:
-	if not can_extract(coord):
+# Taps every tile at coords and returns their shared type, or EMPTY (and changes nothing) if they
+# can't be extracted together. Ported from TileGridManager.TryExtractResource.
+func try_extract(coords: Array[Vector2i]) -> TileType:
+	if not can_extract(coords):
 		return TileType.EMPTY
-	_set_cooldown(coord, tap_cooldown)
-	return tiles[coord]
+	for c in coords:
+		_set_cooldown(c, tap_cooldown)
+	return tiles[coords[0]]
 
 
 func can_swap(a: Vector2i, b: Vector2i) -> bool:

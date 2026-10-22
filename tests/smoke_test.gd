@@ -121,26 +121,47 @@ func _test_core_logic() -> void:
 	_check(Foci.display_name(Foci.STAFF) == "Staff" and Foci.grants(Foci.STAFF, &"extract")
 		and not Foci.grants(Foci.STAFF, &"push") and Foci.actions(&"").is_empty(), "foci: staff grants extract")
 	_check(GameState.new().equipped_focus == Foci.STAFF, "foci: staff equipped by default")
+	_check(Foci.distance(Foci.STAFF) == 1 and Foci.extract_amount(Foci.STAFF) == 1
+		and Foci.distance(&"") == 0, "foci: staff has distance 1, extract amount 1")
+	_check(Hex.line(Vector2i(1, 1), Vector2i(0, 1), 2) == [Vector2i(1, 1), Vector2i(1, 2), Vector2i(1, 3)],
+		"core: Hex.line is the start plus n steps")
 
 	# Extract + inventory.
 	var eg := TileGrid.new(1)
+	var at := func(c: Vector2i) -> Array[Vector2i]: return [c]
 	eg.set_tile(Vector2i.ZERO, T.TIMBER)
-	_check(eg.try_extract(Vector2i.ZERO) == T.TIMBER and eg.get_tile(Vector2i.ZERO) == T.TIMBER
+	_check(eg.try_extract(at.call(Vector2i.ZERO)) == T.TIMBER and eg.get_tile(Vector2i.ZERO) == T.TIMBER
 		and eg.cooldown(Vector2i.ZERO) == 5, "extract: returns the type and taps the tile for 5 actions")
-	_check(eg.try_extract(Vector2i.ZERO) == T.EMPTY, "extract: tapped tile yields nothing")
-	_check(eg.try_extract(Vector2i(1, 0)) == T.EMPTY, "extract: Empty tile yields nothing")
-	_check(eg.try_extract(Vector2i(9, 9)) == T.EMPTY, "extract: off-grid yields nothing")
+	_check(eg.try_extract(at.call(Vector2i.ZERO)) == T.EMPTY, "extract: tapped tile yields nothing")
+	_check(eg.try_extract(at.call(Vector2i(1, 0))) == T.EMPTY, "extract: Empty tile yields nothing")
+	_check(eg.try_extract(at.call(Vector2i(9, 9))) == T.EMPTY, "extract: off-grid yields nothing")
+	# Lines: every tile must match and be free; success taps them all.
+	var lg := TileGrid.new(2)
+	var line := Hex.line(Vector2i.ZERO, Vector2i(0, 1), 2)  # (0,0) (0,1) (0,2)
+	for c in line:
+		lg.set_tile(c, T.IRON_DEPOSIT)
+	lg.set_tile(Vector2i(0, 2), T.GOLD_ORE)
+	_check(lg.try_extract(line) == T.EMPTY and lg.cooldowns.is_empty(), "extract: a mismatched tile in the line, no change")
+	lg.set_tile(Vector2i(0, 2), T.IRON_DEPOSIT)
+	lg.try_extract(at.call(Vector2i(0, 2)))
+	_check(lg.try_extract(line) == T.EMPTY and lg.cooldowns.keys() == [Vector2i(0, 2)],
+		"extract: a tapped tile in the line, no change")
+	for i in lg.tap_cooldown:
+		lg.tick_cooldowns()
+	_check(lg.try_extract(line) == T.IRON_DEPOSIT and line.all(func(c: Vector2i) -> bool: return lg.cooldown(c) == 5),
+		"extract: a matching line taps every tile")
+	_check(not lg.can_extract(Hex.line(Vector2i(0, 1), Vector2i(0, 1), 2)), "extract: a line running off the grid fails")
 	eg.set_tile(Vector2i(1, 0), T.GOLD_ORE)
 	_check(eg.try_swap(Vector2i.ZERO, Vector2i(1, 0)) and eg.cooldown(Vector2i(1, 0)) == 5
 		and not eg.is_tapped(Vector2i.ZERO), "tapped: state moves with the tile on a swap")
 	for i in 4:
 		eg.tick_cooldowns()
-	_check(eg.cooldown(Vector2i(1, 0)) == 1 and not eg.can_extract(Vector2i(1, 0)), "tapped: 4 ticks leave 1")
+	_check(eg.cooldown(Vector2i(1, 0)) == 1 and not eg.can_extract(at.call(Vector2i(1, 0))), "tapped: 4 ticks leave 1")
 	var untapped: Array[Vector2i] = []
 	eg.tapped_changed.connect(func(c: Vector2i, left: int) -> void: if left == 0: untapped.append(c))
 	eg.tick_cooldowns()
 	_check(not eg.is_tapped(Vector2i(1, 0)) and untapped == [Vector2i(1, 0)]
-		and eg.try_extract(Vector2i(1, 0)) == T.TIMBER, "tapped: 5th tick untaps it, extractable again")
+		and eg.try_extract(at.call(Vector2i(1, 0))) == T.TIMBER, "tapped: 5th tick untaps it, extractable again")
 	_check(Items.from_tile(T.GOLD_ORE) == &"gold" and Items.from_tile(T.EMPTY) == &"",
 		"items: tile -> item mapping")
 	var inv := Inventory.new()
@@ -337,7 +358,8 @@ func _test_enter_planet() -> void:
 	await create_timer(0.5).timeout
 	_check(tiles.grid.get_tile(Vector2i(0, 1)) == TileGrid.TileType.GOLD_ORE, "lock: F works again afterwards")
 	tiles.grid.set_tile(Vector2i(0, 1), TileGrid.TileType.EMPTY)
-	# Extract with R: the wizard's own tile goes into the inventory and is tapped.
+	# Extract with R: the staff (distance 1) needs the wizard's tile and the faced one, (0,1), to
+	# match. Both get tapped; the inventory gains the staff's extract amount (1).
 	var inv: Inventory = _game().state.inventory
 	tiles.grid.set_tile(Vector2i.ZERO, TileGrid.TileType.IRON_DEPOSIT)
 	var tile_info: TileInfo = current_scene.get_node("%TileInfo")
@@ -345,9 +367,13 @@ func _test_enter_planet() -> void:
 	_check(tile_info.shown_name() == "Iron Deposit" and tile_info.shown_yield() == "Extracts: Iron"
 		and tile_icon.texture != null, "tile info: shows the tile under the wizard (%s / %s)"
 		% [tile_info.shown_name(), tile_info.shown_yield()])
+	_press(KEY_R)  # (0,1) is Empty: no match
+	_check(inv.count(&"iron") == 0 and tiles.grid.cooldowns.is_empty(), "planet: R without a matching line does nothing")
+	tiles.grid.set_tile(Vector2i(0, 1), TileGrid.TileType.IRON_DEPOSIT)
 	_press(KEY_R)
 	_check(tiles.grid.get_tile(Vector2i.ZERO) == TileGrid.TileType.IRON_DEPOSIT and inv.count(&"iron") == 1
-		and tiles.grid.cooldown(Vector2i.ZERO) == 5, "planet: R extracts Iron and taps the tile for 5 actions")
+		and tiles.grid.cooldown(Vector2i.ZERO) == 5 and tiles.grid.cooldown(Vector2i(0, 1)) == 5,
+		"planet: R extracts 1 Iron and taps both tiles in the line for 5 actions")
 	_check(tile_info.shown_name() == "Iron Deposit" and tile_info.shown_yield() == "Tapped – 5 actions"
 		and tile_icon.texture is ImageTexture, "tile info: shows the tapped state and a greyscale icon (%s)"
 		% tile_info.shown_yield())

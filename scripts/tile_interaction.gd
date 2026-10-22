@@ -23,20 +23,23 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # Each successful action ticks tapped-tile cooldowns before taking effect, so the action that taps
 # a tile doesn't count toward its own cooldown. (Moves tick too; the scene wires that up.)
+# Extraction needs the player's tile plus the focus's distance in tiles straight ahead, all the
+# same untapped type. Success taps them all but yields the focus's extract amount, not one per tile.
 func _try_extract() -> void:
-	if not Foci.grants(Game.state.equipped_focus, &"extract"):
+	var focus := Game.state.equipped_focus
+	if not Foci.grants(focus, &"extract"):
 		print("The equipped focus can't extract")
 		return
-	var coord := player.mover.coord
-	if not tiles.grid.can_extract(coord):
-		print("Nothing to extract at %s" % coord)
+	var coords := Hex.line(player.mover.coord, player.mover.facing, Foci.distance(focus))
+	if not tiles.grid.can_extract(coords):
+		print("Nothing to extract along %s" % [coords])
 		return
 	tiles.grid.tick_cooldowns()
-	var extracted := tiles.grid.try_extract(coord)
+	var extracted := tiles.grid.try_extract(coords)
 	var item := Items.from_tile(extracted)
 	if not item.is_empty():
-		Game.state.inventory.add(item)
-	print("Extracted %s (%s) at %s" % [TileGrid.TileType.keys()[extracted], item, coord])
+		Game.state.inventory.add(item, Foci.extract_amount(focus))
+	print("Extracted %s (%s) along %s" % [TileGrid.TileType.keys()[extracted], item, coords])
 
 
 func _try_swap() -> void:
