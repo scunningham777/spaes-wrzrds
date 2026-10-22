@@ -14,6 +14,22 @@
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_side"]
 bg_color = Color(0, 0, 0, 1)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_focus"]
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 12.0
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 1, 1, 1)
+
+[sub_resource type="StyleBoxLine" id="StyleBoxLine_divider"]
+color = Color(1, 1, 1, 1)
+thickness = 2
+
 [sub_resource type="AtlasTexture" id="AtlasTexture_wizard"]
 atlas = ExtResource("7_icons")
 region = Rect2(378, 1, 12, 12)
@@ -86,6 +102,7 @@ theme_override_constants/separation = 0
 [node name="Top" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout"]
 layout_mode = 2
 size_flags_vertical = 3
+size_flags_stretch_ratio = 1.5
 theme_override_constants/separation = 24
 
 [node name="Header" type="Control" parent="UI/SidePanel/Margin/Layout/Top"]
@@ -123,24 +140,51 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="ExtractHint" type="Label" parent="UI/SidePanel/Margin/Layout/Top/Actions"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "R – Extract"
-
 [node name="PushHint" type="Label" parent="UI/SidePanel/Margin/Layout/Top/Actions"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "F – Push"
 
-[node name="TileInfo" type="Control" parent="UI/SidePanel/Margin/Layout"]
+[node name="FocusBox" type="PanelContainer" parent="UI/SidePanel/Margin/Layout/Top"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_focus")
+
+[node name="Content" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout/Top/FocusBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="FocusName" type="Label" parent="UI/SidePanel/Margin/Layout/Top/FocusBox/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Focus"
+horizontal_alignment = 1
+
+[node name="FocusActions" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout/Top/FocusBox/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Bottom" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 16
+
+[node name="Divider" type="HSeparator" parent="UI/SidePanel/Margin/Layout/Bottom"]
+layout_mode = 2
+theme_override_constants/separation = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_divider")
+
+[node name="TileInfo" type="Control" parent="UI/SidePanel/Margin/Layout/Bottom"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 mouse_filter = 2
 script = ExtResource("9_tile_info")
 
-[node name="TileIcon" type="TextureRect" parent="UI/SidePanel/Margin/Layout/TileInfo"]
+[node name="TileIcon" type="TextureRect" parent="UI/SidePanel/Margin/Layout/Bottom/TileInfo"]
 unique_name_in_owner = true
 layout_mode = 1
 offset_right = 48.0
@@ -149,7 +193,7 @@ mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
 
-[node name="TileName" type="Label" parent="UI/SidePanel/Margin/Layout/TileInfo"]
+[node name="TileName" type="Label" parent="UI/SidePanel/Margin/Layout/Bottom/TileInfo"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 10
@@ -164,7 +208,7 @@ horizontal_alignment = 1
 vertical_alignment = 1
 text_overrun_behavior = 3
 
-[node name="TileYield" type="Label" parent="UI/SidePanel/Margin/Layout/TileInfo"]
+[node name="TileYield" type="Label" parent="UI/SidePanel/Margin/Layout/Bottom/TileInfo"]
 unique_name_in_owner = true
 modulate = Color(1, 1, 1, 0.7)
 layout_mode = 1

@@ -24,6 +24,9 @@ func _unhandled_input(event: InputEvent) -> void:
 # Each successful action ticks tapped-tile cooldowns before taking effect, so the action that taps
 # a tile doesn't count toward its own cooldown. (Moves tick too; the scene wires that up.)
 func _try_extract() -> void:
+	if not Foci.grants(Game.state.equipped_focus, &"extract"):
+		print("The equipped focus can't extract")
+		return
 	var coord := player.mover.coord
 	if not tiles.grid.can_extract(coord):
 		print("Nothing to extract at %s" % coord)

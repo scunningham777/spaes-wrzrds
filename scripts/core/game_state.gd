@@ -10,6 +10,8 @@ var current_location: Enterable = null
 ## Tile grids by Enterable.id, generated on first visit so revisits look the same.
 var location_grids: Dictionary[StringName, TileGrid] = {}
 var inventory := Inventory.new()
+## The focus the wizard has equipped (a Foci id, or &"" for none); it grants extra actions.
+var equipped_focus: StringName = Foci.STAFF
 
 
 func get_or_generate_grid(location_id: StringName, radius: int, empty_probability: float) -> TileGrid:

@@ -41,9 +41,36 @@ func _ready() -> void:
 	_tiles.grid.tapped_changed.connect(func(_coord: Vector2i, _remaining: int) -> void: _update_tile_info())
 	_update_tile_info()
 
-	# Dim the action list while an action plays out and input is blocked.
+	_show_focus(Game.state.equipped_focus)
+
+	# Dim the action lists while an action plays out and input is blocked.
 	($ActionLock as ActionLock).busy_changed.connect(func(busy: bool) -> void:
-		(%Actions as Control).modulate.a = 0.35 if busy else 1.0)
+		for list: Control in [%Actions, %FocusBox]:
+			list.modulate.a = 0.35 if busy else 1.0)
+
+
+# Fills the outlined focus box with the focus's name and the actions it grants; hidden if none.
+func _show_focus(focus: StringName) -> void:
+	var box := %FocusBox as Control
+	box.visible = not focus.is_empty()
+	(%FocusName as Label).text = Foci.display_name(focus)
+	var list := %FocusActions as Control
+	for child in list.get_children():
+		child.queue_free()
+	for action in Foci.actions(focus):
+		var hint := Label.new()
+		hint.add_theme_font_size_override(&"font_size", 20)
+		hint.text = "%s – %s" % [_key_name(action), String(action).capitalize()]
+		list.add_child(hint)
+
+
+# The first key bound to an input action, e.g. "R" for extract.
+static func _key_name(action: StringName) -> String:
+	for event in InputMap.action_get_events(action):
+		if event is InputEventKey:
+			var key := event as InputEventKey
+			return key.as_text_physical_keycode() if key.physical_keycode else key.as_text_keycode()
+	return "?"
 
 
 func _update_tile_info() -> void:

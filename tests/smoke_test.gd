@@ -117,6 +117,11 @@ func _test_core_logic() -> void:
 		"swap: can't swap off the grid, no change")
 	_check(not pg.try_swap(Vector2i(1, 0), Vector2i(2, 0)), "swap: two Empty hexes is no swap")
 
+	# Foci: the staff grants extract, unknown foci grant nothing.
+	_check(Foci.display_name(Foci.STAFF) == "Staff" and Foci.grants(Foci.STAFF, &"extract")
+		and not Foci.grants(Foci.STAFF, &"push") and Foci.actions(&"").is_empty(), "foci: staff grants extract")
+	_check(GameState.new().equipped_focus == Foci.STAFF, "foci: staff equipped by default")
+
 	# Extract + inventory.
 	var eg := TileGrid.new(1)
 	eg.set_tile(Vector2i.ZERO, T.TIMBER)
@@ -361,7 +366,21 @@ func _test_enter_planet() -> void:
 		and tile_icon.size == wizard_icon.size, "tile info: icon aligned with the wizard icon")
 	_check(is_equal_approx(tile_name.get_global_rect().get_center().x, planet_name.get_global_rect().get_center().x),
 		"tile info: name centered under the planet name")
-	_check(tile_info.global_position.y >= side_panel.size.y / 2.0 - 16.0, "tile info: in the panel's bottom half")
+	var divider: Control = current_scene.get_node("UI/SidePanel/Margin/Layout/Bottom/Divider")
+	var split := (divider.global_position.y - 16.0) / (side_panel.size.y - 32.0)  # within the margins
+	_check(absf(split - 0.6) < 0.02 and divider.global_position.y < tile_info.global_position.y,
+		"tile info: below a divider 60%% of the way down (%.2f)" % split)
+	# Focus box: the equipped staff's name, and the actions it grants.
+	var focus_box: Control = current_scene.get_node("%FocusBox")
+	var focus_hints: Array = current_scene.get_node("%FocusActions").get_children().map(
+		func(l: Label) -> String: return l.text)
+	_check(focus_box.visible and (current_scene.get_node("%FocusName") as Label).text == "Staff"
+		and focus_hints == ["R – Extract"], "focus: box shows Staff with R – Extract (%s)" % [focus_hints])
+	var general_hints: Array = current_scene.get_node("%Actions").get_children().map(
+		func(l: Label) -> String: return l.text)
+	_check(general_hints == ["F – Push"], "focus: Extract moved out of the general actions (%s)" % [general_hints])
+	_check(focus_box.global_position.y > (current_scene.get_node("%Actions") as Control).global_position.y
+		and focus_box.get_global_rect().end.y < divider.global_position.y, "focus: box sits between Push and the divider")
 	_press(KEY_R)
 	_check(inv.count(&"iron") == 1 and tiles.grid.cooldown(Vector2i.ZERO) == 5,
 		"planet: R on a tapped tile adds nothing and isn't an action")
@@ -372,6 +391,14 @@ func _test_enter_planet() -> void:
 	_press(KEY_W)
 	_press(KEY_X)
 	_check(tiles.grid.cooldown(Vector2i.ZERO) == 3, "tapped: each move counts down (%d)" % tiles.grid.cooldown(Vector2i.ZERO))
+	# Extract comes from the focus: with none equipped, R does nothing.
+	tiles.grid.set_tile(Vector2i(0, -1), TileGrid.TileType.TIMBER)
+	_game().state.equipped_focus = &""
+	_press(KEY_X)  # to (0,-1)
+	_press(KEY_R)
+	_check(not tiles.grid.is_tapped(Vector2i(0, -1)) and inv.count(&"wood") == 0, "focus: no focus, no extract")
+	_game().state.equipped_focus = Foci.STAFF
+	_press(KEY_W)  # back to (0,0)
 
 	# Inventory panel: I opens and pauses; Esc closes without leaving the planet.
 	var panel: InventoryPanel = current_scene.get_node("UI/InventoryPanel")
