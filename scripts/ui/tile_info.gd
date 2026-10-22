@@ -7,6 +7,7 @@ extends Control
 
 @onready var _icon: TextureRect = %TileIcon
 @onready var _name: Label = %TileName
+@onready var _tapped: Label = %TileTapped
 @onready var _yield: Label = %TileYield
 
 
@@ -14,14 +15,20 @@ extends Control
 func show_tile(type: TileGrid.TileType, icon: Texture2D, cooldown: int = 0) -> void:
 	_icon.texture = icon
 	_name.text = TileGrid.display_name(type)
+	# Tapped affects the whole tile, so it sits beside the name rather than the element.
+	_tapped.visible = cooldown > 0
+	_tapped.text = "tapped: %d" % cooldown
 	var item := Items.from_tile(type)
 	_yield.text = "Element: %s" % (Items.display_name(item) if not item.is_empty() else "none")
-	if cooldown > 0:
-		_yield.text += " (tapped, %d %s)" % [cooldown, "action" if cooldown == 1 else "actions"]
 
 
 func shown_name() -> String:
 	return _name.text
+
+
+# The tapped note beside the name, or "" when the tile isn't tapped.
+func shown_tapped() -> String:
+	return _tapped.text if _tapped.visible else ""
 
 
 func shown_yield() -> String:

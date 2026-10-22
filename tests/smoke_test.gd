@@ -385,9 +385,10 @@ func _test_enter_planet() -> void:
 		and tiles.grid.cooldown(Vector2i.ZERO) == 5 and tiles.grid.cooldown(Vector2i(0, 1)) == 5,
 		"planet: R extracts 1 Iron and taps both tiles in the line for 5 actions")
 	_check(extract_hint.call() == "R – Extract: no match", "focus: tapped tiles make the hint no match")
-	_check(tile_info.shown_name() == "Iron Deposit" and tile_info.shown_yield() == "Element: Iron (tapped, 5 actions)"
-		and tile_icon.texture is ImageTexture, "tile info: shows the tapped state and a greyscale icon (%s)"
-		% tile_info.shown_yield())
+	_check(tile_info.shown_name() == "Iron Deposit" and tile_info.shown_tapped() == "tapped: 5"
+		and tile_info.shown_yield() == "Element: Iron" and tile_icon.texture is ImageTexture,
+		"tile info: tapped beside the name, element unchanged, greyscale icon (%s / %s)"
+		% [tile_info.shown_tapped(), tile_info.shown_yield()])
 	var grey := (tile_icon.texture as ImageTexture).get_image()
 	var any_color := false
 	for y in grey.get_height():
@@ -398,11 +399,26 @@ func _test_enter_planet() -> void:
 	# Lined up with the header: icon under the wizard icon, name centered under the planet name.
 	var wizard_icon: Control = current_scene.get_node("UI/SidePanel/Margin/Layout/Top/Header/WizardIcon")
 	var planet_name: Control = current_scene.get_node("%PlanetName")
-	var tile_name: Control = current_scene.get_node("%TileName")
+	var tile_title: Control = current_scene.get_node("%TileTitle")
 	_check(is_equal_approx(tile_icon.global_position.x, wizard_icon.global_position.x)
 		and tile_icon.size == wizard_icon.size, "tile info: icon aligned with the wizard icon")
-	_check(is_equal_approx(tile_name.get_global_rect().get_center().x, planet_name.get_global_rect().get_center().x),
-		"tile info: name centered under the planet name")
+	# Name + tapped note, as one centered row under the planet name (laid out a frame after showing).
+	await process_frame
+	var title_used := Rect2()
+	for part: Control in tile_title.get_children():
+		if part.visible:
+			title_used = part.get_global_rect() if title_used.size == Vector2.ZERO else title_used.merge(part.get_global_rect())
+	_check(absf(title_used.get_center().x - planet_name.get_global_rect().get_center().x) < 1.0,
+		"tile info: name and tapped note centered under the planet name")
+	# The longest name, tapped, still fits without clipping.
+	tiles.grid.set_tile(Vector2i(0, -1), TileGrid.TileType.STONE_OUTCROP)
+	tile_info.show_tile(TileGrid.TileType.STONE_OUTCROP, null, 5)
+	await process_frame
+	var title_slot := tile_info.size.x - 2 * 56.0  # between the icon-width margins
+	_check(tile_title.get_combined_minimum_size().x <= title_slot,
+		"tile info: \"Stone Outcrop  tapped: 5\" fits (%d of %d px)"
+		% [tile_title.get_combined_minimum_size().x, title_slot])
+	tiles.grid.set_tile(Vector2i(0, -1), TileGrid.TileType.EMPTY)  # also refreshes the panel back
 	var divider: Control = current_scene.get_node("UI/SidePanel/Margin/Layout/Bottom/Divider")
 	var split := (divider.global_position.y - 16.0) / (side_panel.size.y - 32.0)  # within the margins
 	_check(absf(split - 0.6) < 0.02 and divider.global_position.y < tile_info.global_position.y,

@@ -193,7 +193,7 @@ mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
 
-[node name="TileName" type="Label" parent="UI/SidePanel/Margin/Layout/Bottom/TileInfo"]
+[node name="TileTitle" type="HBoxContainer" parent="UI/SidePanel/Margin/Layout/Bottom/TileInfo"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 10
@@ -202,11 +202,26 @@ offset_left = 56.0
 offset_right = -56.0
 offset_bottom = 48.0
 grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+alignment = 1
+
+[node name="TileName" type="Label" parent="UI/SidePanel/Margin/Layout/Bottom/TileInfo/TileTitle"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 1
 theme_override_font_sizes/font_size = 28
 text = "Tile"
-horizontal_alignment = 1
 vertical_alignment = 1
-text_overrun_behavior = 3
+
+[node name="TileTapped" type="Label" parent="UI/SidePanel/Margin/Layout/Bottom/TileInfo/TileTitle"]
+unique_name_in_owner = true
+visible = false
+modulate = Color(1, 1, 1, 0.7)
+layout_mode = 2
+size_flags_vertical = 1
+theme_override_font_sizes/font_size = 16
+vertical_alignment = 1
 
 [node name="TileYield" type="Label" parent="UI/SidePanel/Margin/Layout/Bottom/TileInfo"]
 unique_name_in_owner = true
