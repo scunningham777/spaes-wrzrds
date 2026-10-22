@@ -38,13 +38,13 @@ const TILE_ICONS: Dictionary[TileGrid.TileType, Rect2] = {
 # Channels: x / y (sprite pixels, y-down), scale_y (height factor), alpha, rotation (degrees,
 # clockwise). Transforms pivot on the icon's bottom center.
 const TILE_ANIMS: Dictionary[TileGrid.TileType, Dictionary] = {
-	TileGrid.TileType.WATER_SPRING: {"channel": &"y", "step": 0.5, "values": [0.0, -1.0, 0.0, 1.0]},
-	TileGrid.TileType.IRON_DEPOSIT: {"channel": &"x", "step": 0.5, "values": [0.0, 1.0, 0.0, -1.0]},
-	TileGrid.TileType.STONE_OUTCROP: {"channel": &"scale_y", "step": 0.5, "values": [1.0, 0.9]},
+	TileGrid.TileType.WATER_SPRING: {"channel": &"scale_y", "step": 0.75, "values": [1.0, 0.9]},
+	TileGrid.TileType.IRON_DEPOSIT: {"channel": &"scale_y", "step": 0.75, "values": [1.0, 0.9]},
+	TileGrid.TileType.STONE_OUTCROP: {"channel": &"scale_y", "step": 0.75, "values": [1.0, 0.9]},
 	# Two quick flashes, then full alpha for the last 0.5 s.
-	TileGrid.TileType.GOLD_ORE: {"channel": &"alpha", "step": 0.125,
-		"values": [0.3, 1.0, 0.3, 1.0, 1.0, 1.0, 1.0, 1.0]},
-	TileGrid.TileType.TIMBER: {"channel": &"rotation", "step": 0.5, "values": [0.0, 10.0, 0.0, -10.0]},
+	TileGrid.TileType.GOLD_ORE: {"channel": &"alpha", "step": 0.2,
+		"values": [0.7, 1.0, 0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]},
+	TileGrid.TileType.TIMBER: {"channel": &"rotation", "step": 0.75, "values": [0.0, 10.0, 0.0, -10.0]},
 }
 
 # Channel values when a type has no animation for that channel.

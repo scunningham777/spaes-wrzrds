@@ -3,8 +3,8 @@ extends Node2D
 # Planet surface (Unity's TileExploreScene layout). Esc returns to space.
 
 # Generation settings, from Unity's TileGridManager.
-@export var grid_radius: int = 5
-@export_range(0.0, 1.0) var empty_tile_probability: float = 0.15
+@export var grid_radius: int = 2
+@export_range(0.0, 1.0) var empty_tile_probability: float = 0.0
 
 @onready var _tiles: TileGridView = $HexBoard/TileGridView
 @onready var _wizard: HexPlayerController = $HexBoard/Wizard
