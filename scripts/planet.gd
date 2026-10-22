@@ -34,6 +34,10 @@ func _ready() -> void:
 	_tiles.grid.tile_changed.connect(func(_coord: Vector2i, _type: TileGrid.TileType) -> void: _update_tile_info())
 	_update_tile_info()
 
+	# Dim the action list while an action plays out and input is blocked.
+	($ActionLock as ActionLock).busy_changed.connect(func(busy: bool) -> void:
+		(%Actions as Control).modulate.a = 0.35 if busy else 1.0)
+
 
 func _update_tile_info() -> void:
 	var type := _tiles.grid.get_tile(_wizard.mover.coord)

@@ -62,6 +62,17 @@ var grid: TileGrid:
 		queue_redraw()
 ## Seconds since the animations started.
 var anim_time: float = 0.0
+## 0..1 progress of the swap animation, if one is playing (see animate_swap).
+var swap_progress: float = 1.0:
+	set(value):
+		swap_progress = value
+		queue_redraw()
+
+# Swap being animated: the grid already holds the swapped tiles, so the icon now at _swap_to
+# is drawn travelling from _swap_from (on top), and the one now at _swap_from the other way.
+var _swapping := false
+var _swap_from: Vector2i
+var _swap_to: Vector2i
 
 @onready var board: HexBoard = get_parent() as HexBoard
 
@@ -117,6 +128,21 @@ func _anim_frames() -> Array[int]:
 	return frames
 
 
+# Animates the icons of two just-swapped tiles crossing over; the icon that left `from` draws on
+# top. Returns the tween so callers can wait on it (e.g. ActionLock.run).
+func animate_swap(from: Vector2i, to: Vector2i, seconds: float) -> Tween:
+	_swapping = true
+	_swap_from = from
+	_swap_to = to
+	swap_progress = 0.0
+	var tween := create_tween()
+	tween.tween_property(self, "swap_progress", 1.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.finished.connect(func() -> void:
+		_swapping = false
+		queue_redraw())
+	return tween
+
+
 func _on_tile_changed(_coord: Vector2i, _type: TileGrid.TileType) -> void:
 	queue_redraw()
 
@@ -135,8 +161,16 @@ func _draw() -> void:
 			points.append(center + p)
 		var type := grid.get_tile(coord)
 		draw_colored_polygon(points, color_for(type))
-		if has_icon(type):
+		if has_icon(type) and not (_swapping and (coord == _swap_from or coord == _swap_to)):
 			_draw_icon(type, center)
+	if _swapping:
+		var from_pos := board.hex_to_local(_swap_from)
+		var to_pos := board.hex_to_local(_swap_to)
+		for pair: Array in [[_swap_from, to_pos.lerp(from_pos, swap_progress)],
+				[_swap_to, from_pos.lerp(to_pos, swap_progress)]]:  # last drawn is on top
+			var moving := grid.get_tile(pair[0])
+			if has_icon(moving):
+				_draw_icon(moving, pair[1])
 
 
 func _draw_icon(type: TileGrid.TileType, center: Vector2) -> void:
