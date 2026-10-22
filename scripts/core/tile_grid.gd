@@ -60,8 +60,8 @@ func get_tile(coord: Vector2i) -> TileType:
 func set_tile(coord: Vector2i, type: TileType) -> void:
 	assert(tiles.has(coord), "Coord %s is not on the grid" % coord)
 	tiles[coord] = type
+	_set_cooldown(coord, 0)  # before tile_changed, so listeners never see the old tile's state
 	tile_changed.emit(coord, type)
-	_set_cooldown(coord, 0)
 
 
 func is_tapped(coord: Vector2i) -> bool:

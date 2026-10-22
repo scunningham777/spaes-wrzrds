@@ -61,8 +61,10 @@ func open() -> void:
 	show()
 	get_tree().paused = true
 	_refresh()
+	# Focus the selected item's slot; with nothing owned there's no focusable slot.
 	var focus_slot := _slot_for(selected_item)
-	(focus_slot if focus_slot else _slots[0]).grab_focus()
+	if focus_slot:
+		focus_slot.grab_focus()
 	opened.emit()
 
 

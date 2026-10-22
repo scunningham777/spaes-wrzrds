@@ -4,10 +4,9 @@ extends Node2D
 # Draws a TileGrid as filled hexes, ported from Unity's TileVisualManager/TileVisual. Must be a
 # child of a HexBoard. Draws nothing until a grid is assigned. Types with an entry in TILE_ICONS
 # draw that sprite-sheet icon over an Empty-colored hex; the rest are plain colored hexes. Icons
-# with an entry in TILE_ANIMS step through it, all in sync off one clock.
+# with an entry in TILE_ANIMS step through it, all in sync off one clock. Tile size comes from
+# the board's tile_scale.
 
-## Tile size relative to the hex cell; < 1 leaves gaps between tiles (Unity's sprite was 1/1.1).
-@export var tile_scale: float = 1.0 / 1.1
 ## Sprite sheet that TILE_ICONS regions are cut from.
 @export var icon_sheet: Texture2D
 ## Icon pixel scale; matches the wizard sprite's.
@@ -178,10 +177,8 @@ func _on_tapped_changed(_coord: Vector2i, _remaining: int) -> void:
 func _draw() -> void:
 	if grid == null:
 		return
-	var corners := board.layout.corner_offsets()
-	var tile := PackedVector2Array()
-	for i in corners.size() - 1:  # drop the closing point; polygons close themselves
-		tile.append(Vector2(corners[i].x, -corners[i].y) * tile_scale)
+	var tile := board.corner_points(board.tile_scale)
+	tile.remove_at(tile.size() - 1)  # drop the closing point; polygons close themselves
 	for coord in grid.tiles:
 		var center := board.hex_to_local(coord)
 		var points := PackedVector2Array()
@@ -233,7 +230,7 @@ func _draw_icon(type: TileGrid.TileType, center: Vector2, tapped: bool) -> void:
 func _draw_cooldown(remaining: int, center: Vector2) -> void:
 	var font := ThemeDB.fallback_font
 	var width := board.layout.size * 2.0
-	var baseline := center.y + board.layout.size * HexLayout.SQRT_3 / 2.0 * tile_scale - cooldown_margin
+	var baseline := center.y + board.layout.inner_radius() * board.tile_scale - cooldown_margin
 	var pos := Vector2(center.x - width / 2.0, baseline)
 	var text := str(remaining)
 	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, width, cooldown_font_size, 4, Color.BLACK)

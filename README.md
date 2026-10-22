@@ -7,7 +7,8 @@ A small top-down hex-grid game for **Godot 4.7** (GDScript), ported from a Unity
 Open `project.godot` in Godot 4.7.x (standard build, not .NET) and press **F5**.
 
 Controls (flat-top hexes): **Q/W/E/Z/X/C** or numpad move · **A/D** turn · **Enter** enter a planet ·
-**R** extract the tile you're on · **F** push the tile in front · **I** inventory · **Esc** back.
+**R** extract the tile you're on (needs the staff; taps the tile for a few actions) · **F** swap your tile with
+the one you face · **I** inventory · **Esc** back.
 
 ## Tests
 

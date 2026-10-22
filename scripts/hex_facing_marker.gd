@@ -8,8 +8,6 @@ extends Node2D
 @export var controller: HexPlayerController
 @export var color: Color = Color.WHITE
 @export var line_width: float = 3.0
-## Outline size relative to the hex cell; matches TileGridView.tile_scale so it hugs the tile.
-@export var tile_scale: float = 1.0 / 1.1
 ## Triangle base width and height, in pixels.
 @export var triangle_size: Vector2 = Vector2(14.0, 9.0)
 
@@ -35,15 +33,13 @@ func triangle_points() -> PackedVector2Array:
 	var dir := Vector2(cos(angle), -sin(angle))  # facing angle is y-up; screen is y-down
 	var side := dir.orthogonal() * triangle_size.x / 2.0
 	# The shared edge with the faced neighbor sits at the hex's inner radius along dir.
-	var edge_mid := dir * _board.layout.size * HexLayout.SQRT_3 / 2.0 * tile_scale
+	var edge_mid := dir * _board.layout.inner_radius() * _board.tile_scale
 	return PackedVector2Array([edge_mid + side, edge_mid - side, edge_mid + dir * triangle_size.y])
 
 
 func _draw() -> void:
 	if controller.mover == null:
 		return
-	var outline := PackedVector2Array()
-	for c in _board.layout.corner_offsets():
-		outline.append(Vector2(c.x, -c.y) * tile_scale)
-	draw_polyline(outline, color, line_width)
+	# Outline at the board's tile size so it hugs the tile.
+	draw_polyline(_board.corner_points(_board.tile_scale), color, line_width)
 	draw_colored_polygon(triangle_points(), color)

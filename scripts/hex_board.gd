@@ -17,6 +17,9 @@ extends Node2D
 		if layout:
 			layout.size = value
 		queue_redraw()
+## Size of a drawn tile relative to its hex cell; < 1 leaves gaps between tiles (Unity's sprite
+## was 1/1.1). Shared by everything that draws tile-sized shapes, so they line up.
+@export var tile_scale: float = 1.0 / 1.1
 @export var draw_outlines: bool = true
 @export var line_color: Color = Color.WHITE
 @export var line_width: float = 1.0
@@ -41,6 +44,15 @@ func hex_to_local(coord: Vector2i) -> Vector2:
 	return Vector2(p.x, -p.y)
 
 
+# A hex's corners in local (y-down) space around its center, scaled by `scale`; closed (first
+# point repeated last) for polylines.
+func corner_points(scale: float = 1.0) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for c in layout.corner_offsets():
+		points.append(Vector2(c.x, -c.y) * scale)
+	return points
+
+
 func _draw() -> void:
 	if not draw_outlines:
 		return
@@ -48,7 +60,7 @@ func _draw() -> void:
 	# board's origin is at the screen center (the Play scene's Camera2D sits at the origin).
 	var half := get_viewport_rect().size / 2.0 + Vector2(hex_size, hex_size)
 	var n := ceili((half.x + half.y) / hex_size) + 1
-	var corners := layout.corner_offsets()
+	var corners := corner_points()
 	var outline := PackedVector2Array()
 	outline.resize(corners.size())
 	for q in range(-n, n + 1):
@@ -56,5 +68,5 @@ func _draw() -> void:
 			var center := hex_to_local(Vector2i(q, r))
 			if absf(center.x) <= half.x and absf(center.y) <= half.y:
 				for i in corners.size():
-					outline[i] = center + Vector2(corners[i].x, -corners[i].y)
+					outline[i] = center + corners[i]
 				draw_polyline(outline, line_color, line_width)

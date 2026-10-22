@@ -25,6 +25,11 @@ func hex_to_point(coord: Vector2i) -> Vector2:
 		size * (SQRT_3 / 2.0 * coord.x + SQRT_3 * coord.y))
 
 
+# Center-to-edge-midpoint distance: where a hex meets its neighbor along a direction.
+func inner_radius() -> float:
+	return size * SQRT_3 / 2.0
+
+
 # Corner offsets from a hex center, closed (first point repeated last) for drawing outlines.
 func corner_offsets() -> PackedVector2Array:
 	var corners := PackedVector2Array()
