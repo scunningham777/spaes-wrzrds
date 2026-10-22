@@ -70,6 +70,16 @@ func has_icon(type: TileGrid.TileType) -> bool:
 	return icon_sheet != null and TILE_ICONS.has(type)
 
 
+# The type's icon as a standalone texture (for UI), or null if it has none.
+func icon_texture(type: TileGrid.TileType) -> Texture2D:
+	if not has_icon(type):
+		return null
+	var atlas := AtlasTexture.new()
+	atlas.atlas = icon_sheet
+	atlas.region = TILE_ICONS[type]
+	return atlas
+
+
 # Hex fill color; icon tiles sit on the Empty color so the icon stands out.
 func color_for(type: TileGrid.TileType) -> Color:
 	if has_icon(type):

@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/inventory_panel.tscn" id="6_inventory"]
 [ext_resource type="Texture2D" uid="uid://c5vjocj1uk3l1" path="res://art/urizen_onebit_tileset__v1d1_trans.png" id="7_icons"]
 [ext_resource type="Script" path="res://scripts/hex_facing_marker.gd" id="8_marker"]
+[ext_resource type="Script" path="res://scripts/ui/tile_info.gd" id="9_tile_info"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_side"]
 bg_color = Color(0, 0, 0, 1)
@@ -75,14 +76,19 @@ theme_override_constants/margin_bottom = 16
 
 [node name="Layout" type="VBoxContainer" parent="UI/SidePanel/Margin"]
 layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Top" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout"]
+layout_mode = 2
+size_flags_vertical = 3
 theme_override_constants/separation = 24
 
-[node name="Header" type="Control" parent="UI/SidePanel/Margin/Layout"]
+[node name="Header" type="Control" parent="UI/SidePanel/Margin/Layout/Top"]
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="WizardIcon" type="TextureRect" parent="UI/SidePanel/Margin/Layout/Header"]
+[node name="WizardIcon" type="TextureRect" parent="UI/SidePanel/Margin/Layout/Top/Header"]
 layout_mode = 1
 offset_right = 48.0
 offset_bottom = 48.0
@@ -91,7 +97,7 @@ texture = SubResource("AtlasTexture_wizard")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="PlanetName" type="Label" parent="UI/SidePanel/Margin/Layout/Header"]
+[node name="PlanetName" type="Label" parent="UI/SidePanel/Margin/Layout/Top/Header"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -107,18 +113,64 @@ horizontal_alignment = 1
 vertical_alignment = 1
 text_overrun_behavior = 3
 
-[node name="Actions" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout"]
+[node name="Actions" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout/Top"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="ExtractHint" type="Label" parent="UI/SidePanel/Margin/Layout/Actions"]
+[node name="ExtractHint" type="Label" parent="UI/SidePanel/Margin/Layout/Top/Actions"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "R – Extract"
 
-[node name="PushHint" type="Label" parent="UI/SidePanel/Margin/Layout/Actions"]
+[node name="PushHint" type="Label" parent="UI/SidePanel/Margin/Layout/Top/Actions"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "F – Push"
+
+[node name="TileInfo" type="Control" parent="UI/SidePanel/Margin/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+script = ExtResource("9_tile_info")
+
+[node name="TileIcon" type="TextureRect" parent="UI/SidePanel/Margin/Layout/TileInfo"]
+unique_name_in_owner = true
+layout_mode = 1
+offset_right = 48.0
+offset_bottom = 48.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="TileName" type="Label" parent="UI/SidePanel/Margin/Layout/TileInfo"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 56.0
+offset_right = -56.0
+offset_bottom = 48.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 28
+text = "Tile"
+horizontal_alignment = 1
+vertical_alignment = 1
+text_overrun_behavior = 3
+
+[node name="TileYield" type="Label" parent="UI/SidePanel/Margin/Layout/TileInfo"]
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0.7)
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 56.0
+offset_top = 48.0
+offset_right = -56.0
+offset_bottom = 76.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+text_overrun_behavior = 3
 
 [node name="InventoryPanel" parent="UI" unique_id=189433725 instance=ExtResource("6_inventory")]

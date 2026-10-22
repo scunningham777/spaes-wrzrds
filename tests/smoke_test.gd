@@ -306,9 +306,25 @@ func _test_enter_planet() -> void:
 	# Extract with R: the wizard's own tile is emptied into the inventory.
 	var inv: Inventory = _game().state.inventory
 	tiles.grid.set_tile(Vector2i.ZERO, TileGrid.TileType.IRON_DEPOSIT)
+	var tile_info: TileInfo = current_scene.get_node("%TileInfo")
+	var tile_icon: TextureRect = current_scene.get_node("%TileIcon")
+	_check(tile_info.shown_name() == "Iron Deposit" and tile_info.shown_yield() == "Extracts: Iron"
+		and tile_icon.texture != null, "tile info: shows the tile under the wizard (%s / %s)"
+		% [tile_info.shown_name(), tile_info.shown_yield()])
 	_press(KEY_R)
 	_check(tiles.grid.get_tile(Vector2i.ZERO) == TileGrid.TileType.EMPTY and inv.count(&"iron") == 1,
 		"planet: R extracts Iron into the inventory")
+	_check(tile_info.shown_name() == "Empty" and tile_info.shown_yield() == "Nothing to extract"
+		and tile_icon.texture == null, "tile info: updates after extracting")
+	# Lined up with the header: icon under the wizard icon, name centered under the planet name.
+	var wizard_icon: Control = current_scene.get_node("UI/SidePanel/Margin/Layout/Top/Header/WizardIcon")
+	var planet_name: Control = current_scene.get_node("%PlanetName")
+	var tile_name: Control = current_scene.get_node("%TileName")
+	_check(is_equal_approx(tile_icon.global_position.x, wizard_icon.global_position.x)
+		and tile_icon.size == wizard_icon.size, "tile info: icon aligned with the wizard icon")
+	_check(is_equal_approx(tile_name.get_global_rect().get_center().x, planet_name.get_global_rect().get_center().x),
+		"tile info: name centered under the planet name")
+	_check(tile_info.global_position.y >= side_panel.size.y / 2.0 - 16.0, "tile info: in the panel's bottom half")
 	_press(KEY_R)
 	_check(inv.count(&"iron") == 1, "planet: R on an Empty tile adds nothing")
 

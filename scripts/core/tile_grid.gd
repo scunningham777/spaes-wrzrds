@@ -15,6 +15,15 @@ enum TileType {
 	STONE_OUTCROP,
 }
 
+const TYPE_NAMES: Dictionary[TileType, String] = {
+	TileType.EMPTY: "Empty",
+	TileType.GOLD_ORE: "Gold Ore",
+	TileType.WATER_SPRING: "Water Spring",
+	TileType.IRON_DEPOSIT: "Iron Deposit",
+	TileType.TIMBER: "Timber",
+	TileType.STONE_OUTCROP: "Stone Outcrop",
+}
+
 var radius: int
 var tiles: Dictionary[Vector2i, TileType] = {}
 
@@ -23,6 +32,10 @@ func _init(p_radius: int = 5) -> void:
 	radius = p_radius
 	for coord in Hex.hexagon(radius):
 		tiles[coord] = TileType.EMPTY
+
+
+static func display_name(type: TileType) -> String:
+	return TYPE_NAMES.get(type, String(TileType.keys()[type]).capitalize())
 
 
 func has_tile(coord: Vector2i) -> bool:
