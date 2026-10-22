@@ -99,29 +99,23 @@ func _test_core_logic() -> void:
 	_check(all_empty.tiles.values().all(func(t: int) -> bool: return t == TileGrid.TileType.EMPTY),
 		"gen: probability 1 gives all Empty")
 
-	# Push (TileGrid.try_push_tile, ported from Unity).
+	# Swap (TileGrid.try_swap).
 	var T := TileGrid.TileType
 	var pg := TileGrid.new(2)
 	var changes: Array[Vector2i] = []
 	pg.tile_changed.connect(func(c: Vector2i, _t: int) -> void: changes.append(c))
+	pg.set_tile(Vector2i.ZERO, T.TIMBER)
 	pg.set_tile(Vector2i(0, 1), T.GOLD_ORE)
 	changes.clear()
-	_check(pg.try_push_in_front(Vector2i.ZERO, Vector2i(0, 1)), "push: tile in front moves")
-	_check(pg.get_tile(Vector2i(0, 1)) == T.EMPTY and pg.get_tile(Vector2i(0, 2)) == T.GOLD_ORE,
-		"push: Gold moved from (0,1) to (0,2)")
-	_check(changes.size() == 2, "push: tile_changed fires for both hexes")
-	_check(not pg.try_push_tile(Vector2i(0, 1), Vector2i(0, 2)), "push: nothing to push from Empty")
-	_check(not pg.try_push_tile(Vector2i(0, 2), Vector2i(0, 3)) and pg.get_tile(Vector2i(0, 2)) == T.GOLD_ORE,
-		"push: can't push off the grid, no change")
-	pg.set_tile(Vector2i(1, 0), T.GOLD_ORE)
-	pg.set_tile(Vector2i(2, 0), T.WATER_SPRING)
-	pg.try_push_tile(Vector2i(1, 0), Vector2i(2, 0))
-	_check(pg.get_tile(Vector2i(1, 0)) == T.EMPTY and pg.get_tile(Vector2i(2, 0)) == T.WATER_SPRING,
-		"push: Gold + Water combines to Water (placeholder)")
-	pg.set_tile(Vector2i(-1, 0), T.TIMBER)
-	pg.set_tile(Vector2i(-2, 0), T.STONE_OUTCROP)
-	pg.try_push_tile(Vector2i(-1, 0), Vector2i(-2, 0))
-	_check(pg.get_tile(Vector2i(-2, 0)) == T.IRON_DEPOSIT, "push: Timber + Stone combines to Iron (placeholder)")
+	_check(pg.try_swap(Vector2i.ZERO, Vector2i(0, 1)), "swap: tiles swap")
+	_check(pg.get_tile(Vector2i.ZERO) == T.GOLD_ORE and pg.get_tile(Vector2i(0, 1)) == T.TIMBER,
+		"swap: Timber and Gold traded places")
+	_check(changes.size() == 2, "swap: tile_changed fires for both hexes")
+	_check(pg.try_swap(Vector2i(0, 1), Vector2i(0, 2)) and pg.get_tile(Vector2i(0, 1)) == T.EMPTY
+		and pg.get_tile(Vector2i(0, 2)) == T.TIMBER, "swap: with an Empty hex moves the tile")
+	_check(not pg.try_swap(Vector2i(0, 2), Vector2i(0, 3)) and pg.get_tile(Vector2i(0, 2)) == T.TIMBER,
+		"swap: can't swap off the grid, no change")
+	_check(not pg.try_swap(Vector2i(1, 0), Vector2i(2, 0)), "swap: two Empty hexes is no swap")
 
 	# Extract + inventory.
 	var eg := TileGrid.new(1)
@@ -297,12 +291,36 @@ func _test_enter_planet() -> void:
 		% [board_screen_x, side_panel.get_global_rect().position.x])
 	_check(ItemIcon.color_for(&"wood") == Color(0.4, 0.6, 0.3), "inventory: wood is still a green square")
 
-	# Push with F: wizard at (0,0) faces N on the flat-top planet, so (0,1) -> (0,2).
+	# Swap with F: wizard at (0,0) faces N on the flat-top planet, so (0,0) <-> (0,1).
+	var lock: ActionLock = current_scene.get_node("ActionLock")
+	var actions: Control = current_scene.get_node("%Actions")
+	var swap_wizard: HexPlayerController = current_scene.get_node("HexBoard/Wizard")
+	tiles.grid.set_tile(Vector2i.ZERO, TileGrid.TileType.TIMBER)
 	tiles.grid.set_tile(Vector2i(0, 1), TileGrid.TileType.GOLD_ORE)
-	tiles.grid.set_tile(Vector2i(0, 2), TileGrid.TileType.EMPTY)
 	_press(KEY_F)
-	_check(tiles.grid.get_tile(Vector2i(0, 1)) == TileGrid.TileType.EMPTY
-		and tiles.grid.get_tile(Vector2i(0, 2)) == TileGrid.TileType.GOLD_ORE, "planet: F pushes the tile in front")
+	_check(tiles.grid.get_tile(Vector2i.ZERO) == TileGrid.TileType.GOLD_ORE
+		and tiles.grid.get_tile(Vector2i(0, 1)) == TileGrid.TileType.TIMBER, "planet: F swaps with the faced tile")
+	_check(lock.busy and actions.modulate.a < 1.0, "lock: busy and actions dimmed during the swap")
+	# Everything but the inventory is blocked until the tween ends.
+	var facing_before := swap_wizard.mover.facing
+	for key: Key in [KEY_W, KEY_D, KEY_F, KEY_R, KEY_ESCAPE]:
+		_press(key)
+	_check(swap_wizard.mover.coord == Vector2i.ZERO and swap_wizard.mover.facing == facing_before
+		and tiles.grid.get_tile(Vector2i.ZERO) == TileGrid.TileType.GOLD_ORE
+		and current_scene.scene_file_path == "res://scenes/planet.tscn",
+		"lock: move, turn, swap, extract and Esc are blocked")
+	var swap_inv_panel: InventoryPanel = current_scene.get_node("UI/InventoryPanel")
+	_press(KEY_I)
+	_check(swap_inv_panel.visible, "lock: inventory still opens")
+	_press(KEY_ESCAPE)
+	_check(not swap_inv_panel.visible and current_scene.scene_file_path == "res://scenes/planet.tscn",
+		"lock: Esc closes the inventory, doesn't leave")
+	await create_timer(0.5).timeout
+	_check(not lock.busy and actions.modulate.a == 1.0, "lock: released and actions undimmed after the swap")
+	_press(KEY_F)  # Gold back to (0,1), Timber to (0,0)
+	await create_timer(0.5).timeout
+	_check(tiles.grid.get_tile(Vector2i(0, 1)) == TileGrid.TileType.GOLD_ORE, "lock: F works again afterwards")
+	tiles.grid.set_tile(Vector2i(0, 1), TileGrid.TileType.EMPTY)
 	# Extract with R: the wizard's own tile is emptied into the inventory.
 	var inv: Inventory = _game().state.inventory
 	tiles.grid.set_tile(Vector2i.ZERO, TileGrid.TileType.IRON_DEPOSIT)
