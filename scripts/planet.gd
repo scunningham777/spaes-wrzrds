@@ -10,6 +10,7 @@ extends Node2D
 @onready var _wizard: HexPlayerController = $HexBoard/Wizard
 @onready var _camera: Camera2D = $Camera2D
 @onready var _side_panel: Control = %SidePanel
+@onready var _tile_info: TileInfo = %TileInfo
 
 
 func _ready() -> void:
@@ -27,6 +28,16 @@ func _ready() -> void:
 
 	# Keep the wizard on the planet's tiles.
 	_wizard.mover.can_enter = _tiles.grid.has_tile
+
+	# Side panel describes the tile under the wizard (what R would extract).
+	_wizard.mover.moved.connect(func(_coord: Vector2i) -> void: _update_tile_info())
+	_tiles.grid.tile_changed.connect(func(_coord: Vector2i, _type: TileGrid.TileType) -> void: _update_tile_info())
+	_update_tile_info()
+
+
+func _update_tile_info() -> void:
+	var type := _tiles.grid.get_tile(_wizard.mover.coord)
+	_tile_info.show_tile(type, _tiles.icon_texture(type))
 
 
 # The board sits at the world origin; shift the camera so the origin lands in the middle of the
