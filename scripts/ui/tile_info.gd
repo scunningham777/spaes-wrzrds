@@ -9,11 +9,17 @@ extends Control
 @onready var _yield: Label = %TileYield
 
 
-func show_tile(type: TileGrid.TileType, icon: Texture2D) -> void:
+# cooldown: actions until a tapped tile can be extracted again; 0 if it isn't tapped.
+func show_tile(type: TileGrid.TileType, icon: Texture2D, cooldown: int = 0) -> void:
 	_icon.texture = icon
 	_name.text = TileGrid.display_name(type)
 	var item := Items.from_tile(type)
-	_yield.text = "Extracts: %s" % Items.display_name(item) if not item.is_empty() else "Nothing to extract"
+	if item.is_empty():
+		_yield.text = "Nothing to extract"
+	elif cooldown > 0:
+		_yield.text = "Tapped – %d %s" % [cooldown, "action" if cooldown == 1 else "actions"]
+	else:
+		_yield.text = "Extracts: %s" % Items.display_name(item)
 
 
 func shown_name() -> String:

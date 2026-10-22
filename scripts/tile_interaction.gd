@@ -21,22 +21,28 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+# Each successful action ticks tapped-tile cooldowns before taking effect, so the action that taps
+# a tile doesn't count toward its own cooldown. (Moves tick too; the scene wires that up.)
 func _try_extract() -> void:
 	var coord := player.mover.coord
-	var extracted := tiles.grid.try_extract(coord)
-	var item := Items.from_tile(extracted)
-	if item.is_empty():
+	if not tiles.grid.can_extract(coord):
 		print("Nothing to extract at %s" % coord)
 		return
-	Game.state.inventory.add(item)
+	tiles.grid.tick_cooldowns()
+	var extracted := tiles.grid.try_extract(coord)
+	var item := Items.from_tile(extracted)
+	if not item.is_empty():
+		Game.state.inventory.add(item)
 	print("Extracted %s (%s) at %s" % [TileGrid.TileType.keys()[extracted], item, coord])
 
 
 func _try_swap() -> void:
 	var here := player.mover.coord
 	var front := here + player.mover.facing
-	if not tiles.grid.try_swap(here, front):
+	if not tiles.grid.can_swap(here, front):
 		print("Can't swap tiles %s and %s" % [here, front])
 		return
+	tiles.grid.tick_cooldowns()
+	tiles.grid.try_swap(here, front)
 	print("Swapped tiles %s and %s" % [here, front])
 	lock.run(tiles.animate_swap(here, front, swap_seconds))

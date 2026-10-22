@@ -3,8 +3,10 @@ extends Node2D
 # Planet surface (Unity's TileExploreScene layout). Esc returns to space.
 
 # Generation settings, from Unity's TileGridManager.
-@export var grid_radius: int = 2
-@export_range(0.0, 1.0) var empty_tile_probability: float = 0.0
+@export var grid_radius: int = 5
+@export_range(0.0, 1.0) var empty_tile_probability: float = 0.15
+## Player actions (moves, extracts, swaps) an extracted tile stays tapped.
+@export var tap_cooldown_actions: int = 5
 
 @onready var _tiles: TileGridView = $HexBoard/TileGridView
 @onready var _wizard: HexPlayerController = $HexBoard/Wizard
@@ -29,9 +31,14 @@ func _ready() -> void:
 	# Keep the wizard on the planet's tiles.
 	_wizard.mover.can_enter = _tiles.grid.has_tile
 
+	# Moving is a player action, so it counts down tapped tiles (TileInteraction ticks its own).
+	_tiles.grid.tap_cooldown = tap_cooldown_actions
+	_wizard.mover.moved.connect(func(_coord: Vector2i) -> void: _tiles.grid.tick_cooldowns())
+
 	# Side panel describes the tile under the wizard (what R would extract).
 	_wizard.mover.moved.connect(func(_coord: Vector2i) -> void: _update_tile_info())
 	_tiles.grid.tile_changed.connect(func(_coord: Vector2i, _type: TileGrid.TileType) -> void: _update_tile_info())
+	_tiles.grid.tapped_changed.connect(func(_coord: Vector2i, _remaining: int) -> void: _update_tile_info())
 	_update_tile_info()
 
 	# Dim the action list while an action plays out and input is blocked.
@@ -40,8 +47,9 @@ func _ready() -> void:
 
 
 func _update_tile_info() -> void:
-	var type := _tiles.grid.get_tile(_wizard.mover.coord)
-	_tile_info.show_tile(type, _tiles.icon_texture(type))
+	var coord := _wizard.mover.coord
+	var type := _tiles.grid.get_tile(coord)
+	_tile_info.show_tile(type, _tiles.icon_texture(type, _tiles.grid.is_tapped(coord)), _tiles.grid.cooldown(coord))
 
 
 # The board sits at the world origin; shift the camera so the origin lands in the middle of the
