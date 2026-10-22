@@ -13,6 +13,10 @@ extends Node2D
 @onready var _camera: Camera2D = $Camera2D
 @onready var _side_panel: Control = %SidePanel
 @onready var _tile_info: TileInfo = %TileInfo
+@onready var _interaction: TileInteraction = $TileInteraction
+
+# Focus action hint labels by action, so their status suffixes can be refreshed.
+var _focus_hints: Dictionary[StringName, Label] = {}
 
 
 func _ready() -> void:
@@ -35,13 +39,14 @@ func _ready() -> void:
 	_tiles.grid.tap_cooldown = tap_cooldown_actions
 	_wizard.mover.moved.connect(func(_coord: Vector2i) -> void: _tiles.grid.tick_cooldowns())
 
-	# Side panel describes the tile under the wizard (what R would extract).
-	_wizard.mover.moved.connect(func(_coord: Vector2i) -> void: _update_tile_info())
-	_tiles.grid.tile_changed.connect(func(_coord: Vector2i, _type: TileGrid.TileType) -> void: _update_tile_info())
-	_tiles.grid.tapped_changed.connect(func(_coord: Vector2i, _remaining: int) -> void: _update_tile_info())
-	_update_tile_info()
-
+	# Side panel describes the tile under the wizard and what its focus actions would do from here,
+	# so it refreshes on anything that changes those: moving, turning, and tile changes.
 	_show_focus(Game.state.equipped_focus)
+	_wizard.mover.moved.connect(func(_coord: Vector2i) -> void: _update_side_panel())
+	_wizard.facing_changed.connect(func(_facing: Vector2i) -> void: _update_side_panel())
+	_tiles.grid.tile_changed.connect(func(_coord: Vector2i, _type: TileGrid.TileType) -> void: _update_side_panel())
+	_tiles.grid.tapped_changed.connect(func(_coord: Vector2i, _remaining: int) -> void: _update_side_panel())
+	_update_side_panel()
 
 	# Dim the action lists while an action plays out and input is blocked.
 	($ActionLock as ActionLock).busy_changed.connect(func(busy: bool) -> void:
@@ -57,11 +62,21 @@ func _show_focus(focus: StringName) -> void:
 	var list := %FocusActions as Control
 	for child in list.get_children():
 		child.queue_free()
+	_focus_hints.clear()
 	for action in Foci.actions(focus):
 		var hint := Label.new()
 		hint.add_theme_font_size_override(&"font_size", 20)
-		hint.text = "%s – %s" % [_key_name(action), String(action).capitalize()]
 		list.add_child(hint)
+		_focus_hints[action] = hint
+
+
+# "R – Extract", plus what the action would do from here where that's known ("R – Extract: Iron").
+func _focus_hint_text(action: StringName) -> String:
+	var text := "%s – %s" % [_key_name(action), String(action).capitalize()]
+	if action == &"extract":
+		var item := Items.from_tile(_interaction.extract_preview())
+		text += ": %s" % (Items.display_name(item) if not item.is_empty() else "no match")
+	return text
 
 
 # The first key bound to an input action, e.g. "R" for extract.
@@ -73,10 +88,12 @@ static func _key_name(action: StringName) -> String:
 	return "?"
 
 
-func _update_tile_info() -> void:
+func _update_side_panel() -> void:
 	var coord := _wizard.mover.coord
 	var type := _tiles.grid.get_tile(coord)
 	_tile_info.show_tile(type, _tiles.icon_texture(type, _tiles.grid.is_tapped(coord)), _tiles.grid.cooldown(coord))
+	for action in _focus_hints:
+		_focus_hints[action].text = _focus_hint_text(action)
 
 
 # The board sits at the world origin; shift the camera so the origin lands in the middle of the

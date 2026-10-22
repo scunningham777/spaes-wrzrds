@@ -364,17 +364,28 @@ func _test_enter_planet() -> void:
 	tiles.grid.set_tile(Vector2i.ZERO, TileGrid.TileType.IRON_DEPOSIT)
 	var tile_info: TileInfo = current_scene.get_node("%TileInfo")
 	var tile_icon: TextureRect = current_scene.get_node("%TileIcon")
-	_check(tile_info.shown_name() == "Iron Deposit" and tile_info.shown_yield() == "Extracts: Iron"
+	_check(tile_info.shown_name() == "Iron Deposit" and tile_info.shown_yield() == "Element: Iron"
 		and tile_icon.texture != null, "tile info: shows the tile under the wizard (%s / %s)"
 		% [tile_info.shown_name(), tile_info.shown_yield()])
+	var extract_hint := func() -> String: return (current_scene.get_node("%FocusActions").get_child(0) as Label).text
+	_check(extract_hint.call() == "R – Extract: no match", "focus: extract hint says no match (%s)" % extract_hint.call())
 	_press(KEY_R)  # (0,1) is Empty: no match
 	_check(inv.count(&"iron") == 0 and tiles.grid.cooldowns.is_empty(), "planet: R without a matching line does nothing")
 	tiles.grid.set_tile(Vector2i(0, 1), TileGrid.TileType.IRON_DEPOSIT)
+	tiles.grid.set_tile(Vector2i(1, 0), TileGrid.TileType.GOLD_ORE)
+	_check(extract_hint.call() == "R – Extract: Iron", "focus: extract hint names the matching element (%s)"
+		% extract_hint.call())
+	_press(KEY_D)  # face NE, toward the Gold at (1,0)
+	var turned_hint: String = extract_hint.call()
+	_press(KEY_A)  # back to N
+	_check(turned_hint == "R – Extract: no match" and extract_hint.call() == "R – Extract: Iron",
+		"focus: extract hint follows turning (%s)" % turned_hint)
 	_press(KEY_R)
 	_check(tiles.grid.get_tile(Vector2i.ZERO) == TileGrid.TileType.IRON_DEPOSIT and inv.count(&"iron") == 1
 		and tiles.grid.cooldown(Vector2i.ZERO) == 5 and tiles.grid.cooldown(Vector2i(0, 1)) == 5,
 		"planet: R extracts 1 Iron and taps both tiles in the line for 5 actions")
-	_check(tile_info.shown_name() == "Iron Deposit" and tile_info.shown_yield() == "Tapped – 5 actions"
+	_check(extract_hint.call() == "R – Extract: no match", "focus: tapped tiles make the hint no match")
+	_check(tile_info.shown_name() == "Iron Deposit" and tile_info.shown_yield() == "Element: Iron (tapped, 5 actions)"
 		and tile_icon.texture is ImageTexture, "tile info: shows the tapped state and a greyscale icon (%s)"
 		% tile_info.shown_yield())
 	var grey := (tile_icon.texture as ImageTexture).get_image()
@@ -401,7 +412,8 @@ func _test_enter_planet() -> void:
 	var focus_hints: Array = current_scene.get_node("%FocusActions").get_children().map(
 		func(l: Label) -> String: return l.text)
 	_check(focus_box.visible and (current_scene.get_node("%FocusName") as Label).text == "Staff"
-		and focus_hints == ["R – Extract"], "focus: box shows Staff with R – Extract (%s)" % [focus_hints])
+		and focus_hints.size() == 1 and focus_hints[0].begins_with("R – Extract"),
+		"focus: box shows Staff with R – Extract (%s)" % [focus_hints])
 	var general_hints: Array = current_scene.get_node("%Actions").get_children().map(
 		func(l: Label) -> String: return l.text)
 	_check(general_hints == ["F – Push"], "focus: Extract moved out of the general actions (%s)" % [general_hints])

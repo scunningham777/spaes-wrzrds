@@ -19,3 +19,6 @@ Godot **4.7** project, **GDScript only** (no C#). Binary: `C:\Tools\Godot_v4.7.2
 - Async scene tests append to `_finished` at their end: a script error silently aborts the function, and the completion check catches it.
 - Exports: see README "Builds". Output goes to `builds/` (has a `.gdignore`; never remove it, or exports get imported into the next export).
 - Smoke test: `godot_console.exe --headless --path . -s res://tests/smoke_test.gd`
+- Git workflow: make changes on a new branch in this checkout (`git checkout -b <topic>` from `main`), **not** in a git
+  worktree – the user tests in the Godot editor, which has this folder open as the project. Check `git status` is clean
+  before switching branches. Commit and push the branch; the user merges it into `main`.

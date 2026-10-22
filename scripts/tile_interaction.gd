@@ -21,6 +21,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+# The tiles R would extract: the player's tile plus the equipped focus's distance straight ahead.
+func extract_line() -> Array[Vector2i]:
+	return Hex.line(player.mover.coord, player.mover.facing, Foci.distance(Game.state.equipped_focus))
+
+
+# The type R would extract right now, or EMPTY if the line doesn't match (or a tile is tapped).
+func extract_preview() -> TileGrid.TileType:
+	var coords := extract_line()
+	return tiles.grid.get_tile(coords[0]) if tiles.grid.can_extract(coords) else TileGrid.TileType.EMPTY
+
+
 # Each successful action ticks tapped-tile cooldowns before taking effect, so the action that taps
 # a tile doesn't count toward its own cooldown. (Moves tick too; the scene wires that up.)
 # Extraction needs the player's tile plus the focus's distance in tiles straight ahead, all the
@@ -30,7 +41,7 @@ func _try_extract() -> void:
 	if not Foci.grants(focus, &"extract"):
 		print("The equipped focus can't extract")
 		return
-	var coords := Hex.line(player.mover.coord, player.mover.facing, Foci.distance(focus))
+	var coords := extract_line()
 	if not tiles.grid.can_extract(coords):
 		print("Nothing to extract along %s" % [coords])
 		return
