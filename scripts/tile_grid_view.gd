@@ -44,7 +44,7 @@ const TILE_ANIMS: Dictionary[TileGrid.TileType, Dictionary] = {
 	TileGrid.TileType.WATER_SPRING: {"channel": &"scale_y", "step": 0.75, "values": [1.0, 0.9]},
 	TileGrid.TileType.IRON_DEPOSIT: {"channel": &"scale_y", "step": 0.75, "values": [1.0, 0.9]},
 	TileGrid.TileType.STONE_OUTCROP: {"channel": &"scale_y", "step": 0.75, "values": [1.0, 0.9]},
-	# Two quick flashes, then full alpha for the last 0.5 s.
+	# Two quick flashes, then holds full alpha for the rest of the cycle.
 	TileGrid.TileType.GOLD_ORE: {"channel": &"alpha", "step": 0.2,
 		"values": [0.7, 1.0, 0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]},
 	TileGrid.TileType.TIMBER: {"channel": &"rotation", "step": 0.75, "values": [0.0, 10.0, 0.0, -10.0]},

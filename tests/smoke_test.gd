@@ -267,7 +267,9 @@ func _test_enter_planet() -> void:
 
 	var tiles: TileGridView = current_scene.get_node("HexBoard/TileGridView")
 	var bg: ColorRect = current_scene.get_node("Background/ColorRect")
-	_check(tiles.grid.tiles.size() == 91, "planet: 91 tiles")
+	var radius: int = current_scene.grid_radius
+	_check(tiles.grid.tiles.size() == Hex.hexagon(radius).size(),
+		"planet: %d tiles for radius %d" % [tiles.grid.tiles.size(), radius])
 	_check(tiles.grid.tiles.values().any(func(t: int) -> bool: return t != TileGrid.TileType.EMPTY),
 		"planet: tiles are generated, not all Empty")
 	var tiles_snapshot := tiles.grid.tiles.duplicate()
@@ -277,23 +279,20 @@ func _test_enter_planet() -> void:
 		_check(tiles.has_icon(type) and tiles.color_for(type) == Color.BLACK,
 			"planet: %s draws an icon on a black hex" % TileGrid.TileType.keys()[type])
 	_check(not tiles.has_icon(TileGrid.TileType.EMPTY), "planet: Empty is a plain hex")
-	# Icon animations: [type, channel, seconds between samples, expected values]. Samples are taken
-	# mid-step, starting at half the interval.
-	for case: Array in [
-		[TileGrid.TileType.WATER_SPRING, &"y", 0.5, [0.0, -1.0, 0.0, 1.0, 0.0]],
-		[TileGrid.TileType.IRON_DEPOSIT, &"x", 0.5, [0.0, 1.0, 0.0, -1.0, 0.0]],
-		[TileGrid.TileType.STONE_OUTCROP, &"scale_y", 0.5, [1.0, 0.9, 1.0, 0.9]],
-		[TileGrid.TileType.GOLD_ORE, &"alpha", 0.125, [0.3, 1.0, 0.3, 1.0, 1.0, 1.0, 1.0, 1.0, 0.3]],
-		[TileGrid.TileType.TIMBER, &"rotation", 0.5, [0.0, 10.0, 0.0, -10.0, 0.0]],
-	]:
+	# Icon animations, read from TILE_ANIMS so tuning doesn't break the test: sampled mid-step, each
+	# step shows the next value, wrapping after the last; other channels stay at their defaults.
+	for type: TileGrid.TileType in TileGridView.TILE_ANIMS:
+		var anim: Dictionary = TileGridView.TILE_ANIMS[type]
+		var values: Array = anim["values"]
+		var expected: Array = values + [values[0]]
 		var got: Array = []
-		for i in (case[3] as Array).size():
-			tiles.anim_time = case[2] * (i + 0.5)
-			got.append(tiles.anim_value(case[0], case[1]))
-		_check(got == case[3], "planet: %s %s animation (%s)" % [TileGrid.TileType.keys()[case[0]], case[1], got])
-	tiles.anim_time = 1.6  # gold holds full alpha for the last 0.5 s of its 1 s cycle
-	_check(tiles.anim_value(TileGrid.TileType.GOLD_ORE, &"alpha") == 1.0
-		and tiles.anim_value(TileGrid.TileType.GOLD_ORE, &"y") == 0.0, "planet: gold rests at full alpha, no drift")
+		for i in expected.size():
+			tiles.anim_time = anim["step"] * (i + 0.5)
+			got.append(tiles.anim_value(type, anim["channel"]))
+		var others_default := TileGridView.ANIM_DEFAULTS.keys().all(func(channel: StringName) -> bool:
+			return channel == anim["channel"] or tiles.anim_value(type, channel) == TileGridView.ANIM_DEFAULTS[channel])
+		_check(got == expected and others_default, "planet: %s %s animation (%s)"
+			% [TileGrid.TileType.keys()[type], anim["channel"], got])
 	var side_panel: Control = current_scene.get_node("%SidePanel")
 	_check((current_scene.get_node("%PlanetName") as Label).text == planet_a.display_name,
 		"planet: side panel names the planet")
@@ -397,12 +396,12 @@ func _test_enter_planet() -> void:
 
 	tiles_snapshot = tiles.grid.tiles.duplicate()  # pushed/extracted state should survive a revisit
 
-	# Boundary: walking N from (0,0) stops at the radius-5 edge.
+	# Boundary: walking N from (0,0) stops at the grid's edge.
 	var planet_wizard: HexPlayerController = current_scene.get_node("HexBoard/Wizard")
-	for i in 8:
+	for i in radius + 3:
 		_press(KEY_W)
-	_check(planet_wizard.mover.coord == Vector2i(0, 5), "planet: wizard stops at the grid edge (got %s)" % planet_wizard.mover.coord)
-	_check(planet_wizard.position == (current_scene.get_node("HexBoard") as HexBoard).hex_to_local(Vector2i(0, 5)),
+	_check(planet_wizard.mover.coord == Vector2i(0, radius), "planet: wizard stops at the grid edge (got %s)" % planet_wizard.mover.coord)
+	_check(planet_wizard.position == (current_scene.get_node("HexBoard") as HexBoard).hex_to_local(Vector2i(0, radius)),
 		"planet: wizard drawn on the edge hex")
 	# Facing N on the flat-top planet: the marker's triangle sits on the top edge, tip pointing up.
 	var marker: HexFacingMarker = current_scene.get_node("HexBoard/Wizard/FacingMarker")
