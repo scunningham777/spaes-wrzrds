@@ -102,9 +102,33 @@ func _test_core_logic() -> void:
 		and g1.find_kind(&"nope") == null, "kinds: find_kind by id")
 	var no_empty := TileGridGenerator.generate(5, 0.0, rng)
 	_check(not no_empty.tiles.values().has(TileKind.EMPTY), "gen: probability 0 gives no Empty")
-	var all_empty := TileGridGenerator.generate(5, 1.0, rng)
+	var no_rules: Array[StringName] = []
+	var no_required: Dictionary[StringName, int] = {}
+	var all_empty := TileGridGenerator.generate(5, 1.0, rng, [], no_rules, no_required)
 	_check(all_empty.tiles.values().all(func(k: TileKind) -> bool: return k == TileKind.EMPTY),
-		"gen: probability 1 gives all Empty")
+		"gen: probability 1 without requirements gives all Empty")
+	# Element requirements: the start tile yields aether, and at least 2 tiles do in all.
+	var yields_aether := func(k: TileKind) -> bool: return Aether.ITEM in k.elements
+	var reqs_met := true
+	for seed_value in 30:
+		rng.seed = seed_value
+		var rg := TileGridGenerator.generate(2, 0.15, rng)
+		reqs_met = reqs_met and yields_aether.call(rg.get_tile(TileGridGenerator.START_COORD)) \
+			and rg.tiles.values().filter(yields_aether).size() >= 2
+	_check(reqs_met, "gen: start tile yields aether and 2+ tiles do, over 30 seeds")
+	var bare := TileGridGenerator.generate(5, 1.0, rng)
+	var bare_aether := bare.tiles.keys().filter(func(c: Vector2i) -> bool: return yields_aether.call(bare.get_tile(c)))
+	_check(bare_aether.size() == 2 and TileGridGenerator.START_COORD in bare_aether
+		and bare.tiles.values().filter(func(k: TileKind) -> bool: return k != TileKind.EMPTY).size() == 2,
+		"gen: probability 1 leaves only the start tile and one more aether tile (%s)" % [bare_aether])
+	var stone_rule: Dictionary[StringName, int] = {&"aether": 2, &"stone": 3}
+	var multi := TileGridGenerator.generate(3, 1.0, rng, [], TileGridGenerator.START_ELEMENTS, stone_rule)
+	var count_of := func(e: StringName) -> int:
+		return multi.tiles.values().filter(func(k: TileKind) -> bool: return e in k.elements).size()
+	_check(count_of.call(&"aether") == 2 and count_of.call(&"stone") == 3,
+		"gen: several required elements are each met (aether %d, stone %d)" % [count_of.call(&"aether"), count_of.call(&"stone")])
+	_check(TileGridGenerator.generate(0, 1.0, rng).get_tile(Vector2i.ZERO).id == &"aether_spring",
+		"gen: a one-tile planet still gets its start tile, without looping")
 
 	# Kinds for the grid tests below; rusty gold yields two elements.
 	var timber := TileKind.new(&"timber", "Timber", &"sapling", [&"wood"])
@@ -196,7 +220,18 @@ func _test_core_logic() -> void:
 	inv.add(&"stone")
 	inv.add(&"gold", 2)
 	_check(inv.owned() == [&"gold", &"stone"], "inventory: owned() follows Items.ORDER")
-	_check(inv.spend(&"gold") and inv.count(&"gold") == 1 and not inv.spend(&"water"), "inventory: spend")
+	_check(inv.spend(&"gold") and inv.count(&"gold") == 1 and not inv.spend(&"aether"), "inventory: spend")
+	# Aether: landing tops up to START, moves spend MOVE_COST, and the last one reports empty.
+	var purse := Inventory.new()
+	Aether.land(purse)
+	_check(purse.count(Aether.ITEM) == Aether.START, "aether: landing with none gives START")
+	purse.add(Aether.ITEM, 5)
+	Aether.land(purse)
+	_check(purse.count(Aether.ITEM) == Aether.START + 5, "aether: landing doesn't take away extra")
+	purse.spend(Aether.ITEM, purse.count(Aether.ITEM) - 2)
+	_check(Aether.pay_move(purse) and purse.count(Aether.ITEM) == 1, "aether: a move spends 1")
+	_check(not Aether.pay_move(purse) and purse.count(Aether.ITEM) == 0, "aether: spending the last one reports empty")
+	_check(not Aether.pay_move(purse) and purse.count(Aether.ITEM) == 0, "aether: paying with none stays at 0")
 	_check(inv_changes[0] == 3, "inventory: changed fires on add/spend")
 
 	var state := GameState.new()
@@ -324,6 +359,16 @@ func _test_enter_planet() -> void:
 		"planet: %d tiles for radius %d" % [tiles.grid.tiles.size(), radius])
 	_check(tiles.grid.tiles.values().any(func(k: TileKind) -> bool: return k != TileKind.EMPTY),
 		"planet: tiles are generated, not all Empty")
+	_check(Aether.ITEM in tiles.grid.get_tile(Vector2i.ZERO).elements, "planet: the start tile yields aether")
+	var aether_bar: ProgressBar = current_scene.get_node("%AetherBar")
+	var aether_label: Label = current_scene.get_node("%AetherLabel")
+	var aether := func() -> int: return _game().state.inventory.count(Aether.ITEM)
+	_check(aether.call() == 10 and aether_bar.value == 10 and aether_bar.max_value == 10
+		and aether_label.text == "Aether: 10", "aether: land with 10, shown on the bar (%s)" % aether_label.text)
+	var header: Control = current_scene.get_node("UI/SidePanel/Margin/Layout/Top/Header")
+	_check(aether_bar.global_position.y >= header.get_global_rect().end.y
+		and aether_bar.get_global_rect().end.y <= (current_scene.get_node("%Actions") as Control).global_position.y,
+		"aether: bar sits under the wizard icon and planet name")
 	var tiles_snapshot := tiles.grid.tiles.duplicate()
 	_check(bg.color.is_equal_approx(Color(0.19215687, 0.3019608, 0.4745098)), "planet: blue background")
 	_check(not (current_scene.get_node("HexBoard") as HexBoard).draw_outlines, "planet: no outlines")
@@ -476,6 +521,8 @@ func _test_enter_planet() -> void:
 	_press(KEY_W)
 	_press(KEY_X)
 	_check(tiles.grid.cooldown(Vector2i.ZERO) == 3, "tapped: each move counts down (%d)" % tiles.grid.cooldown(Vector2i.ZERO))
+	_check(aether.call() == 8 and aether_bar.value == 8 and aether_label.text == "Aether: 8",
+		"aether: each move spends 1, turning is free (%d)" % aether.call())
 	# Extract comes from the focus: with none equipped, R does nothing.
 	tiles.grid.set_tile(Vector2i(0, -1), timber)
 	_game().state.equipped_focus = &""
@@ -490,12 +537,12 @@ func _test_enter_planet() -> void:
 	_check(not panel.visible, "inventory: hidden at start")
 	_press(KEY_I)
 	_check(panel.visible and paused, "inventory: I opens it and pauses")
-	_check(panel.shown_items() == [&"iron"], "inventory: grid shows owned items (%s)" % [panel.shown_items()])
+	_check(panel.shown_items() == [&"aether", &"iron"], "inventory: grid shows owned items (%s)" % [panel.shown_items()])
 	var planet_wizard_coord: Vector2i = (current_scene.get_node("HexBoard/Wizard") as HexPlayerController).mover.coord
 	_press(KEY_W)
 	_check((current_scene.get_node("HexBoard/Wizard") as HexPlayerController).mover.coord == planet_wizard_coord,
 		"inventory: wizard can't move while it's open")
-	_check(panel.selected_item == &"iron" and (panel.get_node("%NameLabel") as Label).text == "Iron",
+	_check(panel.selected_item == &"aether" and (panel.get_node("%NameLabel") as Label).text == "Aether",
 		"inventory: first item selected by default")
 	panel.select(&"iron")
 	_check((panel.get_node("%NameLabel") as Label).text == "Iron"
@@ -514,6 +561,13 @@ func _test_enter_planet() -> void:
 		"focus: multi-element tile and hint list every element (%s / %s)" % [tile_info.shown_yield(), extract_hint.call()])
 	_press(KEY_R)
 	_check(inv.count(&"gold") == 1 and inv.count(&"iron") == 2, "planet: R extracts 1 of each shared element")
+	# Extracted aether goes into the same pool moving spends.
+	var aether_before: int = aether.call()
+	tiles.grid.set_tile(Vector2i.ZERO, tiles.grid.find_kind(&"aether_spring"))
+	tiles.grid.set_tile(Vector2i(0, 1), tiles.grid.find_kind(&"aether_spring"))
+	_press(KEY_R)
+	_check(aether.call() == aether_before + 1 and aether_label.text == "Aether: %d" % (aether_before + 1),
+		"aether: extracting it refills the bar (%s)" % aether_label.text)
 	tiles.grid.set_tile(Vector2i(0, 1), iron)
 	tiles.grid.set_tile(Vector2i.ZERO, iron)
 
@@ -521,9 +575,11 @@ func _test_enter_planet() -> void:
 
 	# Boundary: walking N from (0,0) stops at the grid's edge.
 	var planet_wizard: HexPlayerController = current_scene.get_node("HexBoard/Wizard")
+	var aether_before_walk: int = aether.call()
 	for i in radius + 3:
 		_press(KEY_W)
 	_check(planet_wizard.mover.coord == Vector2i(0, radius), "planet: wizard stops at the grid edge (got %s)" % planet_wizard.mover.coord)
+	_check(aether.call() == aether_before_walk - radius, "aether: bumping the edge costs nothing (%d left)" % aether.call())
 	_check(planet_wizard.position == (current_scene.get_node("HexBoard") as HexBoard).hex_to_local(Vector2i(0, radius)),
 		"planet: wizard drawn on the edge hex")
 	# Facing N on the flat-top planet: the marker's triangle sits on the top edge, tip pointing up.
@@ -551,6 +607,22 @@ func _test_enter_planet() -> void:
 	await process_frame
 	var revisit: TileGridView = current_scene.get_node("HexBoard/TileGridView")
 	_check(revisit.grid.tiles == first_visit, "planet: revisit shows the same tiles")
+	# Running out: the move that spends the last aether kicks the wizard back to space.
+	var revisit_inv: Inventory = _game().state.inventory
+	revisit_inv.spend(Aether.ITEM, revisit_inv.count(Aether.ITEM) - 2)
+	_press(KEY_W)
+	await process_frame
+	_check(current_scene.scene_file_path == "res://scenes/planet.tscn", "aether: still on the planet with 1 left")
+	_press(KEY_X)
+	await process_frame
+	await process_frame
+	_check(revisit_inv.count(Aether.ITEM) == 0 and current_scene.scene_file_path == "res://scenes/play.tscn"
+		and _game().state.current_location == null, "aether: running out kicks the wizard back to space")
+	_press(KEY_ENTER)
+	await process_frame
+	await process_frame
+	_check(current_scene.scene_file_path == "res://scenes/planet.tscn" and revisit_inv.count(Aether.ITEM) == 10,
+		"aether: landing again tops back up to 10")
 	current_scene.queue_free()
 	await process_frame
 	_finished.append("enter_planet")

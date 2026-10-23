@@ -14,6 +14,8 @@ extends Node2D
 @onready var _side_panel: Control = %SidePanel
 @onready var _tile_info: TileInfo = %TileInfo
 @onready var _interaction: TileInteraction = $TileInteraction
+@onready var _aether_bar: ProgressBar = %AetherBar
+@onready var _aether_label: Label = %AetherLabel
 
 # Focus action hint labels by action, so their status suffixes can be refreshed.
 var _focus_hints: Dictionary[StringName, Label] = {}
@@ -21,6 +23,10 @@ var _focus_hints: Dictionary[StringName, Label] = {}
 
 func _ready() -> void:
 	($UI/InventoryPanel as InventoryPanel).inventory = Game.state.inventory
+	# Moving costs aether (see the end of _ready); the visit starts with at least Aether.START.
+	Aether.land(Game.state.inventory)
+	Game.state.inventory.changed.connect(_update_aether)
+	_update_aether()
 	get_viewport().size_changed.connect(_center_map)
 	_center_map()
 
@@ -47,6 +53,9 @@ func _ready() -> void:
 	_tiles.grid.tile_changed.connect(func(_coord: Vector2i, _kind: TileKind) -> void: _update_side_panel())
 	_tiles.grid.tapped_changed.connect(func(_coord: Vector2i, _remaining: int) -> void: _update_side_panel())
 	_update_side_panel()
+
+	# Connected last, so a move that runs out of aether has updated everything else before leaving.
+	_wizard.mover.moved.connect(_pay_for_move)
 
 	# Dim the action lists while an action plays out and input is blocked.
 	($ActionLock as ActionLock).busy_changed.connect(func(busy: bool) -> void:
@@ -95,6 +104,23 @@ func _update_side_panel() -> void:
 	_tile_info.show_tile(kind, _tiles.icon_texture(kind, _tiles.grid.is_tapped(coord)), _tiles.grid.cooldown(coord))
 	for action in _focus_hints:
 		_focus_hints[action].text = _focus_hint_text(action)
+
+
+# Successful moves cost aether; running out kicks the player back to space.
+func _pay_for_move(_coord: Vector2i) -> void:
+	if not Aether.pay_move(Game.state.inventory):
+		print("Out of aether")
+		# Deferred: changing scenes takes this one out of the tree at once, and the wizard is still
+		# handling the move's input.
+		Game.leave_location.call_deferred()
+
+
+# The bar fills against Aether.START; the label has the exact count, which extraction can push past it.
+func _update_aether() -> void:
+	var amount := Game.state.inventory.count(Aether.ITEM)
+	_aether_bar.max_value = Aether.START
+	_aether_bar.value = amount
+	_aether_label.text = "Aether: %d" % amount
 
 
 # The board sits at the world origin; shift the camera so the origin lands in the middle of the

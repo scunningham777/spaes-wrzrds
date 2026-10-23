@@ -8,7 +8,7 @@ extends Control
 # Started as copies of the tile colors TileGridView used to draw.
 const ITEM_COLORS: Dictionary[StringName, Color] = {
 	&"gold": Color(1.0, 0.84, 0.0),
-	&"water": Color(0.3, 0.6, 1.0),
+	&"aether": Color(0.3, 0.6, 1.0),
 	&"iron": Color(0.65, 0.35, 0.3),
 	&"wood": Color(0.4, 0.6, 0.3),
 	&"stone": Color(0.6, 0.6, 0.6),

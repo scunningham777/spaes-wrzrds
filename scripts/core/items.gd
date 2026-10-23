@@ -5,11 +5,11 @@ extends RefCounted
 # the counts; this holds what each item *is*. (Structure from the Viking demo's Items.)
 
 ## Inventory display order.
-const ORDER: Array[StringName] = [&"gold", &"water", &"iron", &"wood", &"stone"]
+const ORDER: Array[StringName] = [&"gold", &"aether", &"iron", &"wood", &"stone"]
 
 const NAMES: Dictionary[StringName, String] = {
 	&"gold": "Gold",
-	&"water": "Water",
+	&"aether": "Aether",
 	&"iron": "Iron",
 	&"wood": "Wood",
 	&"stone": "Stone",
@@ -17,7 +17,7 @@ const NAMES: Dictionary[StringName, String] = {
 
 const DESCRIPTIONS: Dictionary[StringName, String] = {
 	&"gold": "Glittering ore chipped from a gold vein. Valuable, if not especially useful on its own.",
-	&"water": "Clear water drawn from a planet-side spring.",
+	&"aether": "Shimmering blue essence welling up from a planet's aether springs. Spent to move across a planet's surface.",
 	&"iron": "Rust-red iron ore. Heavy, and the backbone of anything worth building.",
 	&"wood": "Timber cut from alien trees. Burns, bends, and builds.",
 	&"stone": "Chunks of rock from a stone outcrop. Solid and plentiful.",

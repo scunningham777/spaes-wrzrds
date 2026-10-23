@@ -10,6 +10,9 @@ Controls (flat-top hexes): **Q/W/E/Z/X/C** or numpad move · **A/D** turn · **E
 **R** extract the tile you're on (needs the staff; taps the tile for a few actions) · **F** swap your tile with
 the one you face · **I** inventory · **Esc** back.
 
+On a planet each move costs 1 aether (the blue bar). You land with at least 10; extracting aether
+refills it, and running out sends you back to space. The landing tile always yields aether.
+
 ## Tests
 
 ```
