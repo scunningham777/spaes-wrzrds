@@ -26,16 +26,16 @@ func extract_line() -> Array[Vector2i]:
 	return Hex.line(player.mover.coord, player.mover.facing, Foci.distance(Game.state.equipped_focus))
 
 
-# The type R would extract right now, or EMPTY if the line doesn't match (or a tile is tapped).
-func extract_preview() -> TileGrid.TileType:
-	var coords := extract_line()
-	return tiles.grid.get_tile(coords[0]) if tiles.grid.can_extract(coords) else TileGrid.TileType.EMPTY
+# The elements R would extract right now; empty if the line shares none (or a tile is tapped).
+func extract_preview() -> Array[StringName]:
+	return tiles.grid.extractable_elements(extract_line())
 
 
 # Each successful action ticks tapped-tile cooldowns before taking effect, so the action that taps
 # a tile doesn't count toward its own cooldown. (Moves tick too; the scene wires that up.)
-# Extraction needs the player's tile plus the focus's distance in tiles straight ahead, all the
-# same untapped type. Success taps them all but yields the focus's extract amount, not one per tile.
+# Extraction needs the player's tile plus the focus's distance in tiles straight ahead, all
+# untapped and sharing at least one element. Success taps them all and yields the focus's extract
+# amount of each shared element, not one per tile.
 func _try_extract() -> void:
 	var focus := Game.state.equipped_focus
 	if not Foci.grants(focus, &"extract"):
@@ -46,11 +46,11 @@ func _try_extract() -> void:
 		print("Nothing to extract along %s" % [coords])
 		return
 	tiles.grid.tick_cooldowns()
-	var extracted := tiles.grid.try_extract(coords)
-	var item := Items.from_tile(extracted)
-	if not item.is_empty():
-		Game.state.inventory.add(item, Foci.extract_amount(focus))
-	print("Extracted %s (%s) along %s" % [TileGrid.TileType.keys()[extracted], item, coords])
+	var amount := Foci.extract_amount(focus)
+	var elements := tiles.grid.try_extract(coords)
+	for element in elements:
+		Game.state.inventory.add(element, amount)
+	print("Extracted %d each of %s along %s" % [amount, elements, coords])
 
 
 func _try_swap() -> void:

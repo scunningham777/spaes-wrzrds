@@ -16,8 +16,8 @@ const ACTIONS: Dictionary[StringName, Array] = {
 	STAFF: [&"extract"],
 }
 
-## Per-focus stats. distance: tiles ahead of the player that extraction also needs (all matching
-## the player's tile). extract_amount: items gained per successful extraction.
+## Per-focus stats. distance: tiles ahead of the player that extraction also needs (all sharing an
+## element with the player's tile). extract_amount: items gained of each shared element.
 const STATS: Dictionary[StringName, Dictionary] = {
 	STAFF: {"distance": 1, "extract_amount": 1},
 }

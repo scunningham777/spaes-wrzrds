@@ -44,7 +44,7 @@ func _ready() -> void:
 	_show_focus(Game.state.equipped_focus)
 	_wizard.mover.moved.connect(func(_coord: Vector2i) -> void: _update_side_panel())
 	_wizard.facing_changed.connect(func(_facing: Vector2i) -> void: _update_side_panel())
-	_tiles.grid.tile_changed.connect(func(_coord: Vector2i, _type: TileGrid.TileType) -> void: _update_side_panel())
+	_tiles.grid.tile_changed.connect(func(_coord: Vector2i, _kind: TileKind) -> void: _update_side_panel())
 	_tiles.grid.tapped_changed.connect(func(_coord: Vector2i, _remaining: int) -> void: _update_side_panel())
 	_update_side_panel()
 
@@ -70,12 +70,13 @@ func _show_focus(focus: StringName) -> void:
 		_focus_hints[action] = hint
 
 
-# "R – Extract", plus what the action would do from here where that's known ("R – Extract: Iron").
+# "R – Extract", plus what the action would do from here where that's known ("R – Extract: Iron",
+# or "R – Extract: Gold, Iron" when the line shares several elements).
 func _focus_hint_text(action: StringName) -> String:
 	var text := "%s – %s" % [_key_name(action), String(action).capitalize()]
 	if action == &"extract":
-		var item := Items.from_tile(_interaction.extract_preview())
-		text += ": %s" % (Items.display_name(item) if not item.is_empty() else "no match")
+		var elements := _interaction.extract_preview()
+		text += ": %s" % (Items.list_names(elements) if not elements.is_empty() else "no match")
 	return text
 
 
@@ -90,8 +91,8 @@ static func _key_name(action: StringName) -> String:
 
 func _update_side_panel() -> void:
 	var coord := _wizard.mover.coord
-	var type := _tiles.grid.get_tile(coord)
-	_tile_info.show_tile(type, _tiles.icon_texture(type, _tiles.grid.is_tapped(coord)), _tiles.grid.cooldown(coord))
+	var kind := _tiles.grid.get_tile(coord)
+	_tile_info.show_tile(kind, _tiles.icon_texture(kind, _tiles.grid.is_tapped(coord)), _tiles.grid.cooldown(coord))
 	for action in _focus_hints:
 		_focus_hints[action].text = _focus_hint_text(action)
 

@@ -88,32 +88,44 @@ func _test_core_logic() -> void:
 	var g1 := TileGridGenerator.generate(5, 0.15, rng)
 	rng.seed = 42
 	var g2 := TileGridGenerator.generate(5, 0.15, rng)
-	_check(g1.tiles == g2.tiles, "gen: same seed gives same grid")
+	# Grids get their own kind objects, so compare by id.
+	var kind_ids := func(g: TileGrid) -> Array: return g.tiles.values().map(func(k: TileKind) -> StringName: return k.id)
+	_check(kind_ids.call(g1) == kind_ids.call(g2), "gen: same seed gives same grid")
 	var counts := {}
-	for t in g1.tiles.values():
-		counts[t] = counts.get(t, 0) + 1
-	_check(counts.size() == TileGrid.TileType.size(), "gen: every tile type appears (%s)" % counts)
+	for id: StringName in kind_ids.call(g1):
+		counts[id] = counts.get(id, 0) + 1
+	_check(g1.kinds.size() == TileGridGenerator.DEFAULT_KINDS.size() and counts.size() == g1.kinds.size() + 1,
+		"gen: every default kind, plus Empty, appears (%s)" % counts)
+	_check(g1.kinds.all(func(k: TileKind) -> bool: return k.elements.size() == 1 and Items.NAMES.has(k.elements[0])),
+		"gen: default kinds each yield one known item")
+	_check(g1.find_kind(&"timber").elements == [&"wood"] and g1.find_kind(&"empty") == TileKind.EMPTY
+		and g1.find_kind(&"nope") == null, "kinds: find_kind by id")
 	var no_empty := TileGridGenerator.generate(5, 0.0, rng)
-	_check(not no_empty.tiles.values().has(TileGrid.TileType.EMPTY), "gen: probability 0 gives no Empty")
+	_check(not no_empty.tiles.values().has(TileKind.EMPTY), "gen: probability 0 gives no Empty")
 	var all_empty := TileGridGenerator.generate(5, 1.0, rng)
-	_check(all_empty.tiles.values().all(func(t: int) -> bool: return t == TileGrid.TileType.EMPTY),
+	_check(all_empty.tiles.values().all(func(k: TileKind) -> bool: return k == TileKind.EMPTY),
 		"gen: probability 1 gives all Empty")
 
+	# Kinds for the grid tests below; rusty gold yields two elements.
+	var timber := TileKind.new(&"timber", "Timber", &"sapling", [&"wood"])
+	var gold := TileKind.new(&"gold_ore", "Gold Ore", &"gold_ore", [&"gold"])
+	var iron := TileKind.new(&"iron_deposit", "Iron Deposit", &"iron_deposit", [&"iron"])
+	var rusty_gold := TileKind.new(&"rusty_gold", "Rusty Gold", &"gold_ore", [&"gold", &"iron"])
+
 	# Swap (TileGrid.try_swap).
-	var T := TileGrid.TileType
 	var pg := TileGrid.new(2)
 	var changes: Array[Vector2i] = []
-	pg.tile_changed.connect(func(c: Vector2i, _t: int) -> void: changes.append(c))
-	pg.set_tile(Vector2i.ZERO, T.TIMBER)
-	pg.set_tile(Vector2i(0, 1), T.GOLD_ORE)
+	pg.tile_changed.connect(func(c: Vector2i, _k: TileKind) -> void: changes.append(c))
+	pg.set_tile(Vector2i.ZERO, timber)
+	pg.set_tile(Vector2i(0, 1), gold)
 	changes.clear()
 	_check(pg.try_swap(Vector2i.ZERO, Vector2i(0, 1)), "swap: tiles swap")
-	_check(pg.get_tile(Vector2i.ZERO) == T.GOLD_ORE and pg.get_tile(Vector2i(0, 1)) == T.TIMBER,
+	_check(pg.get_tile(Vector2i.ZERO) == gold and pg.get_tile(Vector2i(0, 1)) == timber,
 		"swap: Timber and Gold traded places")
 	_check(changes.size() == 2, "swap: tile_changed fires for both hexes")
-	_check(pg.try_swap(Vector2i(0, 1), Vector2i(0, 2)) and pg.get_tile(Vector2i(0, 1)) == T.EMPTY
-		and pg.get_tile(Vector2i(0, 2)) == T.TIMBER, "swap: with an Empty hex moves the tile")
-	_check(not pg.try_swap(Vector2i(0, 2), Vector2i(0, 3)) and pg.get_tile(Vector2i(0, 2)) == T.TIMBER,
+	_check(pg.try_swap(Vector2i(0, 1), Vector2i(0, 2)) and pg.get_tile(Vector2i(0, 1)) == TileKind.EMPTY
+		and pg.get_tile(Vector2i(0, 2)) == timber, "swap: with an Empty hex moves the tile")
+	_check(not pg.try_swap(Vector2i(0, 2), Vector2i(0, 3)) and pg.get_tile(Vector2i(0, 2)) == timber,
 		"swap: can't swap off the grid, no change")
 	_check(not pg.try_swap(Vector2i(1, 0), Vector2i(2, 0)), "swap: two Empty hexes is no swap")
 
@@ -129,29 +141,45 @@ func _test_core_logic() -> void:
 	# Extract + inventory.
 	var eg := TileGrid.new(1)
 	var at := func(c: Vector2i) -> Array[Vector2i]: return [c]
-	eg.set_tile(Vector2i.ZERO, T.TIMBER)
-	_check(eg.try_extract(at.call(Vector2i.ZERO)) == T.TIMBER and eg.get_tile(Vector2i.ZERO) == T.TIMBER
-		and eg.cooldown(Vector2i.ZERO) == 5, "extract: returns the type and taps the tile for 5 actions")
-	_check(eg.try_extract(at.call(Vector2i.ZERO)) == T.EMPTY, "extract: tapped tile yields nothing")
-	_check(eg.try_extract(at.call(Vector2i(1, 0))) == T.EMPTY, "extract: Empty tile yields nothing")
-	_check(eg.try_extract(at.call(Vector2i(9, 9))) == T.EMPTY, "extract: off-grid yields nothing")
-	# Lines: every tile must match and be free; success taps them all.
+	eg.set_tile(Vector2i.ZERO, timber)
+	_check(eg.try_extract(at.call(Vector2i.ZERO)) == [&"wood"] and eg.get_tile(Vector2i.ZERO) == timber
+		and eg.cooldown(Vector2i.ZERO) == 5, "extract: returns the elements and taps the tile for 5 actions")
+	_check(eg.try_extract(at.call(Vector2i.ZERO)).is_empty(), "extract: tapped tile yields nothing")
+	_check(eg.try_extract(at.call(Vector2i(1, 0))).is_empty(), "extract: Empty tile yields nothing")
+	_check(eg.try_extract(at.call(Vector2i(9, 9))).is_empty(), "extract: off-grid yields nothing")
+	# Lines: every tile must be free and share an element; success taps them all.
 	var lg := TileGrid.new(2)
 	var line := Hex.line(Vector2i.ZERO, Vector2i(0, 1), 2)  # (0,0) (0,1) (0,2)
 	for c in line:
-		lg.set_tile(c, T.IRON_DEPOSIT)
-	lg.set_tile(Vector2i(0, 2), T.GOLD_ORE)
-	_check(lg.try_extract(line) == T.EMPTY and lg.cooldowns.is_empty(), "extract: a mismatched tile in the line, no change")
-	lg.set_tile(Vector2i(0, 2), T.IRON_DEPOSIT)
+		lg.set_tile(c, iron)
+	lg.set_tile(Vector2i(0, 2), gold)
+	_check(lg.try_extract(line).is_empty() and lg.cooldowns.is_empty(), "extract: a tile sharing nothing in the line, no change")
+	lg.set_tile(Vector2i(0, 2), iron)
 	lg.try_extract(at.call(Vector2i(0, 2)))
-	_check(lg.try_extract(line) == T.EMPTY and lg.cooldowns.keys() == [Vector2i(0, 2)],
+	_check(lg.try_extract(line).is_empty() and lg.cooldowns.keys() == [Vector2i(0, 2)],
 		"extract: a tapped tile in the line, no change")
 	for i in lg.tap_cooldown:
 		lg.tick_cooldowns()
-	_check(lg.try_extract(line) == T.IRON_DEPOSIT and line.all(func(c: Vector2i) -> bool: return lg.cooldown(c) == 5),
+	_check(lg.try_extract(line) == [&"iron"] and line.all(func(c: Vector2i) -> bool: return lg.cooldown(c) == 5),
 		"extract: a matching line taps every tile")
 	_check(not lg.can_extract(Hex.line(Vector2i(0, 1), Vector2i(0, 1), 2)), "extract: a line running off the grid fails")
-	eg.set_tile(Vector2i(1, 0), T.GOLD_ORE)
+	# Multiple elements: the line yields whatever every tile has, in the first tile's order.
+	var mg := TileGrid.new(2)
+	var pair := Hex.line(Vector2i.ZERO, Vector2i(0, 1), 1)  # (0,0) (0,1)
+	mg.set_tile(pair[0], rusty_gold)
+	mg.set_tile(pair[1], rusty_gold)
+	_check(mg.extractable_elements(pair) == [&"gold", &"iron"], "extract: same multi-element kind yields all its elements")
+	mg.set_tile(pair[1], iron)
+	_check(mg.extractable_elements(pair) == [&"iron"], "extract: different kinds yield only the overlap")
+	mg.set_tile(pair[0], gold)
+	mg.set_tile(pair[1], rusty_gold)
+	_check(mg.try_extract(pair) == [&"gold"] and mg.cooldown(pair[0]) == 5 and mg.cooldown(pair[1]) == 5,
+		"extract: overlap taps every tile")
+	mg.set_tile(pair[0], timber)
+	_check(mg.extractable_elements(pair).is_empty(), "extract: kinds sharing nothing yield nothing")
+	_check(Items.list_names([&"gold", &"iron"]) == "Gold, Iron" and Items.list_names([]) == "",
+		"items: list_names joins display names")
+	eg.set_tile(Vector2i(1, 0), gold)
 	_check(eg.try_swap(Vector2i.ZERO, Vector2i(1, 0)) and eg.cooldown(Vector2i(1, 0)) == 5
 		and not eg.is_tapped(Vector2i.ZERO), "tapped: state moves with the tile on a swap")
 	for i in 4:
@@ -161,9 +189,7 @@ func _test_core_logic() -> void:
 	eg.tapped_changed.connect(func(c: Vector2i, left: int) -> void: if left == 0: untapped.append(c))
 	eg.tick_cooldowns()
 	_check(not eg.is_tapped(Vector2i(1, 0)) and untapped == [Vector2i(1, 0)]
-		and eg.try_extract(at.call(Vector2i(1, 0))) == T.TIMBER, "tapped: 5th tick untaps it, extractable again")
-	_check(Items.from_tile(T.GOLD_ORE) == &"gold" and Items.from_tile(T.EMPTY) == &"",
-		"items: tile -> item mapping")
+		and eg.try_extract(at.call(Vector2i(1, 0))) == [&"wood"], "tapped: 5th tick untaps it, extractable again")
 	var inv := Inventory.new()
 	var inv_changes := [0]
 	inv.changed.connect(func() -> void: inv_changes[0] += 1)
@@ -296,29 +322,29 @@ func _test_enter_planet() -> void:
 	var radius: int = current_scene.grid_radius
 	_check(tiles.grid.tiles.size() == Hex.hexagon(radius).size(),
 		"planet: %d tiles for radius %d" % [tiles.grid.tiles.size(), radius])
-	_check(tiles.grid.tiles.values().any(func(t: int) -> bool: return t != TileGrid.TileType.EMPTY),
+	_check(tiles.grid.tiles.values().any(func(k: TileKind) -> bool: return k != TileKind.EMPTY),
 		"planet: tiles are generated, not all Empty")
 	var tiles_snapshot := tiles.grid.tiles.duplicate()
 	_check(bg.color.is_equal_approx(Color(0.19215687, 0.3019608, 0.4745098)), "planet: blue background")
 	_check(not (current_scene.get_node("HexBoard") as HexBoard).draw_outlines, "planet: no outlines")
-	for type: TileGrid.TileType in Items.FROM_TILE:
-		_check(tiles.has_icon(type) and tiles.color_for(type) == Color.BLACK,
-			"planet: %s draws an icon on a black hex" % TileGrid.TileType.keys()[type])
-	_check(not tiles.has_icon(TileGrid.TileType.EMPTY), "planet: Empty is a plain hex")
-	# Icon animations, read from TILE_ANIMS so tuning doesn't break the test: sampled mid-step, each
+	_check(tiles.hex_color == Color.BLACK, "planet: hexes are black")
+	for kind in tiles.grid.kinds:
+		_check(tiles.has_icon(kind), "planet: %s draws an icon" % kind.display_name)
+	_check(not tiles.has_icon(TileKind.EMPTY), "planet: Empty is a plain hex")
+	# Icon animations, read from ICON_ANIMS so tuning doesn't break the test: sampled mid-step, each
 	# step shows the next value, wrapping after the last; other channels stay at their defaults.
-	for type: TileGrid.TileType in TileGridView.TILE_ANIMS:
-		var anim: Dictionary = TileGridView.TILE_ANIMS[type]
+	for icon: StringName in TileGridView.ICON_ANIMS:
+		var anim: Dictionary = TileGridView.ICON_ANIMS[icon]
 		var values: Array = anim["values"]
 		var expected: Array = values + [values[0]]
 		var got: Array = []
 		for i in expected.size():
 			tiles.anim_time = anim["step"] * (i + 0.5)
-			got.append(tiles.anim_value(type, anim["channel"]))
+			got.append(tiles.anim_value(icon, anim["channel"]))
 		var others_default := TileGridView.ANIM_DEFAULTS.keys().all(func(channel: StringName) -> bool:
-			return channel == anim["channel"] or tiles.anim_value(type, channel) == TileGridView.ANIM_DEFAULTS[channel])
+			return channel == anim["channel"] or tiles.anim_value(icon, channel) == TileGridView.ANIM_DEFAULTS[channel])
 		_check(got == expected and others_default, "planet: %s %s animation (%s)"
-			% [TileGrid.TileType.keys()[type], anim["channel"], got])
+			% [icon, anim["channel"], got])
 	var side_panel: Control = current_scene.get_node("%SidePanel")
 	_check((current_scene.get_node("%PlanetName") as Label).text == planet_a.display_name,
 		"planet: side panel names the planet")
@@ -332,18 +358,23 @@ func _test_enter_planet() -> void:
 	var lock: ActionLock = current_scene.get_node("ActionLock")
 	var actions: Control = current_scene.get_node("%Actions")
 	var swap_wizard: HexPlayerController = current_scene.get_node("HexBoard/Wizard")
-	tiles.grid.set_tile(Vector2i.ZERO, TileGrid.TileType.TIMBER)
-	tiles.grid.set_tile(Vector2i(0, 1), TileGrid.TileType.GOLD_ORE)
+	# The planet's own kinds (generated from the defaults).
+	var timber := tiles.grid.find_kind(&"timber")
+	var gold := tiles.grid.find_kind(&"gold_ore")
+	var iron := tiles.grid.find_kind(&"iron_deposit")
+	var stone := tiles.grid.find_kind(&"stone_outcrop")
+	tiles.grid.set_tile(Vector2i.ZERO, timber)
+	tiles.grid.set_tile(Vector2i(0, 1), gold)
 	_press(KEY_F)
-	_check(tiles.grid.get_tile(Vector2i.ZERO) == TileGrid.TileType.GOLD_ORE
-		and tiles.grid.get_tile(Vector2i(0, 1)) == TileGrid.TileType.TIMBER, "planet: F swaps with the faced tile")
+	_check(tiles.grid.get_tile(Vector2i.ZERO) == gold
+		and tiles.grid.get_tile(Vector2i(0, 1)) == timber, "planet: F swaps with the faced tile")
 	_check(lock.busy and actions.modulate.a < 1.0, "lock: busy and actions dimmed during the swap")
 	# Everything but the inventory is blocked until the tween ends.
 	var facing_before := swap_wizard.mover.facing
 	for key: Key in [KEY_W, KEY_D, KEY_F, KEY_R, KEY_ESCAPE]:
 		_press(key)
 	_check(swap_wizard.mover.coord == Vector2i.ZERO and swap_wizard.mover.facing == facing_before
-		and tiles.grid.get_tile(Vector2i.ZERO) == TileGrid.TileType.GOLD_ORE
+		and tiles.grid.get_tile(Vector2i.ZERO) == gold
 		and current_scene.scene_file_path == "res://scenes/planet.tscn",
 		"lock: move, turn, swap, extract and Esc are blocked")
 	var swap_inv_panel: InventoryPanel = current_scene.get_node("UI/InventoryPanel")
@@ -356,12 +387,12 @@ func _test_enter_planet() -> void:
 	_check(not lock.busy and actions.modulate.a == 1.0, "lock: released and actions undimmed after the swap")
 	_press(KEY_F)  # Gold back to (0,1), Timber to (0,0)
 	await create_timer(0.5).timeout
-	_check(tiles.grid.get_tile(Vector2i(0, 1)) == TileGrid.TileType.GOLD_ORE, "lock: F works again afterwards")
-	tiles.grid.set_tile(Vector2i(0, 1), TileGrid.TileType.EMPTY)
+	_check(tiles.grid.get_tile(Vector2i(0, 1)) == gold, "lock: F works again afterwards")
+	tiles.grid.set_tile(Vector2i(0, 1), TileKind.EMPTY)
 	# Extract with R: the staff (distance 1) needs the wizard's tile and the faced one, (0,1), to
 	# match. Both get tapped; the inventory gains the staff's extract amount (1).
 	var inv: Inventory = _game().state.inventory
-	tiles.grid.set_tile(Vector2i.ZERO, TileGrid.TileType.IRON_DEPOSIT)
+	tiles.grid.set_tile(Vector2i.ZERO, iron)
 	var tile_info: TileInfo = current_scene.get_node("%TileInfo")
 	var tile_icon: TextureRect = current_scene.get_node("%TileIcon")
 	_check(tile_info.shown_name() == "Iron Deposit" and tile_info.shown_yield() == "Element: Iron"
@@ -371,8 +402,8 @@ func _test_enter_planet() -> void:
 	_check(extract_hint.call() == "R – Extract: no match", "focus: extract hint says no match (%s)" % extract_hint.call())
 	_press(KEY_R)  # (0,1) is Empty: no match
 	_check(inv.count(&"iron") == 0 and tiles.grid.cooldowns.is_empty(), "planet: R without a matching line does nothing")
-	tiles.grid.set_tile(Vector2i(0, 1), TileGrid.TileType.IRON_DEPOSIT)
-	tiles.grid.set_tile(Vector2i(1, 0), TileGrid.TileType.GOLD_ORE)
+	tiles.grid.set_tile(Vector2i(0, 1), iron)
+	tiles.grid.set_tile(Vector2i(1, 0), gold)
 	_check(extract_hint.call() == "R – Extract: Iron", "focus: extract hint names the matching element (%s)"
 		% extract_hint.call())
 	_press(KEY_D)  # face NE, toward the Gold at (1,0)
@@ -381,7 +412,7 @@ func _test_enter_planet() -> void:
 	_check(turned_hint == "R – Extract: no match" and extract_hint.call() == "R – Extract: Iron",
 		"focus: extract hint follows turning (%s)" % turned_hint)
 	_press(KEY_R)
-	_check(tiles.grid.get_tile(Vector2i.ZERO) == TileGrid.TileType.IRON_DEPOSIT and inv.count(&"iron") == 1
+	_check(tiles.grid.get_tile(Vector2i.ZERO) == iron and inv.count(&"iron") == 1
 		and tiles.grid.cooldown(Vector2i.ZERO) == 5 and tiles.grid.cooldown(Vector2i(0, 1)) == 5,
 		"planet: R extracts 1 Iron and taps both tiles in the line for 5 actions")
 	_check(extract_hint.call() == "R – Extract: no match", "focus: tapped tiles make the hint no match")
@@ -411,14 +442,14 @@ func _test_enter_planet() -> void:
 	_check(absf(title_used.get_center().x - planet_name.get_global_rect().get_center().x) < 1.0,
 		"tile info: name and tapped note centered under the planet name")
 	# The longest name, tapped, still fits without clipping.
-	tiles.grid.set_tile(Vector2i(0, -1), TileGrid.TileType.STONE_OUTCROP)
-	tile_info.show_tile(TileGrid.TileType.STONE_OUTCROP, null, 5)
+	tiles.grid.set_tile(Vector2i(0, -1), stone)
+	tile_info.show_tile(stone, null, 5)
 	await process_frame
 	var title_slot := tile_info.size.x - 2 * 56.0  # between the icon-width margins
 	_check(tile_title.get_combined_minimum_size().x <= title_slot,
 		"tile info: \"Stone Outcrop  tapped: 5\" fits (%d of %d px)"
 		% [tile_title.get_combined_minimum_size().x, title_slot])
-	tiles.grid.set_tile(Vector2i(0, -1), TileGrid.TileType.EMPTY)  # also refreshes the panel back
+	tiles.grid.set_tile(Vector2i(0, -1), TileKind.EMPTY)  # also refreshes the panel back
 	var divider: Control = current_scene.get_node("UI/SidePanel/Margin/Layout/Bottom/Divider")
 	var split := (divider.global_position.y - 16.0) / (side_panel.size.y - 32.0)  # within the margins
 	_check(absf(split - 0.6) < 0.02 and divider.global_position.y < tile_info.global_position.y,
@@ -446,7 +477,7 @@ func _test_enter_planet() -> void:
 	_press(KEY_X)
 	_check(tiles.grid.cooldown(Vector2i.ZERO) == 3, "tapped: each move counts down (%d)" % tiles.grid.cooldown(Vector2i.ZERO))
 	# Extract comes from the focus: with none equipped, R does nothing.
-	tiles.grid.set_tile(Vector2i(0, -1), TileGrid.TileType.TIMBER)
+	tiles.grid.set_tile(Vector2i(0, -1), timber)
 	_game().state.equipped_focus = &""
 	_press(KEY_X)  # to (0,-1)
 	_press(KEY_R)
@@ -474,6 +505,17 @@ func _test_enter_planet() -> void:
 	await process_frame
 	_check(not panel.visible and not paused, "inventory: Esc closes it and unpauses")
 	_check(current_scene.scene_file_path == "res://scenes/planet.tscn", "inventory: Esc didn't also leave the planet")
+
+	# Two elements: tiles that both yield gold and iron give the staff's amount (1) of each.
+	var rusty_gold := TileKind.new(&"rusty_gold", "Rusty Gold", &"gold_ore", [&"gold", &"iron"])
+	tiles.grid.set_tile(Vector2i.ZERO, rusty_gold)  # setting also clears the tapped state
+	tiles.grid.set_tile(Vector2i(0, 1), rusty_gold)
+	_check(tile_info.shown_yield() == "Elements: Gold, Iron" and extract_hint.call() == "R – Extract: Gold, Iron",
+		"focus: multi-element tile and hint list every element (%s / %s)" % [tile_info.shown_yield(), extract_hint.call()])
+	_press(KEY_R)
+	_check(inv.count(&"gold") == 1 and inv.count(&"iron") == 2, "planet: R extracts 1 of each shared element")
+	tiles.grid.set_tile(Vector2i(0, 1), iron)
+	tiles.grid.set_tile(Vector2i.ZERO, iron)
 
 	tiles_snapshot = tiles.grid.tiles.duplicate()  # pushed/extracted state should survive a revisit
 

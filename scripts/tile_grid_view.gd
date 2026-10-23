@@ -2,54 +2,47 @@ class_name TileGridView
 extends Node2D
 
 # Draws a TileGrid as filled hexes, ported from Unity's TileVisualManager/TileVisual. Must be a
-# child of a HexBoard. Draws nothing until a grid is assigned. Types with an entry in TILE_ICONS
-# draw that sprite-sheet icon over an Empty-colored hex; the rest are plain colored hexes. Icons
-# with an entry in TILE_ANIMS step through it, all in sync off one clock. Tile size comes from
-# the board's tile_scale.
+# child of a HexBoard. Draws nothing until a grid is assigned. Every tile is a hex_color hex; kinds
+# whose icon has an entry in ICONS draw that sprite-sheet icon over it. Icons with an entry in
+# ICON_ANIMS step through it, all in sync off one clock. Tile size comes from the board's
+# tile_scale.
 
-## Sprite sheet that TILE_ICONS regions are cut from.
+## Sprite sheet that ICONS regions are cut from.
 @export var icon_sheet: Texture2D
+## Fill of every hex; opaque so icons keep their contrast.
+@export var hex_color: Color = Color.BLACK
 ## Icon pixel scale; matches the wizard sprite's.
 @export var icon_scale: float = 4.0
-## Play the TILE_ANIMS icon animations.
+## Play the ICON_ANIMS icon animations.
 @export var animate_icons: bool = true
 ## Tapped-tile cooldown number size, and its baseline's distance above the tile's bottom edge.
 @export var cooldown_font_size: int = 16
 @export var cooldown_margin: float = 6.0
 
-# Colors from Unity's TileVisual.GetColorForType.
-const TILE_COLORS: Dictionary[TileGrid.TileType, Color] = {
-	TileGrid.TileType.EMPTY: Color.BLACK,  # Opaque so icons keep their contrast
-	TileGrid.TileType.GOLD_ORE: Color(1.0, 0.84, 0.0),  # Gold
-	TileGrid.TileType.WATER_SPRING: Color(0.3, 0.6, 1.0),  # Blue
-	TileGrid.TileType.IRON_DEPOSIT: Color(0.65, 0.35, 0.3),  # Rust
-	TileGrid.TileType.TIMBER: Color(0.4, 0.6, 0.3),  # Green-brown
-	TileGrid.TileType.STONE_OUTCROP: Color(0.6, 0.6, 0.6),  # Gray
+# Tile pictures by TileKind.icon: regions in icon_sheet (12px cells, 1px gutters: cell (col, row)
+# is at 1 + 13 * col/row).
+const ICONS: Dictionary[StringName, Rect2] = {
+	&"gold_ore": Rect2(105, 612, 12, 12),  # Cell (8, 47)
+	&"water_spring": Rect2(378, 196, 12, 12),  # Cell (29, 15)
+	&"iron_deposit": Rect2(378, 40, 12, 12),  # Cell (29, 3)
+	&"sapling": Rect2(144, 118, 12, 12),  # Cell (11, 9)
+	&"stone_outcrop": Rect2(92, 183, 12, 12),  # Cell (7, 14)
 }
 
-# Regions in icon_sheet (12px cells, 1px gutters: cell (col, row) is at 1 + 13 * col/row).
-const TILE_ICONS: Dictionary[TileGrid.TileType, Rect2] = {
-	TileGrid.TileType.GOLD_ORE: Rect2(105, 612, 12, 12),  # Cell (8, 47)
-	TileGrid.TileType.WATER_SPRING: Rect2(378, 196, 12, 12),  # Cell (29, 15)
-	TileGrid.TileType.IRON_DEPOSIT: Rect2(378, 40, 12, 12),  # Cell (29, 3)
-	TileGrid.TileType.TIMBER: Rect2(144, 118, 12, 12),  # Cell (11, 9): sapling
-	TileGrid.TileType.STONE_OUTCROP: Rect2(92, 183, 12, 12),  # Cell (7, 14)
-}
-
-# Per-type icon animation: one channel stepped through `values`, `step` seconds per value.
+# Per-icon animation: one channel stepped through `values`, `step` seconds per value.
 # Channels: x / y (sprite pixels, y-down), scale_y (height factor), alpha, rotation (degrees,
 # clockwise). Transforms pivot on the icon's bottom center.
-const TILE_ANIMS: Dictionary[TileGrid.TileType, Dictionary] = {
-	TileGrid.TileType.WATER_SPRING: {"channel": &"scale_y", "step": 0.75, "values": [1.0, 0.9]},
-	TileGrid.TileType.IRON_DEPOSIT: {"channel": &"scale_y", "step": 0.75, "values": [1.0, 0.9]},
-	TileGrid.TileType.STONE_OUTCROP: {"channel": &"scale_y", "step": 0.75, "values": [1.0, 0.9]},
+const ICON_ANIMS: Dictionary[StringName, Dictionary] = {
+	&"water_spring": {"channel": &"scale_y", "step": 0.75, "values": [1.0, 0.9]},
+	&"iron_deposit": {"channel": &"scale_y", "step": 0.75, "values": [1.0, 0.9]},
+	&"stone_outcrop": {"channel": &"scale_y", "step": 0.75, "values": [1.0, 0.9]},
 	# Two quick flashes, then holds full alpha for the rest of the cycle.
-	TileGrid.TileType.GOLD_ORE: {"channel": &"alpha", "step": 0.2,
+	&"gold_ore": {"channel": &"alpha", "step": 0.2,
 		"values": [0.7, 1.0, 0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]},
-	TileGrid.TileType.TIMBER: {"channel": &"rotation", "step": 0.75, "values": [0.0, 10.0, 0.0, -10.0]},
+	&"sapling": {"channel": &"rotation", "step": 0.75, "values": [0.0, 10.0, 0.0, -10.0]},
 }
 
-# Channel values when a type has no animation for that channel.
+# Channel values when an icon has no animation for that channel.
 const ANIM_DEFAULTS: Dictionary[StringName, float] = {
 	&"x": 0.0, &"y": 0.0, &"scale_y": 1.0, &"alpha": 1.0, &"rotation": 0.0,
 }
@@ -78,52 +71,45 @@ var _swapping := false
 var _swap_from: Vector2i
 var _swap_to: Vector2i
 # Greyscale copies of the icons, for tapped tiles; built on first use.
-var _grey_icons: Dictionary[TileGrid.TileType, Texture2D] = {}
+var _grey_icons: Dictionary[StringName, Texture2D] = {}
 
 @onready var board: HexBoard = get_parent() as HexBoard
 
 
-func has_icon(type: TileGrid.TileType) -> bool:
-	return icon_sheet != null and TILE_ICONS.has(type)
+func has_icon(kind: TileKind) -> bool:
+	return icon_sheet != null and ICONS.has(kind.icon)
 
 
-# The type's icon as a standalone texture (also for UI), greyscale if tapped; null if it has none.
-func icon_texture(type: TileGrid.TileType, tapped: bool = false) -> Texture2D:
-	if not has_icon(type):
+# The kind's icon as a standalone texture (also for UI), greyscale if tapped; null if it has none.
+func icon_texture(kind: TileKind, tapped: bool = false) -> Texture2D:
+	if not has_icon(kind):
 		return null
 	if tapped:
-		return _grey_icon(type)
+		return _grey_icon(kind.icon)
 	var atlas := AtlasTexture.new()
 	atlas.atlas = icon_sheet
-	atlas.region = TILE_ICONS[type]
+	atlas.region = ICONS[kind.icon]
 	return atlas
 
 
-func _grey_icon(type: TileGrid.TileType) -> Texture2D:
-	if not _grey_icons.has(type):
+func _grey_icon(icon: StringName) -> Texture2D:
+	if not _grey_icons.has(icon):
 		var image := icon_sheet.get_image()
 		if image.is_compressed():
 			image.decompress()
-		image = image.get_region(Rect2i(TILE_ICONS[type]))
+		image = image.get_region(Rect2i(ICONS[icon]))
 		for y in image.get_height():
 			for x in image.get_width():
 				var c := image.get_pixel(x, y)
 				var lum := c.get_luminance()
 				image.set_pixel(x, y, Color(lum, lum, lum, c.a))
-		_grey_icons[type] = ImageTexture.create_from_image(image)
-	return _grey_icons[type]
+		_grey_icons[icon] = ImageTexture.create_from_image(image)
+	return _grey_icons[icon]
 
 
-# Hex fill color; icon tiles sit on the Empty color so the icon stands out.
-func color_for(type: TileGrid.TileType) -> Color:
-	if has_icon(type):
-		return TILE_COLORS[TileGrid.TileType.EMPTY]
-	return TILE_COLORS.get(type, Color.WHITE)
-
-
-# Current value of one animation channel for a type, or the channel's default.
-func anim_value(type: TileGrid.TileType, channel: StringName) -> float:
-	var anim: Dictionary = TILE_ANIMS.get(type, {})
+# Current value of one animation channel for an icon, or the channel's default.
+func anim_value(icon: StringName, channel: StringName) -> float:
+	var anim: Dictionary = ICON_ANIMS.get(icon, {})
 	if not animate_icons or anim.get("channel") != channel:
 		return ANIM_DEFAULTS[channel]
 	var values: Array = anim["values"]
@@ -146,7 +132,7 @@ func _process(delta: float) -> void:
 
 func _anim_frames() -> Array[int]:
 	var frames: Array[int] = []
-	for anim: Dictionary in TILE_ANIMS.values():
+	for anim: Dictionary in ICON_ANIMS.values():
 		frames.append(_anim_frame(anim))
 	return frames
 
@@ -166,7 +152,7 @@ func animate_swap(from: Vector2i, to: Vector2i, seconds: float) -> Tween:
 	return tween
 
 
-func _on_tile_changed(_coord: Vector2i, _type: TileGrid.TileType) -> void:
+func _on_tile_changed(_coord: Vector2i, _kind: TileKind) -> void:
 	queue_redraw()
 
 
@@ -184,8 +170,7 @@ func _draw() -> void:
 		var points := PackedVector2Array()
 		for p in tile:
 			points.append(center + p)
-		var type := grid.get_tile(coord)
-		draw_colored_polygon(points, color_for(type))
+		draw_colored_polygon(points, hex_color)
 		if not (_swapping and (coord == _swap_from or coord == _swap_to)):
 			_draw_contents(coord, center)
 	if _swapping:
@@ -198,28 +183,28 @@ func _draw() -> void:
 
 # Draws the icon (and tapped cooldown) of the tile at coord, centered on center.
 func _draw_contents(coord: Vector2i, center: Vector2) -> void:
-	var type := grid.get_tile(coord)
-	if not has_icon(type):
+	var kind := grid.get_tile(coord)
+	if not has_icon(kind):
 		return
 	var tapped := grid.is_tapped(coord)
-	_draw_icon(type, center, tapped)
+	_draw_icon(kind.icon, center, tapped)
 	if tapped:
 		_draw_cooldown(grid.cooldown(coord), center)
 
 
 # Tapped icons are greyscale and hold still.
-func _draw_icon(type: TileGrid.TileType, center: Vector2, tapped: bool) -> void:
-	var region := TILE_ICONS[type]
+func _draw_icon(icon: StringName, center: Vector2, tapped: bool) -> void:
+	var region := ICONS[icon]
 	var icon_size := region.size * icon_scale
 	var anim := func(channel: StringName) -> float:
-		return ANIM_DEFAULTS[channel] if tapped else anim_value(type, channel)
+		return ANIM_DEFAULTS[channel] if tapped else anim_value(icon, channel)
 	var shift := Vector2(anim.call(&"x"), anim.call(&"y")) * icon_scale
 	var pivot := center + Vector2(0.0, icon_size.y / 2.0) + shift  # bottom center
 	draw_set_transform(pivot, deg_to_rad(anim.call(&"rotation")), Vector2(1.0, anim.call(&"scale_y")))
 	var rect := Rect2(Vector2(-icon_size.x / 2.0, -icon_size.y), icon_size)
 	var modulate_color := Color(1.0, 1.0, 1.0, anim.call(&"alpha"))
 	if tapped:
-		draw_texture_rect(_grey_icon(type), rect, false, modulate_color)
+		draw_texture_rect(_grey_icon(icon), rect, false, modulate_color)
 	else:
 		draw_texture_rect_region(icon_sheet, rect, region, modulate_color)
 	draw_set_transform(Vector2.ZERO)

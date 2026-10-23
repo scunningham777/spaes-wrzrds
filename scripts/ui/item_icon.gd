@@ -5,7 +5,7 @@ extends Control
 # lookup once item sprites exist. (From the Viking demo.) Colors are kept separate from
 # TileGridView's on purpose: an item needn't look like the map tile it was extracted from.
 
-# Started as copies of TileGridView.TILE_COLORS.
+# Started as copies of the tile colors TileGridView used to draw.
 const ITEM_COLORS: Dictionary[StringName, Color] = {
 	&"gold": Color(1.0, 0.84, 0.0),
 	&"water": Color(0.3, 0.6, 1.0),

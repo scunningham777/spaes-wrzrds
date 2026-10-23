@@ -23,15 +23,6 @@ const DESCRIPTIONS: Dictionary[StringName, String] = {
 	&"stone": "Chunks of rock from a stone outcrop. Solid and plentiful.",
 }
 
-# Tile type -> item extracted from it (Unity's TileInteractionManager.ToResourceType).
-const FROM_TILE: Dictionary[TileGrid.TileType, StringName] = {
-	TileGrid.TileType.GOLD_ORE: &"gold",
-	TileGrid.TileType.WATER_SPRING: &"water",
-	TileGrid.TileType.IRON_DEPOSIT: &"iron",
-	TileGrid.TileType.TIMBER: &"wood",
-	TileGrid.TileType.STONE_OUTCROP: &"stone",
-}
-
 
 static func display_name(item: StringName) -> String:
 	return NAMES.get(item, String(item).capitalize())
@@ -41,6 +32,6 @@ static func description(item: StringName) -> String:
 	return DESCRIPTIONS.get(item, "")
 
 
-# The item a tile yields when extracted, or &"" for tiles that yield nothing (Empty).
-static func from_tile(type: TileGrid.TileType) -> StringName:
-	return FROM_TILE.get(type, &"")
+# Display names joined with commas, e.g. "Gold, Iron"; "" for no items.
+static func list_names(items: Array[StringName]) -> String:
+	return ", ".join(items.map(display_name))
