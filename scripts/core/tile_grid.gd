@@ -1,8 +1,10 @@
 class_name TileGrid
 extends RefCounted
 
-# Hexagon-shaped board of tiles, ported from Unity's TileExplore.TileGridManager. Starts all
-# Empty; TileGridGenerator fills in the planet's tile kinds.
+# A planet's tiles, ported from Unity's TileExplore.TileGridManager. Holds only the tiles the
+# player has revealed (add_tile); everywhere else is off the grid until something reveals it.
+# On a torus, every method takes any copy of a coord and works on its stored copy (torus.canonical),
+# and signals report stored copies; with no torus the grid is an unbounded plane.
 #
 # Extracting along a line of tiles yields the elements they all share.
 #
@@ -10,13 +12,16 @@ extends RefCounted
 # cooldown, counted in player actions, runs out: whoever runs the actions calls tick_cooldowns()
 # once per action.
 
+## Fires for revealed tiles too (add_tile).
 signal tile_changed(coord: Vector2i, kind: TileKind)
 ## remaining is 0 when the tile becomes untapped.
 signal tapped_changed(coord: Vector2i, remaining: int)
 
-var radius: int
+## The surface's wrapping, or null for an unbounded plane.
+var torus: HexTorus
 ## This planet's tile kinds (TileKind.EMPTY is implied, not listed).
 var kinds: Array[TileKind] = []
+## Revealed tiles, by stored copy.
 var tiles: Dictionary[Vector2i, TileKind] = {}
 ## Player actions a tile stays tapped after extraction.
 var tap_cooldown: int = 5
@@ -24,11 +29,19 @@ var tap_cooldown: int = 5
 var cooldowns: Dictionary[Vector2i, int] = {}
 
 
-func _init(p_radius: int = 5, p_kinds: Array[TileKind] = []) -> void:
-	radius = p_radius
+func _init(p_torus: HexTorus = null, p_kinds: Array[TileKind] = []) -> void:
+	torus = p_torus
 	kinds.assign(p_kinds)
-	for coord in Hex.hexagon(radius):
-		tiles[coord] = TileKind.EMPTY
+
+
+# The stored copy of coord (coord itself on a plane).
+func canonical(coord: Vector2i) -> Vector2i:
+	return torus.canonical(coord) if torus != null else coord
+
+
+# The copy of coord nearest reference (coord itself on a plane).
+func nearest(coord: Vector2i, reference: Vector2i) -> Vector2i:
+	return torus.nearest(coord, reference) if torus != null else coord
 
 
 # This planet's kind with the given id (TileKind.EMPTY for its id), or null if it has none.
@@ -41,39 +54,49 @@ func find_kind(id: StringName) -> TileKind:
 	return null
 
 
+# Whether coord has been revealed.
 func has_tile(coord: Vector2i) -> bool:
-	return tiles.has(coord)
+	return tiles.has(canonical(coord))
 
 
 func get_tile(coord: Vector2i) -> TileKind:
-	return tiles[coord]
+	return tiles[canonical(coord)]
+
+
+# Reveals a new tile at coord.
+func add_tile(coord: Vector2i, kind: TileKind) -> void:
+	var key := canonical(coord)
+	assert(not tiles.has(key), "Coord %s is already on the grid" % coord)
+	tiles[key] = kind
+	tile_changed.emit(key, kind)
 
 
 # Replacing a tile drops any tapped state, which belonged to the old tile.
 func set_tile(coord: Vector2i, kind: TileKind) -> void:
-	assert(tiles.has(coord), "Coord %s is not on the grid" % coord)
-	tiles[coord] = kind
-	_set_cooldown(coord, 0)  # before tile_changed, so listeners never see the old tile's state
-	tile_changed.emit(coord, kind)
+	var key := canonical(coord)
+	assert(tiles.has(key), "Coord %s is not on the grid" % coord)
+	tiles[key] = kind
+	_set_cooldown(key, 0)  # before tile_changed, so listeners never see the old tile's state
+	tile_changed.emit(key, kind)
 
 
 func is_tapped(coord: Vector2i) -> bool:
-	return cooldowns.has(coord)
+	return cooldowns.has(canonical(coord))
 
 
 # Actions left until the tile at coord is untapped; 0 if it isn't tapped.
 func cooldown(coord: Vector2i) -> int:
-	return cooldowns.get(coord, 0)
+	return cooldowns.get(canonical(coord), 0)
 
 
 # The elements every tile at coords yields, in the first tile's order: what extracting them
 # together would give. Empty if they share none, or any of them is off the grid or tapped.
 func extractable_elements(coords: Array[Vector2i]) -> Array[StringName]:
 	var shared: Array[StringName] = []
-	if coords.is_empty() or not coords.all(func(c: Vector2i) -> bool: return tiles.has(c) and not is_tapped(c)):
+	if coords.is_empty() or not coords.all(func(c: Vector2i) -> bool: return has_tile(c) and not is_tapped(c)):
 		return shared
-	for element in tiles[coords[0]].elements:
-		if coords.all(func(c: Vector2i) -> bool: return element in tiles[c].elements):
+	for element in get_tile(coords[0]).elements:
+		if coords.all(func(c: Vector2i) -> bool: return element in get_tile(c).elements):
 			shared.append(element)
 	return shared
 
@@ -88,12 +111,12 @@ func try_extract(coords: Array[Vector2i]) -> Array[StringName]:
 	var shared := extractable_elements(coords)
 	if not shared.is_empty():
 		for c in coords:
-			_set_cooldown(c, tap_cooldown)
+			_set_cooldown(canonical(c), tap_cooldown)
 	return shared
 
 
 func can_swap(a: Vector2i, b: Vector2i) -> bool:
-	return tiles.has(a) and tiles.has(b) and (tiles[a] != tiles[b] or cooldown(a) != cooldown(b))
+	return has_tile(a) and has_tile(b) and (get_tile(a) != get_tile(b) or cooldown(a) != cooldown(b))
 
 
 # Swaps the tiles at a and b, tapped state included. Returns false (no change) if either isn't
@@ -101,13 +124,13 @@ func can_swap(a: Vector2i, b: Vector2i) -> bool:
 func try_swap(a: Vector2i, b: Vector2i) -> bool:
 	if not can_swap(a, b):
 		return false
-	var a_kind := tiles[a]
+	var a_kind := get_tile(a)
 	var a_cooldown := cooldown(a)
 	var b_cooldown := cooldown(b)
-	set_tile(a, tiles[b])
+	set_tile(a, get_tile(b))
 	set_tile(b, a_kind)
-	_set_cooldown(a, b_cooldown)
-	_set_cooldown(b, a_cooldown)
+	_set_cooldown(canonical(a), b_cooldown)
+	_set_cooldown(canonical(b), a_cooldown)
 	return true
 
 
@@ -117,11 +140,12 @@ func tick_cooldowns() -> void:
 		_set_cooldown(coord, cooldowns[coord] - 1)
 
 
-func _set_cooldown(coord: Vector2i, remaining: int) -> void:
-	if remaining == cooldown(coord):
+# key must be a stored copy.
+func _set_cooldown(key: Vector2i, remaining: int) -> void:
+	if remaining == cooldowns.get(key, 0):
 		return
 	if remaining > 0:
-		cooldowns[coord] = remaining
+		cooldowns[key] = remaining
 	else:
-		cooldowns.erase(coord)
-	tapped_changed.emit(coord, maxi(remaining, 0))
+		cooldowns.erase(key)
+	tapped_changed.emit(key, maxi(remaining, 0))

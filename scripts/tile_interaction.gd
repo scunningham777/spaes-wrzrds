@@ -3,13 +3,16 @@ extends Node
 
 # Ported from Unity TileExplore.TileInteractionManager: maps interaction keys to TileGrid
 # operations at the player's position/facing. R extracts, F swaps the player's tile with the
-# one it faces. Animated actions hand their tween to the ActionLock, which blocks input until
-# they finish.
+# one it faces, V scries (reveals the next patch of the planet). Animated actions hand their
+# tween to the ActionLock, which blocks input until they finish.
 
 @export var player: HexPlayerController
 @export var tiles: TileGridView
 @export var lock: ActionLock
 @export var swap_seconds: float = 0.3
+
+## The planet being explored, for scrying; assigned by the scene. tiles shows its grid.
+var surface: PlanetSurface
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -18,6 +21,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("push"):
 		_try_swap()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("scry"):
+		_try_scry()
 		get_viewport().set_input_as_handled()
 
 
@@ -63,3 +69,16 @@ func _try_swap() -> void:
 	tiles.grid.try_swap(here, front)
 	print("Swapped tiles %s and %s" % [here, front])
 	lock.run(tiles.animate_swap(here, front, swap_seconds))
+
+
+# Scrying works from the middle of the explored area's edge (see PlanetSurface.scry_target) and
+# reveals the patch beyond it.
+func _try_scry() -> void:
+	var here := player.mover.coord
+	if surface == null or not surface.can_scry(here):
+		print("Nothing to scry from %s" % [here])
+		return
+	tiles.grid.tick_cooldowns()
+	var target: Vector2i = surface.scry_target(here)
+	surface.try_scry(here)
+	print("Scried the patch around %s" % [target])

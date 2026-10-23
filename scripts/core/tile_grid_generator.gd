@@ -1,10 +1,14 @@
 class_name TileGridGenerator
 extends RefCounted
 
-# Random tile generation, ported from Unity's TileGridManager.GenerateGrid: each tile is Empty
-# with probability empty_probability, otherwise a uniformly random kind from the planet's kinds.
-# Element requirements then override that: the start tile always yields the start elements, and
-# each required element is topped up to its minimum tile count on other tiles.
+# Random tile generation, ported from Unity's TileGridManager.GenerateGrid. A planet keeps its
+# generator and calls reveal() as the player uncovers more of it, so tiles are rolled when they're
+# first seen rather than all up front (what's revealed later can depend on what the player did).
+#
+# Each new tile is Empty with probability empty_probability, otherwise a uniformly random kind
+# from the planet's kinds. Element requirements then override that, per revealed region: the
+# start tile always yields the start elements, and each required element is topped up to its
+# minimum tile count within the region, by turning tiles the region newly revealed.
 
 ## Tile kinds every planet uses until generation rolls its own. Fields as in TileKind.
 const DEFAULT_KINDS: Array[Dictionary] = [
@@ -19,8 +23,29 @@ const DEFAULT_KINDS: Array[Dictionary] = [
 const START_COORD := Vector2i.ZERO
 ## Elements the start tile always yields, so the player can extract what moving costs.
 const START_ELEMENTS: Array[StringName] = [Aether.ITEM]
-## Fewest tiles that yield each element, the start tile included.
+## Fewest tiles in each revealed region that yield each element, the start tile included.
 const REQUIRED_ELEMENTS: Dictionary[StringName, int] = {Aether.ITEM: 2}
+
+var kinds: Array[TileKind] = []
+var empty_probability: float
+var start_elements: Array[StringName] = []
+var required_elements: Dictionary[StringName, int] = {}
+var rng: RandomNumberGenerator
+
+
+# Pass a seeded rng for reproducible results; otherwise a randomized one is used. p_kinds defaults
+# to default_kinds(). Every start and required element must be yielded by at least one kind.
+func _init(p_empty_probability: float = 0.0, p_rng: RandomNumberGenerator = null,
+		p_kinds: Array[TileKind] = [], p_start_elements: Array[StringName] = START_ELEMENTS,
+		p_required_elements: Dictionary[StringName, int] = REQUIRED_ELEMENTS) -> void:
+	empty_probability = p_empty_probability
+	rng = p_rng
+	if rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
+	kinds.assign(p_kinds if not p_kinds.is_empty() else default_kinds())
+	start_elements.assign(p_start_elements)
+	required_elements.assign(p_required_elements)
 
 
 # Fresh TileKinds built from DEFAULT_KINDS.
@@ -33,51 +58,62 @@ static func default_kinds() -> Array[TileKind]:
 	return result
 
 
-# Pass a seeded rng for reproducible results; otherwise a randomized one is used. kinds defaults
-# to default_kinds(). Every start and required element must be yielded by at least one kind.
-static func generate(radius: int, empty_probability: float,
-		rng: RandomNumberGenerator = null, kinds: Array[TileKind] = [],
-		start_elements: Array[StringName] = START_ELEMENTS,
-		required_elements: Dictionary[StringName, int] = REQUIRED_ELEMENTS) -> TileGrid:
-	if rng == null:
-		rng = RandomNumberGenerator.new()
-		rng.randomize()
-	if kinds.is_empty():
-		kinds = default_kinds()
-
-	var grid := TileGrid.new(radius, kinds)
-	for coord in grid.tiles:
-		if rng.randf() < empty_probability:
-			grid.set_tile(coord, TileKind.EMPTY)
-		else:
-			grid.set_tile(coord, kinds[rng.randi_range(0, kinds.size() - 1)])
-
-	var start := grid.get_tile(START_COORD)
-	if not start_elements.all(func(e: StringName) -> bool: return e in start.elements):
-		grid.set_tile(START_COORD, _pick_kind(kinds, start_elements, rng))
-	for element in required_elements:
-		_require(grid, element, required_elements, rng)
+# A plane grid with just a radius-sized hexagon around START_COORD revealed. Arguments as in _init.
+static func generate(radius: int, p_empty_probability: float,
+		p_rng: RandomNumberGenerator = null, p_kinds: Array[TileKind] = [],
+		p_start_elements: Array[StringName] = START_ELEMENTS,
+		p_required_elements: Dictionary[StringName, int] = REQUIRED_ELEMENTS) -> TileGrid:
+	var generator := TileGridGenerator.new(p_empty_probability, p_rng, p_kinds, p_start_elements, p_required_elements)
+	var grid := TileGrid.new(null, generator.kinds)
+	generator.reveal(grid, Hex.hexagon(radius))
 	return grid
 
 
-# Turns random tiles into kinds yielding element until required_elements[element] tiles yield it.
-# Only tiles yielding no required element are turned (and never the start tile), so meeting one
-# requirement can't undo another.
-static func _require(grid: TileGrid, element: StringName, required_elements: Dictionary[StringName, int],
-		rng: RandomNumberGenerator) -> void:
-	var missing: int = required_elements[element] - grid.tiles.values().filter(
-		func(k: TileKind) -> bool: return element in k.elements).size()
-	var open: Array = grid.tiles.keys().filter(func(c: Vector2i) -> bool:
-		return c != START_COORD and not grid.get_tile(c).elements.any(
+# Adds a tile to grid at every coord of region it doesn't have yet, then applies the element
+# requirements to the region. Returns the stored copies of the new tiles.
+func reveal(grid: TileGrid, region: Array[Vector2i]) -> Array[Vector2i]:
+	# Stored copies, deduplicated: on a small torus a region can overlap itself.
+	var area: Array[Vector2i] = []
+	for c in region:
+		if not grid.canonical(c) in area:
+			area.append(grid.canonical(c))
+	var rolled: Dictionary[Vector2i, TileKind] = {}
+	for key in area:
+		if not grid.has_tile(key):
+			rolled[key] = TileKind.EMPTY if rng.randf() < empty_probability \
+				else kinds[rng.randi_range(0, kinds.size() - 1)]
+
+	var start := grid.canonical(START_COORD)
+	if rolled.has(start) and not start_elements.all(func(e: StringName) -> bool: return e in rolled[start].elements):
+		rolled[start] = _pick_kind(start_elements)
+	for element in required_elements:
+		_require(grid, area, rolled, element, start)
+
+	# Added only now, so listeners see each new tile once, in its final kind.
+	for key in rolled:
+		grid.add_tile(key, rolled[key])
+	return rolled.keys()
+
+
+# Turns random newly rolled tiles into kinds yielding element until required_elements[element]
+# tiles in area yield it. Only tiles yielding no required element are turned (and never the
+# start tile), so meeting one requirement can't undo another.
+func _require(grid: TileGrid, area: Array[Vector2i], rolled: Dictionary[Vector2i, TileKind],
+		element: StringName, start: Vector2i) -> void:
+	var kind_at := func(key: Vector2i) -> TileKind: return rolled[key] if rolled.has(key) else grid.get_tile(key)
+	var missing: int = required_elements[element] - area.filter(
+		func(key: Vector2i) -> bool: return element in kind_at.call(key).elements).size()
+	var open: Array = rolled.keys().filter(func(key: Vector2i) -> bool:
+		return key != start and not rolled[key].elements.any(
 			func(e: StringName) -> bool: return required_elements.has(e)))
 	var elements: Array[StringName] = [element]
 	while missing > 0 and not open.is_empty():
-		grid.set_tile(open.pop_at(rng.randi_range(0, open.size() - 1)), _pick_kind(grid.kinds, elements, rng))
+		rolled[open.pop_at(rng.randi_range(0, open.size() - 1))] = _pick_kind(elements)
 		missing -= 1
 
 
 # A random kind yielding all of elements.
-static func _pick_kind(kinds: Array[TileKind], elements: Array[StringName], rng: RandomNumberGenerator) -> TileKind:
+func _pick_kind(elements: Array[StringName]) -> TileKind:
 	var matches := kinds.filter(func(k: TileKind) -> bool:
 		return elements.all(func(e: StringName) -> bool: return e in k.elements))
 	assert(not matches.is_empty(), "No tile kind yields all of %s" % [elements])

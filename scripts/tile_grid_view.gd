@@ -57,6 +57,12 @@ var grid: TileGrid:
 			grid.tile_changed.connect(_on_tile_changed)
 			grid.tapped_changed.connect(_on_tapped_changed)
 		queue_redraw()
+## Where the view is looking from (the player's coord). On a wrapping grid each tile is drawn at
+## its copy nearest here, so the map wraps around whoever is exploring it.
+var view_center: Vector2i = Vector2i.ZERO:
+	set(value):
+		view_center = value
+		queue_redraw()
 ## Seconds since the animations started.
 var anim_time: float = 0.0
 ## 0..1 progress of the swap animation, if one is playing (see animate_swap).
@@ -165,13 +171,14 @@ func _draw() -> void:
 		return
 	var tile := board.corner_points(board.tile_scale)
 	tile.remove_at(tile.size() - 1)  # drop the closing point; polygons close themselves
+	var swapping_keys := [grid.canonical(_swap_from), grid.canonical(_swap_to)] if _swapping else []
 	for coord in grid.tiles:
-		var center := board.hex_to_local(coord)
+		var center := board.hex_to_local(grid.nearest(coord, view_center))
 		var points := PackedVector2Array()
 		for p in tile:
 			points.append(center + p)
 		draw_colored_polygon(points, hex_color)
-		if not (_swapping and (coord == _swap_from or coord == _swap_to)):
+		if not coord in swapping_keys:
 			_draw_contents(coord, center)
 	if _swapping:
 		var from_pos := board.hex_to_local(_swap_from)

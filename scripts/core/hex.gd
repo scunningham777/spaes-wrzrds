@@ -53,6 +53,12 @@ static func line(start: Vector2i, direction: Vector2i, steps: int) -> Array[Vect
 	return coords
 
 
+# Steps between two coords (from the origin if b is left out).
+static func distance(a: Vector2i, b: Vector2i = Vector2i.ZERO) -> int:
+	var d := a - b
+	return (absi(d.x) + absi(d.y) + absi(d.x + d.y)) / 2
+
+
 # Every coord within `radius` steps of the origin, i.e. a hexagon-shaped board.
 static func hexagon(radius: int) -> Array[Vector2i]:
 	var coords: Array[Vector2i] = []

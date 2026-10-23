@@ -72,9 +72,28 @@ func _test_core_logic() -> void:
 				"pointy" if pt else "flat", Hex.Compass.keys()[order[i]]])
 
 	_check(Hex.hexagon(5).size() == 91, "core: radius-5 hexagon has 91 hexes")
-	var grid := TileGrid.new(5)
+	var grid := _hexagon_grid(5)
 	_check(grid.tiles.size() == 91 and grid.has_tile(Vector2i(5, -5)) and not grid.has_tile(Vector2i(5, 1)),
-		"core: TileGrid covers exactly the hexagon")
+		"core: TileGrid holds just the tiles added")
+	_check(Hex.distance(Vector2i(2, -1)) == 2 and Hex.distance(Vector2i(3, 3)) == 6
+		and Hex.distance(Vector2i(1, 1), Vector2i(1, 1)) == 0, "core: Hex.distance")
+
+	# Wrapping (HexTorus): 8 columns around, 6 rows down.
+	var torus := HexTorus.new(8, 6)
+	_check(torus.canonical(Vector2i(8, -4)) == Vector2i.ZERO and torus.canonical(Vector2i(0, 6)) == Vector2i.ZERO
+		and torus.canonical(Vector2i(-1, 0)) == Vector2i(7, 2), "torus: wrap finds the stored copy")
+	_check(torus.nearest(Vector2i(7, 2), Vector2i.ZERO) == Vector2i(-1, 0)
+		and torus.nearest(Vector2i(0, 5), Vector2i(0, 1)) == Vector2i(0, -1)
+		and torus.nearest(Vector2i(1, 1), Vector2i.ZERO) == Vector2i(1, 1), "torus: nearest copy, across the wrap")
+	var flat_layout := HexLayout.new(false, 1.0)
+	_check(is_zero_approx(flat_layout.hex_to_point(Vector2i(8, -4)).y) and is_zero_approx(flat_layout.hex_to_point(Vector2i(0, 6)).x),
+		"torus: flat-top wraps straight across and straight down")
+	var tg := TileGrid.new(torus)
+	var revealed_at: Array[Vector2i] = []
+	tg.tile_changed.connect(func(c: Vector2i, _k: TileKind) -> void: revealed_at.append(c))
+	tg.add_tile(Vector2i(-1, 0), TileKind.EMPTY)
+	_check(tg.has_tile(Vector2i(7, 2)) and tg.has_tile(Vector2i(-1, 6)) and tg.tiles.keys() == [Vector2i(7, 2)]
+		and revealed_at == [Vector2i(7, 2)], "torus: a grid stores and reports one copy of each tile")
 
 	var a := Enterable.new()
 	a.coord = Vector2i(1, 1)
@@ -137,7 +156,7 @@ func _test_core_logic() -> void:
 	var rusty_gold := TileKind.new(&"rusty_gold", "Rusty Gold", &"gold_ore", [&"gold", &"iron"])
 
 	# Swap (TileGrid.try_swap).
-	var pg := TileGrid.new(2)
+	var pg := _hexagon_grid(2)
 	var changes: Array[Vector2i] = []
 	pg.tile_changed.connect(func(c: Vector2i, _k: TileKind) -> void: changes.append(c))
 	pg.set_tile(Vector2i.ZERO, timber)
@@ -163,7 +182,7 @@ func _test_core_logic() -> void:
 		"core: Hex.line is the start plus n steps")
 
 	# Extract + inventory.
-	var eg := TileGrid.new(1)
+	var eg := _hexagon_grid(1)
 	var at := func(c: Vector2i) -> Array[Vector2i]: return [c]
 	eg.set_tile(Vector2i.ZERO, timber)
 	_check(eg.try_extract(at.call(Vector2i.ZERO)) == [&"wood"] and eg.get_tile(Vector2i.ZERO) == timber
@@ -172,7 +191,7 @@ func _test_core_logic() -> void:
 	_check(eg.try_extract(at.call(Vector2i(1, 0))).is_empty(), "extract: Empty tile yields nothing")
 	_check(eg.try_extract(at.call(Vector2i(9, 9))).is_empty(), "extract: off-grid yields nothing")
 	# Lines: every tile must be free and share an element; success taps them all.
-	var lg := TileGrid.new(2)
+	var lg := _hexagon_grid(2)
 	var line := Hex.line(Vector2i.ZERO, Vector2i(0, 1), 2)  # (0,0) (0,1) (0,2)
 	for c in line:
 		lg.set_tile(c, iron)
@@ -188,7 +207,7 @@ func _test_core_logic() -> void:
 		"extract: a matching line taps every tile")
 	_check(not lg.can_extract(Hex.line(Vector2i(0, 1), Vector2i(0, 1), 2)), "extract: a line running off the grid fails")
 	# Multiple elements: the line yields whatever every tile has, in the first tile's order.
-	var mg := TileGrid.new(2)
+	var mg := _hexagon_grid(2)
 	var pair := Hex.line(Vector2i.ZERO, Vector2i(0, 1), 1)  # (0,0) (0,1)
 	mg.set_tile(pair[0], rusty_gold)
 	mg.set_tile(pair[1], rusty_gold)
@@ -235,9 +254,67 @@ func _test_core_logic() -> void:
 	_check(inv_changes[0] == 3, "inventory: changed fires on add/spend")
 
 	var state := GameState.new()
-	var first := state.get_or_generate_grid(&"x", 5, 0.15)
-	_check(state.get_or_generate_grid(&"x", 5, 0.15) == first, "state: same id returns the stored grid")
-	_check(state.get_or_generate_grid(&"y", 5, 0.15) != first, "state: different id gets its own grid")
+	var first := state.get_or_create_surface(&"x", 2, 4, 3, 0.15)
+	_check(state.get_or_create_surface(&"x", 2, 4, 3, 0.15) == first, "state: same id returns the stored surface")
+	_check(state.get_or_create_surface(&"y", 2, 4, 3, 0.15) != first, "state: different id gets its own surface")
+
+	_test_planet_surface()
+
+
+# PlanetSurface: patches revealed by scrying on a wrapping planet.
+func _test_planet_surface() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var surface := PlanetSurface.new(2, 4, 3, TileGridGenerator.new(0.0, rng))  # 16 x 18 tiles, 24 patches
+	var g := surface.grid
+	_check(g.torus.width == 16 and g.torus.height == 18, "surface: torus sized in patches (%dx%d)" % [g.torus.width, g.torus.height])
+	_check(g.tiles.size() == 19 and surface.patches.keys() == [Vector2i.ZERO], "surface: lands with one radius-2 patch revealed")
+	_check(Aether.ITEM in g.get_tile(TileGridGenerator.START_COORD).elements, "surface: start tile yields aether")
+	# The middles of the landing patch's six edges, one step of each PATCH_STEPS direction out.
+	var spots := Hex.hexagon(2).filter(surface.can_scry)
+	_check(spots == [Vector2i(-2, 1), Vector2i(-1, -1), Vector2i(-1, 2), Vector2i(1, -2), Vector2i(1, 1), Vector2i(2, -1)],
+		"surface: scry only from the middle of an edge (%s)" % [spots])
+	_check(surface.scry_target(Vector2i(2, -1)) == Vector2i(4, -2), "scry: targets the patch mirrored across the edge")
+
+	var before := g.tiles.duplicate()
+	_check(surface.try_scry(Vector2i(2, -1)) and g.tiles.size() == 19 + 16, "scry: reveals a patch sharing one 3-tile edge")
+	_check(before.keys().all(func(c: Vector2i) -> bool: return g.get_tile(c) == before[c]),
+		"scry: already revealed tiles keep their kinds")
+	_check(surface.patch_tiles(Vector2i(4, -2)).filter(func(c: Vector2i) -> bool:
+		return Aether.ITEM in g.get_tile(c).elements).size() >= 2, "scry: the new patch meets the element requirements")
+	_check(not surface.can_scry(Vector2i(2, -1)) and not surface.try_scry(Vector2i(2, -1)) and g.tiles.size() == 35,
+		"scry: the shared edge is no longer the explored edge")
+	_check(surface.can_scry(Vector2i(6, -3)) and surface.can_scry(Vector2i(3, 0)), "scry: works from the new patch's edges")
+	_check(not surface.can_scry(Vector2i(9, 9)), "scry: not from off the explored area")
+
+	# Scrying east around the planet: the fourth patch over is the landing one again.
+	_check(surface.try_scry(Vector2i(6, -3)) and surface.try_scry(Vector2i(10, -5)), "wrap: scry onward east")
+	_check(surface.patches.size() == 4 and g.tiles.size() == 4 * 19 - 4 * 3,
+		"wrap: a ring of 4 patches meets the landing one edge to edge (%d tiles)" % g.tiles.size())
+	_check(not surface.can_scry(Vector2i(14, -7)) and not surface.can_scry(Vector2i(-2, 1)),
+		"wrap: no scry across the seam where the ring closed")
+	# Reveal everything: the patches cover the planet exactly once over.
+	var frontier: Array[Vector2i] = [Vector2i.ZERO]
+	while not frontier.is_empty():
+		var center: Vector2i = frontier.pop_back()
+		for step in PlanetSurface.PATCH_STEPS:
+			if surface.reveal_patch(center + step * 2):
+				frontier.append(center + step * 2)
+	_check(surface.patches.size() == 24 and g.tiles.size() == 16 * 18,
+		"wrap: all %d patches cover all %d tiles" % [surface.patches.size(), g.tiles.size()])
+	_check(Hex.hexagon(2).all(func(c: Vector2i) -> bool: return not surface.can_scry(c)), "wrap: nothing left to scry")
+	# Odd radius: edges have 4 tiles, so either middle one scries.
+	var odd := PlanetSurface.new(3, 3, 2)
+	_check(Hex.hexagon(3).filter(odd.can_scry).size() == 12 and odd.scry_target(Vector2i(3, -1)) == Vector2i(6, -3)
+		and odd.scry_target(Vector2i(3, -2)) == Vector2i(6, -3), "surface: odd radius scries from both middle tiles")
+
+
+# A plane grid with a radius-sized hexagon of Empty tiles.
+static func _hexagon_grid(radius: int) -> TileGrid:
+	var grid := TileGrid.new()
+	for c in Hex.hexagon(radius):
+		grid.add_tile(c, TileKind.EMPTY)
+	return grid
 
 
 # Runs the Play scene with the board forced to the given orientation (regardless of what the
@@ -506,8 +583,8 @@ func _test_enter_planet() -> void:
 	_check(focus_box.visible and (current_scene.get_node("%FocusName") as Label).text == "Staff"
 		and focus_hints.size() == 1 and focus_hints[0].begins_with("R – Extract"),
 		"focus: box shows Staff with R – Extract (%s)" % [focus_hints])
-	var general_hints: Array = current_scene.get_node("%Actions").get_children().map(
-		func(l: Label) -> String: return l.text)
+	var general_hints: Array = current_scene.get_node("%Actions").get_children().filter(
+		func(l: Label) -> bool: return l.visible).map(func(l: Label) -> String: return l.text)
 	_check(general_hints == ["F – Push"], "focus: Extract moved out of the general actions (%s)" % [general_hints])
 	_check(focus_box.global_position.y > (current_scene.get_node("%Actions") as Control).global_position.y
 		and focus_box.get_global_rect().end.y < divider.global_position.y, "focus: box sits between Push and the divider")
@@ -591,6 +668,29 @@ func _test_enter_planet() -> void:
 	_press(KEY_D)  # turn clockwise to NE
 	tri = marker.triangle_points()
 	_check(tri[2].x > 0.0 and tri[2].y < 0.0, "planet: facing triangle follows a turn to NE (%s)" % tri)
+
+	# Scry: from the middle of the landing patch's edge, V reveals the next patch over.
+	var scry_hint: Label = current_scene.get_node("%ScryHint")
+	var actions_box: Control = current_scene.get_node("%Actions")
+	_game().state.inventory.add(Aether.ITEM, 10)  # plenty for the walk
+	_check(not scry_hint.visible, "scry: no hint away from an edge middle")
+	_press(KEY_V)
+	_check(tiles.grid.tiles.size() == Hex.hexagon(radius).size(), "scry: V does nothing away from an edge middle")
+	for key in [KEY_X, KEY_X, KEY_C, KEY_E]:  # (0, 2) -> (0, 0) -> SE (1, -1) -> NE (2, -1)
+		_press(key)
+	_check_coord(planet_wizard, Vector2i(2, -1), "scry: walked to the east edge's middle")
+	_check(scry_hint.visible and scry_hint.text == "V – Scry"
+		and actions_box.get_child(scry_hint.get_index() - 1).name == "PushHint", "scry: hint shows, below Push")
+	var camera: Camera2D = current_scene.get_node("Camera2D")
+	_check(camera.position == planet_wizard.position and tiles.view_center == planet_wizard.mover.coord,
+		"planet: camera and view follow the wizard")
+	_press(KEY_V)
+	_check(tiles.grid.tiles.size() == 2 * Hex.hexagon(radius).size() - (radius + 1),
+		"scry: V reveals a second patch sharing an edge (%d tiles)" % tiles.grid.tiles.size())
+	_check(not scry_hint.visible, "scry: hint hides once the edge is explored")
+	_press(KEY_E)  # NE onto (3, -1), only on the new patch
+	_check_coord(planet_wizard, Vector2i(3, -1), "scry: can walk onto the revealed patch")
+	tiles_snapshot = tiles.grid.tiles.duplicate()  # the revisit should keep the scried patch
 
 	_press(KEY_ESCAPE)
 	await process_frame

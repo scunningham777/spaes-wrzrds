@@ -66,6 +66,8 @@ mouse_filter = 2
 color = Color(0.19215687, 0.3019608, 0.4745098, 1)
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=159357361]
+position_smoothing_enabled = true
+position_smoothing_speed = 8.0
 
 [node name="HexBoard" type="Node2D" parent="." unique_id=401960176]
 script = ExtResource("2_board")
@@ -187,6 +189,13 @@ theme_override_constants/separation = 8
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "F – Push"
+
+[node name="ScryHint" type="Label" parent="UI/SidePanel/Margin/Layout/Top/Actions"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "V – Scry"
 
 [node name="FocusBox" type="PanelContainer" parent="UI/SidePanel/Margin/Layout/Top"]
 unique_name_in_owner = true

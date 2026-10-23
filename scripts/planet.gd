@@ -2,8 +2,12 @@ extends Node2D
 
 # Planet surface (Unity's TileExploreScene layout). Esc returns to space.
 
-# Generation settings, from Unity's TileGridManager.
+# Generation settings, from Unity's TileGridManager. They only apply on a planet's first visit.
+## Radius of each patch of tiles: the one you land in, and each one scrying reveals.
 @export var grid_radius: int = 2
+## Planet size in patches; the surface wraps around both ways (see PlanetSurface).
+@export var patches_across: int = 10
+@export var patches_down: int = 6
 @export_range(0.0, 1.0) var empty_tile_probability: float = 0.0
 ## Player actions (moves, extracts, swaps) an extracted tile stays tapped.
 @export var tap_cooldown_actions: int = 5
@@ -19,6 +23,7 @@ extends Node2D
 
 # Focus action hint labels by action, so their status suffixes can be refreshed.
 var _focus_hints: Dictionary[StringName, Label] = {}
+var _surface: PlanetSurface
 
 
 func _ready() -> void:
@@ -33,13 +38,20 @@ func _ready() -> void:
 	var location := Game.state.current_location
 	(%PlanetName as Label).text = location.display_name if location != null else "Unknown planet"
 	if location != null:
-		_tiles.grid = Game.state.get_or_generate_grid(location.id, grid_radius, empty_tile_probability)
+		_surface = Game.state.get_or_create_surface(location.id, grid_radius, patches_across, patches_down,
+			empty_tile_probability)
 	else:
 		# Scene run directly from the editor (F6): nothing to remember it under.
-		_tiles.grid = TileGridGenerator.generate(grid_radius, empty_tile_probability)
+		_surface = PlanetSurface.new(grid_radius, patches_across, patches_down,
+			TileGridGenerator.new(empty_tile_probability))
+	_tiles.grid = _surface.grid
+	_interaction.surface = _surface
 
-	# Keep the wizard on the planet's tiles.
+	# Keep the wizard on the revealed tiles, and the view (camera and wrap) on the wizard.
 	_wizard.mover.can_enter = _tiles.grid.has_tile
+	_follow_wizard()
+	_camera.reset_smoothing()
+	_wizard.mover.moved.connect(func(_coord: Vector2i) -> void: _follow_wizard())
 
 	# Moving is a player action, so it counts down tapped tiles (TileInteraction ticks its own).
 	_tiles.grid.tap_cooldown = tap_cooldown_actions
@@ -104,6 +116,16 @@ func _update_side_panel() -> void:
 	_tile_info.show_tile(kind, _tiles.icon_texture(kind, _tiles.grid.is_tapped(coord)), _tiles.grid.cooldown(coord))
 	for action in _focus_hints:
 		_focus_hints[action].text = _focus_hint_text(action)
+	# Scry is only listed where it works: the middle of the explored area's edge.
+	var scry_hint := %ScryHint as Label
+	scry_hint.text = "%s – Scry" % _key_name(&"scry")
+	scry_hint.visible = _surface.can_scry(coord)
+
+
+# The camera tracks the wizard, and the tile view draws the wrapping map around them.
+func _follow_wizard() -> void:
+	_camera.position = _wizard.position
+	_tiles.view_center = _wizard.mover.coord
 
 
 # Successful moves cost aether; running out kicks the player back to space.
@@ -123,8 +145,8 @@ func _update_aether() -> void:
 	_aether_label.text = "Aether: %d" % amount
 
 
-# The board sits at the world origin; shift the camera so the origin lands in the middle of the
-# area left of the side panel instead of the middle of the screen.
+# The camera sits on the wizard; shift its view so the wizard lands in the middle of the area left
+# of the side panel instead of the middle of the screen.
 func _center_map() -> void:
 	var width := get_viewport_rect().size.x
 	_camera.offset.x = width / 2.0 - width * _side_panel.anchor_left / 2.0

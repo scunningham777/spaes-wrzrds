@@ -8,10 +8,14 @@ Open `project.godot` in Godot 4.7.x (standard build, not .NET) and press **F5**.
 
 Controls (flat-top hexes): **Q/W/E/Z/X/C** or numpad move · **A/D** turn · **Enter** enter a planet ·
 **R** extract the tile you're on (needs the staff; taps the tile for a few actions) · **F** swap your tile with
-the one you face · **I** inventory · **Esc** back.
+the one you face · **V** scry (from the middle of the explored area's edge) · **I** inventory · **Esc** back.
 
 On a planet each move costs 1 aether (the blue bar). You land with at least 10; extracting aether
 refills it, and running out sends you back to space. The landing tile always yields aether.
+
+A planet is a large hex map that wraps around both ways, but you only see what you've explored: you land in a
+small hexagon of tiles, and scrying reveals the next hexagon over, sharing the edge you stand on. Tiles are
+generated as they're revealed.
 
 ## Tests
 
