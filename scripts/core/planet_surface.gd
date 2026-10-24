@@ -9,6 +9,8 @@ extends RefCounted
 #
 # The torus is sized in whole patches (patches_across x patches_down lattice steps), so patches
 # fit together seamlessly across the wrap as well. A planet holds 2 * across * down patches.
+# Ley lines close in one lap around it when patches_across is a multiple of 3 * patches_down
+# (see LeyLines).
 
 signal patch_revealed(center: Vector2i)
 
@@ -21,6 +23,8 @@ const PATCH_STEPS: Array[Vector2i] = [
 var grid: TileGrid
 var generator: TileGridGenerator
 var patch_radius: int
+## Hidden lines across the planet, picked when it's made.
+var ley_lines: LeyLines
 ## Stored copies of revealed patch centers.
 var patches: Dictionary[Vector2i, bool] = {}
 
@@ -34,6 +38,7 @@ func _init(p_patch_radius: int, patches_across: int, patches_down: int,
 	generator = p_generator if p_generator != null else TileGridGenerator.new()
 	var torus := HexTorus.new(2 * patch_radius * patches_across, 3 * patch_radius * patches_down)
 	grid = TileGrid.new(torus, generator.kinds)
+	ley_lines = LeyLines.generate(torus, generator.rng)
 	reveal_patch(TileGridGenerator.START_COORD)
 
 

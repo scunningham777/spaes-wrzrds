@@ -2,15 +2,20 @@ class_name TileGridView
 extends Node2D
 
 # Draws a TileGrid as filled hexes, ported from Unity's TileVisualManager/TileVisual. Must be a
-# child of a HexBoard. Draws nothing until a grid is assigned. Every tile is a hex_color hex; kinds
-# whose icon has an entry in ICONS draw that sprite-sheet icon over it. Icons with an entry in
-# ICON_ANIMS step through it, all in sync off one clock. Tile size comes from the board's
-# tile_scale.
+# child of a HexBoard. Draws nothing until a grid is assigned. Every tile is a filled hex
+# (hex_color, or resonant_color where it resonates with a ley line); kinds whose icon has an entry
+# in ICONS draw that sprite-sheet icon over it. Icons with an entry in ICON_ANIMS step through it,
+# all in sync off one clock. Tile size comes from the board's tile_scale.
 
 ## Sprite sheet that ICONS regions are cut from.
 @export var icon_sheet: Texture2D
 ## Fill of every hex; opaque so icons keep their contrast.
 @export var hex_color: Color = Color.BLACK
+## Fill of tiles resonating with a ley line (LeyLines.is_resonant).
+@export var resonant_color: Color = Color(0.5, 0.5, 0.5)
+## Testing aid: fill every ley line tile with ley_line_color. Ley lines are meant to stay hidden.
+@export var show_ley_lines: bool = true
+@export var ley_line_color: Color = Color(0.4, 0.15, 0.55)
 ## Icon pixel scale; matches the wizard sprite's.
 @export var icon_scale: float = 4.0
 ## Play the ICON_ANIMS icon animations.
@@ -62,6 +67,11 @@ var grid: TileGrid:
 var view_center: Vector2i = Vector2i.ZERO:
 	set(value):
 		view_center = value
+		queue_redraw()
+## The planet's ley lines, or null if it has none.
+var ley_lines: LeyLines:
+	set(value):
+		ley_lines = value
 		queue_redraw()
 ## Seconds since the animations started.
 var anim_time: float = 0.0
@@ -177,7 +187,7 @@ func _draw() -> void:
 		var points := PackedVector2Array()
 		for p in tile:
 			points.append(center + p)
-		draw_colored_polygon(points, hex_color)
+		draw_colored_polygon(points, fill_color(coord))
 		if not coord in swapping_keys:
 			_draw_contents(coord, center)
 	if _swapping:
@@ -186,6 +196,17 @@ func _draw() -> void:
 		# Last drawn is on top.
 		_draw_contents(_swap_from, to_pos.lerp(from_pos, swap_progress))
 		_draw_contents(_swap_to, from_pos.lerp(to_pos, swap_progress))
+
+
+# Hex fill for the tile at coord: resonant tiles stand out, everything else is hex_color.
+func fill_color(coord: Vector2i) -> Color:
+	if ley_lines == null:
+		return hex_color
+	if ley_lines.is_resonant(grid, coord):
+		return resonant_color
+	if show_ley_lines and ley_lines.is_on_line(coord):
+		return ley_line_color
+	return hex_color
 
 
 # Draws the icon (and tapped cooldown) of the tile at coord, centered on center.

@@ -17,6 +17,9 @@ A planet is a large hex map that wraps around both ways, but you only see what y
 small hexagon of tiles, and scrying reveals the next hexagon over, sharing the edge you stand on. Tiles are
 generated as they're revealed.
 
+Each planet also has hidden ley lines, 1–2 along each hex axis. Two or more iron tiles in a row along one get a grey
+background. (For testing, the lines themselves show purple: `TileGridView.show_ley_lines`.)
+
 ## Tests
 
 ```

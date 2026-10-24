@@ -176,8 +176,8 @@ func _test_core_logic() -> void:
 	_check(Foci.display_name(Foci.STAFF) == "Staff" and Foci.grants(Foci.STAFF, &"extract")
 		and not Foci.grants(Foci.STAFF, &"push") and Foci.actions(&"").is_empty(), "foci: staff grants extract")
 	_check(GameState.new().equipped_focus == Foci.STAFF, "foci: staff equipped by default")
-	_check(Foci.distance(Foci.STAFF) == 1 and Foci.extract_amount(Foci.STAFF) == 1
-		and Foci.distance(&"") == 0, "foci: staff has distance 1, extract amount 1")
+	_check(Foci.distance(Foci.STAFF) == 1 and Foci.extract_amount(Foci.STAFF) >= 1
+		and Foci.distance(&"") == 0 and Foci.extract_amount(&"") == 0, "foci: staff has distance 1 and extracts something")
 	_check(Hex.line(Vector2i(1, 1), Vector2i(0, 1), 2) == [Vector2i(1, 1), Vector2i(1, 2), Vector2i(1, 3)],
 		"core: Hex.line is the start plus n steps")
 
@@ -259,6 +259,7 @@ func _test_core_logic() -> void:
 	_check(state.get_or_create_surface(&"y", 2, 4, 3, 0.15) != first, "state: different id gets its own surface")
 
 	_test_planet_surface()
+	_test_ley_lines()
 
 
 # PlanetSurface: patches revealed by scrying on a wrapping planet.
@@ -307,6 +308,66 @@ func _test_planet_surface() -> void:
 	var odd := PlanetSurface.new(3, 3, 2)
 	_check(Hex.hexagon(3).filter(odd.can_scry).size() == 12 and odd.scry_target(Vector2i(3, -1)) == Vector2i(6, -3)
 		and odd.scry_target(Vector2i(3, -2)) == Vector2i(6, -3), "surface: odd radius scries from both middle tiles")
+
+
+# LeyLines: hidden lines along each axis; iron runs along them resonate.
+func _test_ley_lines() -> void:
+	var torus := HexTorus.new(48, 24)
+	var rng := RandomNumberGenerator.new()
+	var counts_ok := true
+	var lengths_ok := true
+	var apart_ok := true
+	for seed_value in 20:
+		rng.seed = seed_value
+		var ley := LeyLines.generate(torus, rng)
+		for axis in LeyLines.AXES:
+			var on_axis := ley.lines.filter(func(l: LeyLines.Line) -> bool: return l.direction == axis)
+			counts_ok = counts_ok and on_axis.size() >= 1 and on_axis.size() <= 2
+			for line: LeyLines.Line in on_axis:
+				# One lap: the vertical axis is height tiles long, the diagonals width.
+				lengths_ok = lengths_ok and line.tiles.size() == (24 if axis == Vector2i(0, 1) else 48)
+			if on_axis.size() == 2:
+				var first: LeyLines.Line = on_axis[0]
+				var second: LeyLines.Line = on_axis[1]
+				apart_ok = apart_ok and first.tiles.keys().all(func(c: Vector2i) -> bool:
+					return LeyLines.AXES.all(func(a: Vector2i) -> bool:
+						return not second.tiles.has(torus.canonical(c + a)) and not second.tiles.has(torus.canonical(c - a))))
+	_check(counts_ok, "ley: 1 or 2 lines along each axis, over 20 seeds")
+	_check(lengths_ok, "ley: lines run once around a planet sized for it")
+	_check(apart_ok, "ley: lines on the same axis never touch")
+	var surface := PlanetSurface.new(2, 12, 4)
+	_check(surface.ley_lines != null and surface.ley_lines.lines.size() >= 3, "ley: planets get their lines when made")
+
+	# Resonance, with one hand-placed NE line through the origin.
+	var ley := LeyLines.new(torus)
+	ley.add_line(Vector2i.ZERO, Vector2i(1, 0))
+	_check(ley.is_on_line(Vector2i(5, 0)) and ley.is_on_line(Vector2i(48, -24)) and not ley.is_on_line(Vector2i(0, 1)),
+		"ley: is_on_line, across the wrap too")
+	var iron := TileKind.new(&"iron_deposit", "Iron Deposit", &"iron_deposit", [&"iron"])
+	var gold := TileKind.new(&"gold_ore", "Gold Ore", &"gold_ore", [&"gold"])
+	var g := TileGrid.new(torus)
+	for c in [Vector2i(-1, 0), Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(5, 0), Vector2i(6, 0)]:
+		g.add_tile(c, gold)
+	g.set_tile(Vector2i.ZERO, iron)
+	_check(not ley.is_resonant(g, Vector2i.ZERO), "ley: a lone iron tile on a line doesn't resonate")
+	g.set_tile(Vector2i(0, 1), iron)
+	_check(not ley.is_resonant(g, Vector2i.ZERO) and not ley.is_resonant(g, Vector2i(0, 1)),
+		"ley: iron next to it off the line doesn't count")
+	g.set_tile(Vector2i(1, 0), iron)
+	_check(ley.is_resonant(g, Vector2i.ZERO) and ley.is_resonant(g, Vector2i(1, 0))
+		and not ley.is_resonant(g, Vector2i(0, 1)) and not ley.is_resonant(g, Vector2i(-1, 0)),
+		"ley: two iron in a row along the line both resonate, nothing else")
+	g.set_tile(Vector2i(5, 0), iron)
+	g.set_tile(Vector2i(6, 0), iron)
+	var off := LeyLines.new(torus)
+	off.add_line(Vector2i(0, 3), Vector2i(1, 0))
+	_check(not off.is_resonant(g, Vector2i.ZERO), "ley: iron runs off every line don't resonate")
+	# A line that has to wrap: the run continues across the seam.
+	var seam := TileGrid.new(torus)
+	seam.add_tile(Vector2i(47, 0), iron)  # (-1, 0), one step back from (0, 0) along NE, stored across the wrap
+	seam.add_tile(Vector2i.ZERO, iron)
+	_check(ley.is_resonant(seam, Vector2i.ZERO) and ley.is_resonant(seam, Vector2i(-1, 0)),
+		"ley: runs carry across the wrap")
 
 
 # A plane grid with a radius-sized hexagon of Empty tiles.
@@ -534,9 +595,10 @@ func _test_enter_planet() -> void:
 	_check(turned_hint == "R – Extract: no match" and extract_hint.call() == "R – Extract: Iron",
 		"focus: extract hint follows turning (%s)" % turned_hint)
 	_press(KEY_R)
-	_check(tiles.grid.get_tile(Vector2i.ZERO) == iron and inv.count(&"iron") == 1
+	var amount := Foci.extract_amount(Foci.STAFF)
+	_check(tiles.grid.get_tile(Vector2i.ZERO) == iron and inv.count(&"iron") == amount
 		and tiles.grid.cooldown(Vector2i.ZERO) == 5 and tiles.grid.cooldown(Vector2i(0, 1)) == 5,
-		"planet: R extracts 1 Iron and taps both tiles in the line for 5 actions")
+		"planet: R extracts the staff's amount of Iron and taps both tiles in the line for 5 actions")
 	_check(extract_hint.call() == "R – Extract: no match", "focus: tapped tiles make the hint no match")
 	_check(tile_info.shown_name() == "Iron Deposit" and tile_info.shown_tapped() == "tapped: 5"
 		and tile_info.shown_yield() == "Element: Iron" and tile_icon.texture is ImageTexture,
@@ -589,7 +651,7 @@ func _test_enter_planet() -> void:
 	_check(focus_box.global_position.y > (current_scene.get_node("%Actions") as Control).global_position.y
 		and focus_box.get_global_rect().end.y < divider.global_position.y, "focus: box sits between Push and the divider")
 	_press(KEY_R)
-	_check(inv.count(&"iron") == 1 and tiles.grid.cooldown(Vector2i.ZERO) == 5,
+	_check(inv.count(&"iron") == amount and tiles.grid.cooldown(Vector2i.ZERO) == 5,
 		"planet: R on a tapped tile adds nothing and isn't an action")
 	# Turning doesn't count down; moving does (W to (0,1), X back to (0,0)).
 	_press(KEY_D)
@@ -637,13 +699,14 @@ func _test_enter_planet() -> void:
 	_check(tile_info.shown_yield() == "Elements: Gold, Iron" and extract_hint.call() == "R – Extract: Gold, Iron",
 		"focus: multi-element tile and hint list every element (%s / %s)" % [tile_info.shown_yield(), extract_hint.call()])
 	_press(KEY_R)
-	_check(inv.count(&"gold") == 1 and inv.count(&"iron") == 2, "planet: R extracts 1 of each shared element")
+	_check(inv.count(&"gold") == amount and inv.count(&"iron") == 2 * amount,
+		"planet: R extracts the staff's amount of each shared element")
 	# Extracted aether goes into the same pool moving spends.
 	var aether_before: int = aether.call()
 	tiles.grid.set_tile(Vector2i.ZERO, tiles.grid.find_kind(&"aether_spring"))
 	tiles.grid.set_tile(Vector2i(0, 1), tiles.grid.find_kind(&"aether_spring"))
 	_press(KEY_R)
-	_check(aether.call() == aether_before + 1 and aether_label.text == "Aether: %d" % (aether_before + 1),
+	_check(aether.call() == aether_before + amount and aether_label.text == "Aether: %d" % (aether_before + amount),
 		"aether: extracting it refills the bar (%s)" % aether_label.text)
 	tiles.grid.set_tile(Vector2i(0, 1), iron)
 	tiles.grid.set_tile(Vector2i.ZERO, iron)
@@ -668,6 +731,29 @@ func _test_enter_planet() -> void:
 	_press(KEY_D)  # turn clockwise to NE
 	tri = marker.triangle_points()
 	_check(tri[2].x > 0.0 and tri[2].y < 0.0, "planet: facing triangle follows a turn to NE (%s)" % tri)
+
+	# Ley lines: shown purple for now (show_ley_lines), and iron runs along one turn grey.
+	_check(tiles.ley_lines != null and tiles.ley_lines.lines.size() >= 3, "ley: the planet view has the planet's lines")
+	var planet_ley := tiles.ley_lines
+	var test_ley := LeyLines.new(tiles.grid.torus)
+	test_ley.add_line(Vector2i.ZERO, Vector2i(0, 1))  # straight N-S through the landing tile
+	tiles.ley_lines = test_ley
+	for c in [Vector2i(0, -2), Vector2i(0, 1), Vector2i(0, 2)]:  # line tiles that mustn't extend a run
+		tiles.grid.set_tile(c, gold)
+	tiles.grid.set_tile(Vector2i(0, -1), iron)
+	tiles.grid.set_tile(Vector2i.ZERO, gold)
+	tiles.grid.set_tile(Vector2i(1, 0), iron)
+	_check(tiles.fill_color(Vector2i(0, -1)) == tiles.ley_line_color and tiles.fill_color(Vector2i(1, 0)) == tiles.hex_color,
+		"ley: line tiles show purple, others black")
+	tiles.grid.set_tile(Vector2i.ZERO, iron)
+	_check(tiles.fill_color(Vector2i.ZERO) == tiles.resonant_color and tiles.fill_color(Vector2i(0, -1)) == tiles.resonant_color
+		and tiles.resonant_color == Color(0.5, 0.5, 0.5) and tiles.fill_color(Vector2i(1, 0)) == tiles.hex_color,
+		"ley: an iron run along the line turns medium grey")
+	tiles.show_ley_lines = false
+	_check(tiles.fill_color(Vector2i(0, 1)) == tiles.hex_color and tiles.fill_color(Vector2i.ZERO) == tiles.resonant_color,
+		"ley: with the testing aid off, only resonance shows")
+	tiles.show_ley_lines = true
+	tiles.ley_lines = planet_ley
 
 	# Scry: from the middle of the landing patch's edge, V reveals the next patch over.
 	var scry_hint: Label = current_scene.get_node("%ScryHint")

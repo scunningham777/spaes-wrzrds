@@ -5,9 +5,10 @@ extends Node2D
 # Generation settings, from Unity's TileGridManager. They only apply on a planet's first visit.
 ## Radius of each patch of tiles: the one you land in, and each one scrying reveals.
 @export var grid_radius: int = 2
-## Planet size in patches; the surface wraps around both ways (see PlanetSurface).
-@export var patches_across: int = 10
-@export var patches_down: int = 6
+## Planet size in patches; the surface wraps around both ways (see PlanetSurface). Keep across a
+## multiple of 3 * down so ley lines run once around the planet rather than winding.
+@export var patches_across: int = 12
+@export var patches_down: int = 4
 @export_range(0.0, 1.0) var empty_tile_probability: float = 0.0
 ## Player actions (moves, extracts, swaps) an extracted tile stays tapped.
 @export var tap_cooldown_actions: int = 5
@@ -45,6 +46,7 @@ func _ready() -> void:
 		_surface = PlanetSurface.new(grid_radius, patches_across, patches_down,
 			TileGridGenerator.new(empty_tile_probability))
 	_tiles.grid = _surface.grid
+	_tiles.ley_lines = _surface.ley_lines
 	_interaction.surface = _surface
 
 	# Keep the wizard on the revealed tiles, and the view (camera and wrap) on the wizard.
