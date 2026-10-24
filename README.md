@@ -18,7 +18,7 @@ small hexagon of tiles, and scrying reveals the next hexagon over, sharing the e
 generated as they're revealed.
 
 Each planet also has hidden ley lines, 1–2 along each hex axis. Two or more iron tiles in a row along one get a grey
-background. (For testing, the lines themselves show purple: `TileGridView.show_ley_lines`.)
+background; the lines themselves are never shown.
 
 ## Tests
 

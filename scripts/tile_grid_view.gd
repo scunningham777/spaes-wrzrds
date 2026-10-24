@@ -13,9 +13,6 @@ extends Node2D
 @export var hex_color: Color = Color.BLACK
 ## Fill of tiles resonating with a ley line (LeyLines.is_resonant).
 @export var resonant_color: Color = Color(0.5, 0.5, 0.5)
-## Testing aid: fill every ley line tile with ley_line_color. Ley lines are meant to stay hidden.
-@export var show_ley_lines: bool = true
-@export var ley_line_color: Color = Color(0.4, 0.15, 0.55)
 ## Icon pixel scale; matches the wizard sprite's.
 @export var icon_scale: float = 4.0
 ## Play the ICON_ANIMS icon animations.
@@ -198,14 +195,11 @@ func _draw() -> void:
 		_draw_contents(_swap_to, from_pos.lerp(to_pos, swap_progress))
 
 
-# Hex fill for the tile at coord: resonant tiles stand out, everything else is hex_color.
+# Hex fill for the tile at coord: resonant tiles stand out, everything else is hex_color. The ley
+# lines themselves are never drawn.
 func fill_color(coord: Vector2i) -> Color:
-	if ley_lines == null:
-		return hex_color
-	if ley_lines.is_resonant(grid, coord):
+	if ley_lines != null and ley_lines.is_resonant(grid, coord):
 		return resonant_color
-	if show_ley_lines and ley_lines.is_on_line(coord):
-		return ley_line_color
 	return hex_color
 
 

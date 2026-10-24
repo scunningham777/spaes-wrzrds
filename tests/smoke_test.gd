@@ -732,7 +732,7 @@ func _test_enter_planet() -> void:
 	tri = marker.triangle_points()
 	_check(tri[2].x > 0.0 and tri[2].y < 0.0, "planet: facing triangle follows a turn to NE (%s)" % tri)
 
-	# Ley lines: shown purple for now (show_ley_lines), and iron runs along one turn grey.
+	# Ley lines: hidden, but iron runs along one turn grey.
 	_check(tiles.ley_lines != null and tiles.ley_lines.lines.size() >= 3, "ley: the planet view has the planet's lines")
 	var planet_ley := tiles.ley_lines
 	var test_ley := LeyLines.new(tiles.grid.torus)
@@ -743,16 +743,12 @@ func _test_enter_planet() -> void:
 	tiles.grid.set_tile(Vector2i(0, -1), iron)
 	tiles.grid.set_tile(Vector2i.ZERO, gold)
 	tiles.grid.set_tile(Vector2i(1, 0), iron)
-	_check(tiles.fill_color(Vector2i(0, -1)) == tiles.ley_line_color and tiles.fill_color(Vector2i(1, 0)) == tiles.hex_color,
-		"ley: line tiles show purple, others black")
+	_check(tiles.fill_color(Vector2i(0, -1)) == tiles.hex_color and tiles.fill_color(Vector2i(1, 0)) == tiles.hex_color,
+		"ley: lines themselves don't show")
 	tiles.grid.set_tile(Vector2i.ZERO, iron)
 	_check(tiles.fill_color(Vector2i.ZERO) == tiles.resonant_color and tiles.fill_color(Vector2i(0, -1)) == tiles.resonant_color
 		and tiles.resonant_color == Color(0.5, 0.5, 0.5) and tiles.fill_color(Vector2i(1, 0)) == tiles.hex_color,
 		"ley: an iron run along the line turns medium grey")
-	tiles.show_ley_lines = false
-	_check(tiles.fill_color(Vector2i(0, 1)) == tiles.hex_color and tiles.fill_color(Vector2i.ZERO) == tiles.resonant_color,
-		"ley: with the testing aid off, only resonance shows")
-	tiles.show_ley_lines = true
 	tiles.ley_lines = planet_ley
 
 	# Scry: from the middle of the landing patch's edge, V reveals the next patch over.
