@@ -1,27 +1,10 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://dnubnvbfaqsu0"]
 
-[ext_resource type="Script" path="res://scripts/ui/inventory_panel.gd" id="1_script"]
-[ext_resource type="Script" path="res://scripts/ui/item_icon.gd" id="2_icon"]
+[ext_resource type="Script" uid="uid://ev1kvi44dwf2" path="res://scripts/ui/inventory_panel.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://ccvbm35omxlk5" path="res://scripts/ui/item_icon.gd" id="2_icon"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
-bg_color = Color(0.1, 0.105, 0.12, 0.97)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.5, 0.42, 0.28, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slot"]
-bg_color = Color(0.2, 0.21, 0.24, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.3, 0.31, 0.34, 1)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slot_empty"]
+bg_color = Color(0.14, 0.145, 0.16, 1)
 corner_radius_top_left = 6
 corner_radius_top_right = 6
 corner_radius_bottom_right = 6
@@ -51,23 +34,40 @@ corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slot_empty"]
-bg_color = Color(0.14, 0.145, 0.16, 1)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slot"]
+bg_color = Color(0.2, 0.21, 0.24, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.31, 0.34, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.1, 0.105, 0.12, 0.97)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.5, 0.42, 0.28, 1)
 corner_radius_top_left = 6
 corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
 [sub_resource type="Theme" id="Theme_inventory"]
+default_font_size = 20
 Button/styles/disabled = SubResource("StyleBoxFlat_slot_empty")
 Button/styles/hover = SubResource("StyleBoxFlat_slot_hover")
 Button/styles/hover_pressed = SubResource("StyleBoxFlat_slot_selected")
 Button/styles/normal = SubResource("StyleBoxFlat_slot")
 Button/styles/pressed = SubResource("StyleBoxFlat_slot_selected")
 PanelContainer/styles/panel = SubResource("StyleBoxFlat_panel")
-default_font_size = 20
 
-[node name="InventoryPanel" type="PanelContainer"]
+[node name="InventoryPanel" type="PanelContainer" unique_id=263384360]
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
@@ -82,29 +82,29 @@ grow_vertical = 2
 theme = SubResource("Theme_inventory")
 script = ExtResource("1_script")
 
-[node name="Margin" type="MarginContainer" parent="."]
+[node name="Margin" type="MarginContainer" parent="." unique_id=860108609]
 layout_mode = 2
 theme_override_constants/margin_left = 16
 theme_override_constants/margin_top = 12
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 12
 
-[node name="Layout" type="VBoxContainer" parent="Margin"]
+[node name="Layout" type="VBoxContainer" parent="Margin" unique_id=1178430682]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="Title" type="Label" parent="Margin/Layout"]
+[node name="Title" type="Label" parent="Margin/Layout" unique_id=1682672190]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 28
 text = "Inventory"
 
-[node name="Body" type="HBoxContainer" parent="Margin/Layout"]
+[node name="Body" type="HBoxContainer" parent="Margin/Layout" unique_id=1170468992]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 20
 
-[node name="Grid" type="GridContainer" parent="Margin/Layout/Body"]
+[node name="Grid" type="GridContainer" parent="Margin/Layout/Body" unique_id=2119663910]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 0
@@ -112,39 +112,39 @@ theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 8
 columns = 4
 
-[node name="Details" type="VBoxContainer" parent="Margin/Layout/Body"]
+[node name="Details" type="VBoxContainer" parent="Margin/Layout/Body" unique_id=1699002207]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
-[node name="Header" type="HBoxContainer" parent="Margin/Layout/Body/Details"]
+[node name="Header" type="HBoxContainer" parent="Margin/Layout/Body/Details" unique_id=1259380633]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="DetailIcon" type="Control" parent="Margin/Layout/Body/Details/Header"]
+[node name="DetailIcon" type="Control" parent="Margin/Layout/Body/Details/Header" unique_id=2070523112]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(64, 64)
 layout_mode = 2
 mouse_filter = 2
 script = ExtResource("2_icon")
 
-[node name="Names" type="VBoxContainer" parent="Margin/Layout/Body/Details/Header"]
+[node name="Names" type="VBoxContainer" parent="Margin/Layout/Body/Details/Header" unique_id=1051678223]
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_constants/separation = 0
 
-[node name="NameLabel" type="Label" parent="Margin/Layout/Body/Details/Header/Names"]
+[node name="NameLabel" type="Label" parent="Margin/Layout/Body/Details/Header/Names" unique_id=52944722]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
 text = "Nothing selected"
 
-[node name="CountLabel" type="Label" parent="Margin/Layout/Body/Details/Header/Names"]
+[node name="CountLabel" type="Label" parent="Margin/Layout/Body/Details/Header/Names" unique_id=930971960]
 unique_name_in_owner = true
 modulate = Color(1, 1, 1, 0.7)
 layout_mode = 2
 
-[node name="DescriptionLabel" type="Label" parent="Margin/Layout/Body/Details"]
+[node name="DescriptionLabel" type="Label" parent="Margin/Layout/Body/Details" unique_id=1661324884]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(280, 0)
 layout_mode = 2
@@ -152,7 +152,7 @@ size_flags_vertical = 3
 text = "Select an item to see what it is."
 autowrap_mode = 3
 
-[node name="Hint" type="Label" parent="Margin/Layout"]
+[node name="Hint" type="Label" parent="Margin/Layout" unique_id=45499235]
 modulate = Color(1, 1, 1, 0.6)
 layout_mode = 2
 text = "I / Esc close"
