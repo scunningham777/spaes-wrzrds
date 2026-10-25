@@ -62,6 +62,13 @@ border_width_right = 2
 border_width_bottom = 2
 border_color = Color(1, 1, 1, 1)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ley_line"]
+content_margin_left = 8.0
+content_margin_top = 2.0
+content_margin_right = 8.0
+content_margin_bottom = 2.0
+bg_color = Color(0.5, 0.5, 0.5, 1)
+
 [node name="Planet" type="Node2D" unique_id=73139735]
 script = ExtResource("1_planet")
 
@@ -301,6 +308,21 @@ grow_horizontal = 2
 theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
 text_overrun_behavior = 3
+
+[node name="TileLeyLine" type="Label" parent="UI/SidePanel/Margin/Layout/Bottom/TileInfo"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_right = 0.5
+offset_top = 84.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBoxFlat_ley_line")
+text = "ley line detected"
+horizontal_alignment = 1
 
 [node name="InventoryPanel" parent="UI" unique_id=189433725 instance=ExtResource("6_inventory")]
 

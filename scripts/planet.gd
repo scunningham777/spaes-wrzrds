@@ -119,7 +119,10 @@ static func _key_name(action: StringName) -> String:
 func _update_side_panel() -> void:
 	var coord := _wizard.mover.coord
 	var kind := _tiles.grid.get_tile(coord)
-	_tile_info.show_tile(kind, _tiles.icon_texture(kind, _tiles.grid.is_tapped(coord)), _tiles.grid.cooldown(coord))
+	# Resonance as the map shows it (the grey tiles), so the panel always agrees with the map.
+	var resonant := _tiles.ley_lines != null and _tiles.ley_lines.is_resonant(_tiles.grid, coord)
+	_tile_info.show_tile(kind, _tiles.icon_texture(kind, _tiles.grid.is_tapped(coord)), _tiles.grid.cooldown(coord),
+		resonant)
 	for action in _focus_hints:
 		_focus_hints[action].text = _focus_hint_text(action)
 	# Scry is only listed where it works: the middle of the explored area's edge.

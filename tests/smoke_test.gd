@@ -797,6 +797,26 @@ func _test_enter_planet() -> void:
 	_check(tiles.fill_color(Vector2i.ZERO) == tiles.resonant_color and tiles.fill_color(Vector2i(0, -1)) == tiles.resonant_color
 		and tiles.resonant_color == Color(0.5, 0.5, 0.5) and tiles.fill_color(Vector2i(1, 0)) == tiles.hex_color,
 		"ley: an iron run along the line turns medium grey")
+	# Standing on a resonating tile, the tile info says so, in a grey badge under the elements.
+	var ley_info: TileInfo = current_scene.get_node("%TileInfo")
+	var ley_badge: Label = current_scene.get_node("%TileLeyLine")
+	_check(ley_info.shown_ley_line() == "", "ley: no badge on a tile that doesn't resonate")
+	_game().state.inventory.add(Aether.ITEM, 4)  # for the walk there and back
+	_press(KEY_X)
+	_press(KEY_X)  # (0, 2) -> (0, 0)
+	await process_frame
+	var yield_label: Label = current_scene.get_node("%TileYield")
+	_check(ley_info.shown_ley_line() == "ley line detected"
+		and ley_badge.get_global_rect().position.y >= yield_label.get_global_rect().end.y
+		and absf(ley_badge.get_global_rect().get_center().x - yield_label.get_global_rect().get_center().x) < 1.0,
+		"ley: resonating tile shows the badge, centered under the elements")
+	_check((ley_badge.get_theme_stylebox(&"normal") as StyleBoxFlat).bg_color == Color(0.5, 0.5, 0.5)
+		and ley_badge.get_theme_color(&"font_color") == Color.BLACK, "ley: badge is black on grey")
+	tiles.grid.set_tile(Vector2i(0, -1), gold)
+	_check(ley_info.shown_ley_line() == "", "ley: badge goes when the run is broken")
+	tiles.grid.set_tile(Vector2i(0, -1), iron)
+	_press(KEY_W)
+	_press(KEY_W)  # back to (0, 2)
 	tiles.ley_lines = planet_ley
 
 	# Scry: from the middle of the landing patch's edge, V reveals the next patch over.
