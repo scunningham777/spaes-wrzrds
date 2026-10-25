@@ -15,6 +15,8 @@ extends Node2D
 ## Running out of aether: how long the message shows, then how long the fade to black takes.
 @export var out_of_aether_message_seconds: float = 1.5
 @export var out_of_aether_fade_seconds: float = 0.4
+## Fade in from black, when arriving from a scene that faded out (Game.fade_in).
+@export var fade_in_seconds: float = 0.3
 
 @onready var _tiles: TileGridView = $HexBoard/TileGridView
 @onready var _wizard: HexPlayerController = $HexBoard/Wizard
@@ -79,6 +81,11 @@ func _ready() -> void:
 	($ActionLock as ActionLock).busy_changed.connect(func(busy: bool) -> void:
 		for list: Control in [%Actions, %FocusBox]:
 			list.modulate.a = 0.35 if busy else 1.0)
+
+	if Game.fade_in:
+		Game.fade_in = false
+		(%Fade as ColorRect).color.a = 1.0
+		create_tween().tween_property(%Fade, "color:a", 0.0, fade_in_seconds)
 
 
 # Fills the outlined focus box with the focus's name and the actions it grants; hidden if none.

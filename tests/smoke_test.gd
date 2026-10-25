@@ -509,11 +509,26 @@ func _test_enter_planet() -> void:
 	_check(label.contains(planet_a.display_name), "enter: prompt names the planet (%s)" % label)
 	_check(_game().state.space_coord == planet_a.coord, "enter: space position tracked")
 
+	# Entering fades space to black first, with input blocked, then the planet fades in.
 	_press(KEY_ENTER)
 	await process_frame
-	await process_frame
+	var space_out_fade: ColorRect = play.get_node("%Fade")
+	_press(KEY_X)  # would step off the planet
+	_press(KEY_ENTER)
+	_check(current_scene == play and _game().state.space_coord == planet_a.coord and _game().state.current_location == null,
+		"enter: space stays up, input blocked, while it fades out")
+	await create_timer(play.fade_out_seconds / 2.0).timeout
+	_check(current_scene == play and space_out_fade.color.a > 0.0 and space_out_fade.color.a < 1.0,
+		"enter: space fades to black (%.2f)" % space_out_fade.color.a)
+	await _await_scene("res://scenes/planet.tscn")
 	_check(current_scene != null and current_scene.scene_file_path == "res://scenes/planet.tscn",
 		"enter: Enter loads the planet scene")
+	if current_scene != null and current_scene.has_node("%Fade"):
+		var planet_in_fade: ColorRect = current_scene.get_node("%Fade")
+		_check(planet_in_fade.color.a > 0.5 and not _game().fade_in,
+			"enter: the planet fades in (%.2f)" % planet_in_fade.color.a)
+		await create_timer(current_scene.fade_in_seconds + 0.1).timeout
+		_check(planet_in_fade.color.a == 0.0, "enter: planet fade-in finishes clear")
 	_check(_game().state.current_location == planet_a, "enter: current location recorded")
 	if current_scene == null or current_scene.scene_file_path != "res://scenes/planet.tscn":
 		return
@@ -855,8 +870,8 @@ func _test_enter_planet() -> void:
 	# Re-enter: the planet should look exactly the same.
 	var first_visit := tiles_snapshot
 	_press(KEY_ENTER)
-	await process_frame
-	await process_frame
+	await _await_scene("res://scenes/planet.tscn")
+	await create_timer(current_scene.fade_in_seconds + 0.1).timeout  # the running-out checks watch the fade
 	var revisit: TileGridView = current_scene.get_node("HexBoard/TileGridView")
 	_check(revisit.grid.tiles == first_visit, "planet: revisit shows the same tiles")
 	# Running out: the move that spends the last aether kicks the wizard back to space.
@@ -898,13 +913,20 @@ func _test_enter_planet() -> void:
 	await create_timer(current_scene.fade_in_seconds + 0.1).timeout
 	_check(space_fade.color.a == 0.0, "space: fade-in finishes clear")
 	_press(KEY_ENTER)
-	await process_frame
-	await process_frame
+	await _await_scene("res://scenes/planet.tscn")
 	_check(current_scene.scene_file_path == "res://scenes/planet.tscn" and revisit_inv.count(Aether.ITEM) == 10,
 		"aether: landing again tops back up to 10")
 	current_scene.queue_free()
 	await process_frame
 	_finished.append("enter_planet")
+
+
+# Waits (up to 2 seconds) for a scene change that comes after a fade, plus a frame for it to settle.
+func _await_scene(path: String) -> void:
+	var deadline := Time.get_ticks_msec() + 2000
+	while (current_scene == null or current_scene.scene_file_path != path) and Time.get_ticks_msec() < deadline:
+		await process_frame
+	await process_frame
 
 
 func _press(keycode: Key) -> void:

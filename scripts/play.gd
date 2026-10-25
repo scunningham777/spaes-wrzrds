@@ -5,11 +5,14 @@ extends Node2D
 
 ## Fade in from black, when arriving from a scene that faded out (Game.fade_in).
 @export var fade_in_seconds: float = 0.3
+## Fade to black on entering a location, before it fades in.
+@export var fade_out_seconds: float = 0.3
 
 @onready var _board: HexBoard = $HexBoard
 @onready var _wizard: HexPlayerController = $HexBoard/Wizard
 @onready var _prompt := $EnterPrompt
 @onready var _fade: ColorRect = %Fade
+@onready var _lock: ActionLock = $ActionLock
 
 var _enterables: Array[Enterable] = []
 var _available: Enterable = null
@@ -36,7 +39,6 @@ func _ready() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_accept") and _available != null:
-		# Before entering: the scene change removes this node from the tree immediately.
 		get_viewport().set_input_as_handled()
 		_enter_available()
 	elif event.is_action_pressed("ui_cancel"):
@@ -53,6 +55,14 @@ func _on_wizard_moved(coord: Vector2i) -> void:
 		_prompt.hide_prompt()
 
 
+# Fades to black, then enters (and the location fades in). All input is blocked meanwhile, the
+# inventory too (it would pause the fade); the lock only filters keys, so a second click on the
+# prompt is caught by the busy check.
 func _enter_available() -> void:
-	if _available != null:
-		Game.enter(_available)
+	if _available == null or _lock.busy:
+		return
+	_lock.allowed_actions = []
+	var tween := create_tween()
+	tween.tween_property(_fade, "color:a", 1.0, fade_out_seconds)
+	tween.tween_callback(Game.enter.bind(_available, true))
+	_lock.run(tween)

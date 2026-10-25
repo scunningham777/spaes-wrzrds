@@ -20,8 +20,10 @@ func new_game() -> void:
 	go_to("space")
 
 
-func enter(location: Enterable) -> void:
+# faded: space faded to black on its way out, so the location fades in.
+func enter(location: Enterable, faded: bool = false) -> void:
 	state.current_location = location
+	fade_in = faded
 	go_to(location.destination)
 
 
