@@ -858,11 +858,21 @@ func _test_enter_planet() -> void:
 	_check_coord(planet_wizard, Vector2i(3, -1), "scry: can walk onto the revealed patch")
 	tiles_snapshot = tiles.grid.tiles.duplicate()  # the revisit should keep the scried patch
 
+	# Esc fades out too, with input blocked, and space fades in.
+	var esc_scene := current_scene
 	_press(KEY_ESCAPE)
 	await process_frame
-	await process_frame
+	var esc_coord := planet_wizard.mover.coord
+	_press(KEY_W)
+	_check(current_scene == esc_scene and planet_wizard.mover.coord == esc_coord,
+		"planet: after Esc, the planet stays up with input blocked while it fades out")
+	await create_timer(esc_scene.fade_out_seconds / 2.0).timeout
+	var esc_fade: ColorRect = esc_scene.get_node("%Fade")
+	_check(current_scene == esc_scene and esc_fade.color.a > 0.0 and esc_fade.color.a < 1.0,
+		"planet: Esc fades to black (%.2f)" % esc_fade.color.a)
+	await _await_scene("res://scenes/play.tscn")
 	_check(current_scene.scene_file_path == "res://scenes/play.tscn", "planet: Esc returns to space")
-	_check((current_scene.get_node("%Fade") as ColorRect).color.a == 0.0, "space: no fade-in after Esc")
+	_check((current_scene.get_node("%Fade") as ColorRect).color.a > 0.5, "space: fades in after Esc")
 	var wizard: HexPlayerController = current_scene.get_node("HexBoard/Wizard")
 	_check(wizard.mover.coord == planet_a.coord, "planet: back on the planet's tile (got %s)" % wizard.mover.coord)
 	_check((current_scene.get_node("EnterPrompt") as CanvasLayer).is_showing(), "planet: prompt shows again on return")

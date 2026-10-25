@@ -1,6 +1,6 @@
 extends Node2D
 
-# Planet surface (Unity's TileExploreScene layout). Esc returns to space.
+# Planet surface (Unity's TileExploreScene layout). Esc fades out and returns to space.
 
 # Generation settings, from Unity's TileGridManager. They only apply on a planet's first visit.
 ## Radius of each patch of tiles: the one you land in, and each one scrying reveals.
@@ -17,6 +17,8 @@ extends Node2D
 @export var out_of_aether_fade_seconds: float = 0.4
 ## Fade in from black, when arriving from a scene that faded out (Game.fade_in).
 @export var fade_in_seconds: float = 0.3
+## Fade to black on leaving with Esc.
+@export var fade_out_seconds: float = 0.3
 
 @onready var _tiles: TileGridView = $HexBoard/TileGridView
 @onready var _wizard: HexPlayerController = $HexBoard/Wizard
@@ -152,15 +154,21 @@ func _pay_for_move(coord: Vector2i) -> void:
 		_leave_out_of_aether()
 
 
-# Shows the out-of-aether message, then fades to black and returns to space. All input is
-# blocked meanwhile, the inventory too (it would pause the fade).
+# Shows the out-of-aether message, then fades to black and returns to space.
 func _leave_out_of_aether() -> void:
+	(%OutOfAetherMessage as Control).show()
+	_fade_out_and_leave(out_of_aether_message_seconds, out_of_aether_fade_seconds)
+
+
+# After delay seconds, fades to black over seconds and returns to space (which fades in). All
+# input is blocked meanwhile, the inventory too (it would pause the fade).
+func _fade_out_and_leave(delay: float, seconds: float) -> void:
 	var lock := $ActionLock as ActionLock
 	lock.allowed_actions = []
-	(%OutOfAetherMessage as Control).show()
 	var tween := create_tween()
-	tween.tween_interval(out_of_aether_message_seconds)
-	tween.tween_property(%Fade, "color:a", 1.0, out_of_aether_fade_seconds)
+	if delay > 0.0:
+		tween.tween_interval(delay)
+	tween.tween_property(%Fade, "color:a", 1.0, seconds)
 	tween.tween_callback(Game.leave_location.bind(true))
 	lock.run(tween)
 
@@ -182,4 +190,5 @@ func _center_map() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
-		Game.leave_location()
+		get_viewport().set_input_as_handled()
+		_fade_out_and_leave(0.0, fade_out_seconds)
