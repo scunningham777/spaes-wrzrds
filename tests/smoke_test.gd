@@ -104,9 +104,10 @@ func _test_core_logic() -> void:
 	# Generation (seeded so results are reproducible).
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 42
-	var g1 := TileGridGenerator.generate(5, 0.15, rng)
+	# Radius 8 reaches past the free zone (radius 5), so aether tiles can appear too.
+	var g1 := TileGridGenerator.generate(8, 0.15, rng)
 	rng.seed = 42
-	var g2 := TileGridGenerator.generate(5, 0.15, rng)
+	var g2 := TileGridGenerator.generate(8, 0.15, rng)
 	# Grids get their own kind objects, so compare by id.
 	var kind_ids := func(g: TileGrid) -> Array: return g.tiles.values().map(func(k: TileKind) -> StringName: return k.id)
 	_check(kind_ids.call(g1) == kind_ids.call(g2), "gen: same seed gives same grid")
@@ -121,33 +122,22 @@ func _test_core_logic() -> void:
 		and g1.find_kind(&"nope") == null, "kinds: find_kind by id")
 	var no_empty := TileGridGenerator.generate(5, 0.0, rng)
 	_check(not no_empty.tiles.values().has(TileKind.EMPTY), "gen: probability 0 gives no Empty")
-	var no_rules: Array[StringName] = []
-	var no_required: Dictionary[StringName, int] = {}
-	var all_empty := TileGridGenerator.generate(5, 1.0, rng, [], no_rules, no_required)
+	var all_empty := TileGridGenerator.generate(8, 1.0, rng)
 	_check(all_empty.tiles.values().all(func(k: TileKind) -> bool: return k == TileKind.EMPTY),
-		"gen: probability 1 without requirements gives all Empty")
-	# Element requirements: the start tile yields aether, and at least 2 tiles do in all.
+		"gen: probability 1 gives all Empty, landing tile included")
+	# No aether within the free zone, so the player can't walk around there refilling it forever.
 	var yields_aether := func(k: TileKind) -> bool: return Aether.ITEM in k.elements
-	var reqs_met := true
+	var free_aether := 0
 	for seed_value in 30:
 		rng.seed = seed_value
-		var rg := TileGridGenerator.generate(2, 0.15, rng)
-		reqs_met = reqs_met and yields_aether.call(rg.get_tile(TileGridGenerator.START_COORD)) \
-			and rg.tiles.values().filter(yields_aether).size() >= 2
-	_check(reqs_met, "gen: start tile yields aether and 2+ tiles do, over 30 seeds")
-	var bare := TileGridGenerator.generate(5, 1.0, rng)
-	var bare_aether := bare.tiles.keys().filter(func(c: Vector2i) -> bool: return yields_aether.call(bare.get_tile(c)))
-	_check(bare_aether.size() == 2 and TileGridGenerator.START_COORD in bare_aether
-		and bare.tiles.values().filter(func(k: TileKind) -> bool: return k != TileKind.EMPTY).size() == 2,
-		"gen: probability 1 leaves only the start tile and one more aether tile (%s)" % [bare_aether])
-	var stone_rule: Dictionary[StringName, int] = {&"aether": 2, &"stone": 3}
-	var multi := TileGridGenerator.generate(3, 1.0, rng, [], TileGridGenerator.START_ELEMENTS, stone_rule)
-	var count_of := func(e: StringName) -> int:
-		return multi.tiles.values().filter(func(k: TileKind) -> bool: return e in k.elements).size()
-	_check(count_of.call(&"aether") == 2 and count_of.call(&"stone") == 3,
-		"gen: several required elements are each met (aether %d, stone %d)" % [count_of.call(&"aether"), count_of.call(&"stone")])
-	_check(TileGridGenerator.generate(0, 1.0, rng).get_tile(Vector2i.ZERO).id == &"aether_spring",
-		"gen: a one-tile planet still gets its start tile, without looping")
+		var rg := TileGridGenerator.generate(5, 0.0, rng)
+		free_aether += rg.tiles.values().filter(yields_aether).size()
+	_check(free_aether == 0, "gen: no aether tiles within the free zone, over 30 seeds (%d)" % free_aether)
+	var only_aether: Array[TileKind] = [g1.find_kind(&"aether_spring")]
+	var dry := TileGridGenerator.generate(6, 0.0, rng, only_aether)
+	_check(Hex.hexagon(6).all(func(c: Vector2i) -> bool:
+		return (dry.get_tile(c) == TileKind.EMPTY) == (Hex.distance(c) <= 5)),
+		"gen: with only aether kinds, the free zone is Empty and the rest is aether")
 
 	# Kinds for the grid tests below; rusty gold yields two elements.
 	var timber := TileKind.new(&"timber", "Timber", &"sapling", [&"wood"])
@@ -272,7 +262,8 @@ func _test_planet_surface() -> void:
 	var g := surface.grid
 	_check(g.torus.width == 16 and g.torus.height == 18, "surface: torus sized in patches (%dx%d)" % [g.torus.width, g.torus.height])
 	_check(g.tiles.size() == 19 and surface.patches.keys() == [Vector2i.ZERO], "surface: lands with one radius-2 patch revealed")
-	_check(Aether.ITEM in g.get_tile(TileGridGenerator.START_COORD).elements, "surface: start tile yields aether")
+	_check(g.tiles.values().all(func(k: TileKind) -> bool: return not Aether.ITEM in k.elements),
+		"surface: no aether tiles in the free landing patch")
 	# The middles of the landing patch's six edges, one step of each PATCH_STEPS direction out.
 	var spots := Hex.hexagon(2).filter(surface.can_scry)
 	_check(spots == [Vector2i(-2, 1), Vector2i(-1, -1), Vector2i(-1, 2), Vector2i(1, -2), Vector2i(1, 1), Vector2i(2, -1)],
@@ -283,8 +274,6 @@ func _test_planet_surface() -> void:
 	_check(surface.try_scry(Vector2i(2, -1)) and g.tiles.size() == 19 + 16, "scry: reveals a patch sharing one 3-tile edge")
 	_check(before.keys().all(func(c: Vector2i) -> bool: return g.get_tile(c) == before[c]),
 		"scry: already revealed tiles keep their kinds")
-	_check(surface.patch_tiles(Vector2i(4, -2)).filter(func(c: Vector2i) -> bool:
-		return Aether.ITEM in g.get_tile(c).elements).size() >= 2, "scry: the new patch meets the element requirements")
 	_check(not surface.can_scry(Vector2i(2, -1)) and not surface.try_scry(Vector2i(2, -1)) and g.tiles.size() == 35,
 		"scry: the shared edge is no longer the explored edge")
 	_check(surface.can_scry(Vector2i(6, -3)) and surface.can_scry(Vector2i(3, 0)), "scry: works from the new patch's edges")
@@ -317,8 +306,9 @@ func _test_planet_surface() -> void:
 		return g.move_cost(c) == (1 if Aether.ITEM in g.get_tile(c).elements else g.move_cost(c)) and g.move_cost(c) in [1, 2]),
 		"cost: farther tiles cost 1, aether ones always")
 	_check(far.any(func(c: Vector2i) -> bool: return g.move_cost(c) == 2), "cost: some farther tiles cost 2")
-	_check(g.move_cost(Vector2i(7, 0)) == g.move_cost(Vector2i(7 + 16, 0)), "cost: any copy of a coord has its cost")
 	var rough: Vector2i = far.filter(func(c: Vector2i) -> bool: return g.move_cost(c) == 2)[0]
+	# A lap across the 16 x 18 torus shifts r back by 8.
+	_check(g.move_cost(rough + Vector2i(16, -8)) == 2, "cost: any copy of a coord has its cost")
 	var rough_neighbor := g.canonical(rough + Vector2i(1, 0))
 	var neighbor_cost := g.move_cost(rough_neighbor)
 	g.try_swap(rough, rough_neighbor)
@@ -541,7 +531,8 @@ func _test_enter_planet() -> void:
 		"planet: %d tiles for radius %d" % [tiles.grid.tiles.size(), radius])
 	_check(tiles.grid.tiles.values().any(func(k: TileKind) -> bool: return k != TileKind.EMPTY),
 		"planet: tiles are generated, not all Empty")
-	_check(Aether.ITEM in tiles.grid.get_tile(Vector2i.ZERO).elements, "planet: the start tile yields aether")
+	_check(tiles.grid.tiles.values().all(func(k: TileKind) -> bool: return not Aether.ITEM in k.elements),
+		"planet: no aether tiles in the free landing patch")
 	var aether_bar: ProgressBar = current_scene.get_node("%AetherBar")
 	var aether_label: Label = current_scene.get_node("%AetherLabel")
 	var aether := func() -> int: return _game().state.inventory.count(Aether.ITEM)
