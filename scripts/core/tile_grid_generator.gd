@@ -6,12 +6,8 @@ extends RefCounted
 # first seen rather than all up front (what's revealed later can depend on what the player did).
 #
 # Each new tile is Empty with probability empty_probability, otherwise a uniformly random kind
-# from the planet's kinds. Tiles within free_move_radius of the start tile cost nothing to step
-# onto, so the first steps of exploring don't drain aether, and are never rolled a kind yielding
-# a free_zone_excluded element, so the player can't wander there extracting aether forever.
-#
-# Past free_move_radius, tiles yielding a steady element always cost move_cost, and others cost
-# rough_move_cost with probability rough_probability (move_cost otherwise).
+# from the planet's kinds. Tiles yielding a steady element cost move_cost to step onto, and others
+# cost rough_move_cost with probability rough_probability (move_cost otherwise).
 
 ## Tile kinds every planet uses until generation rolls its own. Fields as in TileKind.
 const DEFAULT_KINDS: Array[Dictionary] = [
@@ -28,11 +24,7 @@ const START_COORD := Vector2i.ZERO
 var kinds: Array[TileKind] = []
 var empty_probability: float
 var rng: RandomNumberGenerator
-## Tiles within this many steps of the start tile cost nothing to step onto.
-var free_move_radius: int = 0
-## Tiles within free_move_radius never yield any of these.
-var free_zone_excluded: Array[StringName] = [Aether.ITEM]
-## Aether most tiles past free_move_radius cost to step onto.
+## Aether most tiles cost to step onto.
 var move_cost: int = 1
 ## What the occasional rough tile costs instead, with probability rough_probability.
 var rough_move_cost: int = 2
@@ -75,30 +67,20 @@ static func generate(radius: int, p_empty_probability: float,
 # Adds a tile to grid at every coord of region it doesn't have yet. Returns the stored copies of
 # the new tiles.
 func reveal(grid: TileGrid, region: Array[Vector2i]) -> Array[Vector2i]:
-	var free_kinds := kinds.filter(func(k: TileKind) -> bool:
-		return not k.elements.any(func(e: StringName) -> bool: return e in free_zone_excluded))
 	var added: Array[Vector2i] = []
 	for c in region:
 		var key := grid.canonical(c)
 		# Also skips repeats: on a small torus a region can overlap itself.
 		if grid.has_tile(key):
 			continue
-		var free := _is_free(grid, key)
-		var pool: Array = free_kinds if free else kinds
-		var kind: TileKind = TileKind.EMPTY if pool.is_empty() or rng.randf() < empty_probability \
-			else pool[rng.randi_range(0, pool.size() - 1)]
-		grid.add_tile(key, kind, 0 if free else _roll_move_cost(kind))
+		var kind: TileKind = TileKind.EMPTY if rng.randf() < empty_probability \
+			else kinds[rng.randi_range(0, kinds.size() - 1)]
+		grid.add_tile(key, kind, _roll_move_cost(kind))
 		added.append(key)
 	return added
 
 
-# Whether the tile at key (a stored copy) is within free_move_radius, measured from the start
-# tile's nearest copy so the free area wraps like everything else.
-func _is_free(grid: TileGrid, key: Vector2i) -> bool:
-	return Hex.distance(grid.nearest(key, START_COORD), START_COORD) <= free_move_radius
-
-
-# Move cost for a new tile of kind past free_move_radius.
+# Move cost for a new tile of kind.
 func _roll_move_cost(kind: TileKind) -> int:
 	if kind.elements.any(func(e: StringName) -> bool: return e in steady_elements):
 		return move_cost
