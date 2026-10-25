@@ -12,6 +12,9 @@ extends Node2D
 @export_range(0.0, 1.0) var empty_tile_probability: float = 0.0
 ## Player actions (moves, extracts, scrying; not pushes) an extracted tile stays tapped.
 @export var tap_cooldown_actions: int = 5
+## Running out of aether: how long the message shows, then how long the fade to black takes.
+@export var out_of_aether_message_seconds: float = 1.5
+@export var out_of_aether_fade_seconds: float = 0.4
 
 @onready var _tiles: TileGridView = $HexBoard/TileGridView
 @onready var _wizard: HexPlayerController = $HexBoard/Wizard
@@ -136,9 +139,20 @@ func _follow_wizard() -> void:
 func _pay_for_move(coord: Vector2i) -> void:
 	if not Aether.pay_move(Game.state.inventory, _tiles.grid.move_cost(coord)):
 		print("Out of aether")
-		# Deferred: changing scenes takes this one out of the tree at once, and the wizard is still
-		# handling the move's input.
-		Game.leave_location.call_deferred()
+		_leave_out_of_aether()
+
+
+# Shows the out-of-aether message, then fades to black and returns to space. All input is
+# blocked meanwhile, the inventory too (it would pause the fade).
+func _leave_out_of_aether() -> void:
+	var lock := $ActionLock as ActionLock
+	lock.allowed_actions = []
+	(%OutOfAetherMessage as Control).show()
+	var tween := create_tween()
+	tween.tween_interval(out_of_aether_message_seconds)
+	tween.tween_property(%Fade, "color:a", 1.0, out_of_aether_fade_seconds)
+	tween.tween_callback(Game.leave_location)
+	lock.run(tween)
 
 
 # The bar fills against Aether.START; the label has the exact count, which extraction can push past it.

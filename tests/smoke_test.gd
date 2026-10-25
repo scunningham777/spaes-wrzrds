@@ -846,6 +846,25 @@ func _test_enter_planet() -> void:
 	_press(KEY_X)
 	await process_frame
 	await process_frame
+	# Running out: a message first, with everything (inventory and Esc too) blocked, then a fade.
+	var out_scene := current_scene
+	var out_message: Label = out_scene.get_node("%OutOfAetherMessage")
+	var fade: ColorRect = out_scene.get_node("%Fade")
+	var out_wizard: HexPlayerController = out_scene.get_node("HexBoard/Wizard")
+	var out_coord := out_wizard.mover.coord
+	for key: Key in [KEY_W, KEY_I, KEY_ESCAPE]:
+		_press(key)
+	await process_frame
+	_check(current_scene == out_scene and revisit_inv.count(Aether.ITEM) == 0 and out_message.visible
+		and out_message.text.begins_with("Out of aether.") and fade.color.a == 0.0,
+		"aether: running out shows a message before leaving")
+	_check(out_wizard.mover.coord == out_coord and not (out_scene.get_node("UI/InventoryPanel") as Control).visible,
+		"aether: moving, the inventory and Esc are blocked while it shows")
+	await create_timer(out_scene.out_of_aether_message_seconds + out_scene.out_of_aether_fade_seconds / 2.0).timeout
+	_check(current_scene == out_scene and fade.color.a > 0.0 and fade.color.a < 1.0,
+		"aether: then fades to black (%.2f)" % fade.color.a)
+	await create_timer(out_scene.out_of_aether_fade_seconds).timeout
+	await process_frame
 	_check(revisit_inv.count(Aether.ITEM) == 0 and current_scene.scene_file_path == "res://scenes/play.tscn"
 		and _game().state.current_location == null, "aether: running out kicks the wizard back to space")
 	_press(KEY_ENTER)

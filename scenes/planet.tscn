@@ -50,6 +50,18 @@ border_color = Color(1, 1, 1, 1)
 atlas = ExtResource("7_icons")
 region = Rect2(378, 1, 12, 12)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_out_of_aether"]
+content_margin_left = 24.0
+content_margin_top = 16.0
+content_margin_right = 24.0
+content_margin_bottom = 16.0
+bg_color = Color(0, 0, 0, 0.8)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 1, 1, 1)
+
 [node name="Planet" type="Node2D" unique_id=73139735]
 script = ExtResource("1_planet")
 
@@ -291,3 +303,33 @@ horizontal_alignment = 1
 text_overrun_behavior = 3
 
 [node name="InventoryPanel" parent="UI" unique_id=189433725 instance=ExtResource("6_inventory")]
+
+[node name="Leaving" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="OutOfAetherMessage" type="Label" parent="Leaving"]
+unique_name_in_owner = true
+visible = false
+anchors_preset = -1
+anchor_left = 0.33333334
+anchor_top = 0.5
+anchor_right = 0.33333334
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 28
+theme_override_styles/normal = SubResource("StyleBoxFlat_out_of_aether")
+text = "Out of aether.
+Returning to your ship before you get the bends."
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Fade" type="ColorRect" parent="Leaving"]
+unique_name_in_owner = true
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
