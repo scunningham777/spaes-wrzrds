@@ -104,7 +104,6 @@ func _test_core_logic() -> void:
 	# Generation (seeded so results are reproducible).
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 42
-	# Radius 8 reaches past the free zone (radius 5), so aether tiles can appear too.
 	var g1 := TileGridGenerator.generate(8, 0.15, rng)
 	rng.seed = 42
 	var g2 := TileGridGenerator.generate(8, 0.15, rng)
@@ -126,15 +125,22 @@ func _test_core_logic() -> void:
 	_check(all_empty.tiles.values().all(func(k: TileKind) -> bool: return k == TileKind.EMPTY),
 		"gen: probability 1 gives all Empty, landing tile included")
 	# No aether within the free zone, so the player can't walk around there refilling it forever.
+	# Radius set here so these hold whatever the default is.
+	var free_grid := func(radius: int, p_kinds: Array[TileKind] = []) -> TileGrid:
+		var gen := TileGridGenerator.new(0.0, rng, p_kinds)
+		gen.free_move_radius = 5
+		var fg := TileGrid.new(null, gen.kinds)
+		gen.reveal(fg, Hex.hexagon(radius))
+		return fg
 	var yields_aether := func(k: TileKind) -> bool: return Aether.ITEM in k.elements
 	var free_aether := 0
 	for seed_value in 30:
 		rng.seed = seed_value
-		var rg := TileGridGenerator.generate(5, 0.0, rng)
+		var rg: TileGrid = free_grid.call(5)
 		free_aether += rg.tiles.values().filter(yields_aether).size()
 	_check(free_aether == 0, "gen: no aether tiles within the free zone, over 30 seeds (%d)" % free_aether)
 	var only_aether: Array[TileKind] = [g1.find_kind(&"aether_spring")]
-	var dry := TileGridGenerator.generate(6, 0.0, rng, only_aether)
+	var dry: TileGrid = free_grid.call(6, only_aether)
 	_check(Hex.hexagon(6).all(func(c: Vector2i) -> bool:
 		return (dry.get_tile(c) == TileKind.EMPTY) == (Hex.distance(c) <= 5)),
 		"gen: with only aether kinds, the free zone is Empty and the rest is aether")
@@ -262,8 +268,9 @@ func _test_planet_surface() -> void:
 	var g := surface.grid
 	_check(g.torus.width == 16 and g.torus.height == 18, "surface: torus sized in patches (%dx%d)" % [g.torus.width, g.torus.height])
 	_check(g.tiles.size() == 19 and surface.patches.keys() == [Vector2i.ZERO], "surface: lands with one radius-2 patch revealed")
-	_check(g.tiles.values().all(func(k: TileKind) -> bool: return not Aether.ITEM in k.elements),
-		"surface: no aether tiles in the free landing patch")
+	_check(g.tiles.keys().all(func(c: Vector2i) -> bool:
+		return Hex.distance(c) > surface.generator.free_move_radius or not Aether.ITEM in g.get_tile(c).elements),
+		"surface: no aether tiles in the free zone")
 	# The middles of the landing patch's six edges, one step of each PATCH_STEPS direction out.
 	var spots := Hex.hexagon(2).filter(surface.can_scry)
 	_check(spots == [Vector2i(-2, 1), Vector2i(-1, -1), Vector2i(-1, 2), Vector2i(1, -2), Vector2i(1, 1), Vector2i(2, -1)],
@@ -299,8 +306,8 @@ func _test_planet_surface() -> void:
 	# cost 1 and the rest 1, or occasionally 2.
 	var free_radius := surface.generator.free_move_radius
 	var near := func(c: Vector2i) -> bool: return Hex.distance(g.nearest(c, Vector2i.ZERO)) <= free_radius
-	_check(free_radius == 5 and g.tiles.keys().filter(near).all(func(c: Vector2i) -> bool: return g.move_cost(c) == 0),
-		"cost: tiles within 5 of the landing tile are free")
+	_check(g.tiles.keys().filter(near).all(func(c: Vector2i) -> bool: return g.move_cost(c) == 0),
+		"cost: tiles within %d of the landing tile are free" % free_radius)
 	var far: Array = g.tiles.keys().filter(func(c: Vector2i) -> bool: return not near.call(c))
 	_check(far.all(func(c: Vector2i) -> bool:
 		return g.move_cost(c) == (1 if Aether.ITEM in g.get_tile(c).elements else g.move_cost(c)) and g.move_cost(c) in [1, 2]),
@@ -531,15 +538,18 @@ func _test_enter_planet() -> void:
 		"planet: %d tiles for radius %d" % [tiles.grid.tiles.size(), radius])
 	_check(tiles.grid.tiles.values().any(func(k: TileKind) -> bool: return k != TileKind.EMPTY),
 		"planet: tiles are generated, not all Empty")
-	_check(tiles.grid.tiles.values().all(func(k: TileKind) -> bool: return not Aether.ITEM in k.elements),
-		"planet: no aether tiles in the free landing patch")
+	var free_radius := TileGridGenerator.new().free_move_radius
+	_check(tiles.grid.tiles.keys().all(func(c: Vector2i) -> bool:
+		return Hex.distance(c) > free_radius or not Aether.ITEM in tiles.grid.get_tile(c).elements),
+		"planet: no aether tiles in the free zone")
 	var aether_bar: ProgressBar = current_scene.get_node("%AetherBar")
 	var aether_label: Label = current_scene.get_node("%AetherLabel")
 	var aether := func() -> int: return _game().state.inventory.count(Aether.ITEM)
 	_check(aether.call() == 10 and aether_bar.value == 10 and aether_bar.max_value == 10
 		and aether_label.text == "Aether: 10", "aether: land with 10, shown on the bar (%s)" % aether_label.text)
-	_check(tiles.grid.move_costs.is_empty() and tiles.landing == Vector2i.ZERO,
-		"cost: the landing patch is free to walk, and the landing tile is outlined")
+	_check(tiles.grid.tiles.keys().all(func(c: Vector2i) -> bool:
+		return (tiles.grid.move_cost(c) == 0) == (Hex.distance(c) <= free_radius)) and tiles.landing == Vector2i.ZERO,
+		"cost: only the free zone is free to walk, and the landing tile is outlined")
 	# The checks below count aether spent per step, so give the landing patch real costs.
 	for c in Hex.hexagon(radius):
 		tiles.grid.set_move_cost(c, 1)

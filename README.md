@@ -11,10 +11,10 @@ Controls (flat-top hexes): **Q/W/E/Z/X/C** or numpad move · **A/D** turn · **E
 the one you face · **V** scry (from the middle of the explored area's edge) · **I** inventory · **Esc** back.
 
 On a planet each move costs the aether (the blue bar) of the tile you step onto, shown as a number
-and blue dot in its upper left. Tiles within 5 of the landing tile (outlined in yellow) are free;
-farther ones cost 1, or occasionally 2 (never for aether tiles). Pushing a tile takes its cost with
+and blue dot in its upper left. The landing tile (outlined in yellow) is free;
+others cost 1, or occasionally 2 (never for aether tiles). Pushing a tile takes its cost with
 it. You land with at least 10; extracting aether refills it, and running out sends you back to
-space. No aether tiles spawn in the free zone, so you have to venture out to refill.
+space. The landing tile never yields aether, so you have to venture out to refill.
 
 A planet is a large hex map that wraps around both ways, but you only see what you've explored: you land in a
 small hexagon of tiles, and scrying reveals the next hexagon over, sharing the edge you stand on. Tiles are

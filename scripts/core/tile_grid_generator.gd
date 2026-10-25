@@ -29,7 +29,7 @@ var kinds: Array[TileKind] = []
 var empty_probability: float
 var rng: RandomNumberGenerator
 ## Tiles within this many steps of the start tile cost nothing to step onto.
-var free_move_radius: int = 5
+var free_move_radius: int = 0
 ## Tiles within free_move_radius never yield any of these.
 var free_zone_excluded: Array[StringName] = [Aether.ITEM]
 ## Aether most tiles past free_move_radius cost to step onto.
