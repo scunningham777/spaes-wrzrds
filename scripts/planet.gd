@@ -47,6 +47,7 @@ func _ready() -> void:
 			TileGridGenerator.new(empty_tile_probability))
 	_tiles.grid = _surface.grid
 	_tiles.ley_lines = _surface.ley_lines
+	_tiles.landing = TileGridGenerator.START_COORD
 	_interaction.surface = _surface
 
 	# Keep the wizard on the revealed tiles, and the view (camera and wrap) on the wizard.
@@ -130,9 +131,10 @@ func _follow_wizard() -> void:
 	_tiles.view_center = _wizard.mover.coord
 
 
-# Successful moves cost aether; running out kicks the player back to space.
-func _pay_for_move(_coord: Vector2i) -> void:
-	if not Aether.pay_move(Game.state.inventory):
+# Successful moves cost the aether of the tile stepped onto; running out kicks the player back to
+# space.
+func _pay_for_move(coord: Vector2i) -> void:
+	if not Aether.pay_move(Game.state.inventory, _tiles.grid.move_cost(coord)):
 		print("Out of aether")
 		# Deferred: changing scenes takes this one out of the tree at once, and the wizard is still
 		# handling the move's input.

@@ -11,6 +11,9 @@ extends RefCounted
 # Extracting from a tile taps it rather than removing it. A tapped tile yields nothing until its
 # cooldown, counted in player actions, runs out: whoever runs the actions calls tick_cooldowns()
 # once per action.
+#
+# Each tile also has a move cost: the aether it takes to step onto it. It belongs to the spot, not
+# the tile kind, so it stays put when tiles are replaced or swapped.
 
 ## Fires for revealed tiles too (add_tile).
 signal tile_changed(coord: Vector2i, kind: TileKind)
@@ -27,6 +30,8 @@ var tiles: Dictionary[Vector2i, TileKind] = {}
 var tap_cooldown: int = 5
 ## Tapped tiles -> actions left until they're untapped.
 var cooldowns: Dictionary[Vector2i, int] = {}
+## Revealed tiles -> aether it costs to step onto them; tiles that cost nothing are left out.
+var move_costs: Dictionary[Vector2i, int] = {}
 
 
 func _init(p_torus: HexTorus = null, p_kinds: Array[TileKind] = []) -> void:
@@ -63,12 +68,25 @@ func get_tile(coord: Vector2i) -> TileKind:
 	return tiles[canonical(coord)]
 
 
-# Reveals a new tile at coord.
-func add_tile(coord: Vector2i, kind: TileKind) -> void:
+# Reveals a new tile at coord, costing move_cost aether to step onto.
+func add_tile(coord: Vector2i, kind: TileKind, move_cost: int = 0) -> void:
 	var key := canonical(coord)
 	assert(not tiles.has(key), "Coord %s is already on the grid" % coord)
 	tiles[key] = kind
+	set_move_cost(key, move_cost)  # before tile_changed, so listeners see the new tile whole
 	tile_changed.emit(key, kind)
+
+
+# Aether it costs to step onto the tile at coord; 0 if it's free (or off the grid).
+func move_cost(coord: Vector2i) -> int:
+	return move_costs.get(canonical(coord), 0)
+
+
+func set_move_cost(coord: Vector2i, cost: int) -> void:
+	if cost > 0:
+		move_costs[canonical(coord)] = cost
+	else:
+		move_costs.erase(canonical(coord))
 
 
 # Replacing a tile drops any tapped state, which belonged to the old tile.

@@ -5,7 +5,9 @@ extends Node2D
 # child of a HexBoard. Draws nothing until a grid is assigned. Every tile is a filled hex
 # (hex_color, or resonant_color where it resonates with a ley line); kinds whose icon has an entry
 # in ICONS draw that sprite-sheet icon over it. Icons with an entry in ICON_ANIMS step through it,
-# all in sync off one clock. Tile size comes from the board's tile_scale.
+# all in sync off one clock. Tile size comes from the board's tile_scale. Tiles that cost aether
+# to step onto show the cost as a number and a blue dot in their upper left; the landing tile is
+# outlined.
 
 ## Sprite sheet that ICONS regions are cut from.
 @export var icon_sheet: Texture2D
@@ -20,6 +22,15 @@ extends Node2D
 ## Tapped-tile cooldown number size, and its baseline's distance above the tile's bottom edge.
 @export var cooldown_font_size: int = 16
 @export var cooldown_margin: float = 6.0
+## Move cost number size, and the dot beside it.
+@export var move_cost_font_size: int = 14
+@export var move_cost_dot_color: Color = Color(0.3, 0.6, 1.0)
+@export var move_cost_dot_radius: float = 3.5
+## Outline around the landing tile.
+@export var landing_color: Color = Color(1.0, 0.85, 0.1)
+@export var landing_line_width: float = 3.0
+## Size of the landing outline relative to the tile.
+@export var landing_inset: float = 0.88
 
 # Tile pictures by TileKind.icon: regions in icon_sheet (12px cells, 1px gutters: cell (col, row)
 # is at 1 + 13 * col/row).
@@ -69,6 +80,11 @@ var view_center: Vector2i = Vector2i.ZERO:
 var ley_lines: LeyLines:
 	set(value):
 		ley_lines = value
+		queue_redraw()
+## The tile the player landed on (outlined in landing_color), or null for none.
+var landing: Variant = null:
+	set(value):
+		landing = value
 		queue_redraw()
 ## Seconds since the animations started.
 var anim_time: float = 0.0
@@ -193,6 +209,16 @@ func _draw() -> void:
 		# Last drawn is on top.
 		_draw_contents(_swap_from, to_pos.lerp(from_pos, swap_progress))
 		_draw_contents(_swap_to, from_pos.lerp(to_pos, swap_progress))
+	# Move costs belong to the spot rather than the tile, so they stay put (and on top) during swaps.
+	for coord in grid.move_costs:
+		_draw_move_cost(grid.move_costs[coord], board.hex_to_local(grid.nearest(coord, view_center)))
+	if landing != null and grid.has_tile(landing):
+		# Inset, so it still shows inside the player's outline while they stand on it.
+		var outline := board.corner_points(board.tile_scale * landing_inset)
+		var center := board.hex_to_local(grid.nearest(landing, view_center))
+		for i in outline.size():
+			outline[i] += center
+		draw_polyline(outline, landing_color, landing_line_width)
 
 
 # Hex fill for the tile at coord: resonant tiles stand out, everything else is hex_color. The ley
@@ -242,3 +268,20 @@ func _draw_cooldown(remaining: int, center: Vector2) -> void:
 	var text := str(remaining)
 	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, width, cooldown_font_size, 4, Color.BLACK)
 	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, width, cooldown_font_size, Color.WHITE)
+
+
+# Cost number with a blue dot after it, in the tile's upper left.
+func _draw_move_cost(cost: int, center: Vector2) -> void:
+	var font := ThemeDB.fallback_font
+	var tile := board.corner_points(board.tile_scale)
+	var half := Vector2.ZERO
+	for p in tile:
+		half = half.max(p.abs())
+	var text := str(cost)
+	var text_width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, move_cost_font_size).x
+	var pos := center + Vector2(-0.68 * half.x, -0.32 * half.y)  # baseline start
+	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, move_cost_font_size, 4, Color.BLACK)
+	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, move_cost_font_size, Color.WHITE)
+	var dot := pos + Vector2(text_width + move_cost_dot_radius + 2.0, -font.get_ascent(move_cost_font_size) * 0.35)
+	draw_circle(dot, move_cost_dot_radius + 1.5, Color.BLACK)
+	draw_circle(dot, move_cost_dot_radius, move_cost_dot_color)

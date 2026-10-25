@@ -9,6 +9,11 @@ extends RefCounted
 # from the planet's kinds. Element requirements then override that, per revealed region: the
 # start tile always yields the start elements, and each required element is topped up to its
 # minimum tile count within the region, by turning tiles the region newly revealed.
+#
+# Each new tile's move cost is then rolled from its final kind: free within free_move_radius of
+# the start tile, so the first steps of exploring don't drain aether; past that, tiles yielding a
+# steady element always cost move_cost, and others cost rough_move_cost with probability
+# rough_probability (move_cost otherwise).
 
 ## Tile kinds every planet uses until generation rolls its own. Fields as in TileKind.
 const DEFAULT_KINDS: Array[Dictionary] = [
@@ -31,6 +36,15 @@ var empty_probability: float
 var start_elements: Array[StringName] = []
 var required_elements: Dictionary[StringName, int] = {}
 var rng: RandomNumberGenerator
+## Tiles within this many steps of the start tile cost nothing to step onto.
+var free_move_radius: int = 5
+## Aether most tiles past free_move_radius cost to step onto.
+var move_cost: int = 1
+## What the occasional rough tile costs instead, with probability rough_probability.
+var rough_move_cost: int = 2
+var rough_probability: float = 0.1
+## Tiles yielding any of these are never rough.
+var steady_elements: Array[StringName] = [Aether.ITEM]
 
 
 # Pass a seeded rng for reproducible results; otherwise a randomized one is used. p_kinds defaults
@@ -91,8 +105,18 @@ func reveal(grid: TileGrid, region: Array[Vector2i]) -> Array[Vector2i]:
 
 	# Added only now, so listeners see each new tile once, in its final kind.
 	for key in rolled:
-		grid.add_tile(key, rolled[key])
+		grid.add_tile(key, rolled[key], _roll_move_cost(grid, key, rolled[key]))
 	return rolled.keys()
+
+
+# Move cost for a new tile of kind at key (a stored copy), measured from the start tile's nearest
+# copy so the free area wraps like everything else.
+func _roll_move_cost(grid: TileGrid, key: Vector2i, kind: TileKind) -> int:
+	if Hex.distance(grid.nearest(key, START_COORD), START_COORD) <= free_move_radius:
+		return 0
+	if kind.elements.any(func(e: StringName) -> bool: return e in steady_elements):
+		return move_cost
+	return rough_move_cost if rng.randf() < rough_probability else move_cost
 
 
 # Turns random newly rolled tiles into kinds yielding element until required_elements[element]

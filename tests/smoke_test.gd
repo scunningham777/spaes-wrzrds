@@ -240,17 +240,19 @@ func _test_core_logic() -> void:
 	inv.add(&"gold", 2)
 	_check(inv.owned() == [&"gold", &"stone"], "inventory: owned() follows Items.ORDER")
 	_check(inv.spend(&"gold") and inv.count(&"gold") == 1 and not inv.spend(&"aether"), "inventory: spend")
-	# Aether: landing tops up to START, moves spend MOVE_COST, and the last one reports empty.
+	# Aether: landing tops up to START, moves spend their cost, and the last one reports empty.
 	var purse := Inventory.new()
 	Aether.land(purse)
 	_check(purse.count(Aether.ITEM) == Aether.START, "aether: landing with none gives START")
 	purse.add(Aether.ITEM, 5)
 	Aether.land(purse)
 	_check(purse.count(Aether.ITEM) == Aether.START + 5, "aether: landing doesn't take away extra")
-	purse.spend(Aether.ITEM, purse.count(Aether.ITEM) - 2)
-	_check(Aether.pay_move(purse) and purse.count(Aether.ITEM) == 1, "aether: a move spends 1")
-	_check(not Aether.pay_move(purse) and purse.count(Aether.ITEM) == 0, "aether: spending the last one reports empty")
-	_check(not Aether.pay_move(purse) and purse.count(Aether.ITEM) == 0, "aether: paying with none stays at 0")
+	purse.spend(Aether.ITEM, purse.count(Aether.ITEM) - 4)
+	_check(Aether.pay_move(purse, 0) and purse.count(Aether.ITEM) == 4, "aether: a free move spends nothing")
+	_check(Aether.pay_move(purse, 2) and purse.count(Aether.ITEM) == 2, "aether: a move spends its cost")
+	_check(Aether.pay_move(purse, 1) and purse.count(Aether.ITEM) == 1, "aether: a move spends 1")
+	_check(not Aether.pay_move(purse, 2) and purse.count(Aether.ITEM) == 0, "aether: a cost past what's left spends the rest")
+	_check(not Aether.pay_move(purse, 1) and purse.count(Aether.ITEM) == 0, "aether: paying with none stays at 0")
 	_check(inv_changes[0] == 3, "inventory: changed fires on add/spend")
 
 	var state := GameState.new()
@@ -304,6 +306,23 @@ func _test_planet_surface() -> void:
 	_check(surface.patches.size() == 24 and g.tiles.size() == 16 * 18,
 		"wrap: all %d patches cover all %d tiles" % [surface.patches.size(), g.tiles.size()])
 	_check(Hex.hexagon(2).all(func(c: Vector2i) -> bool: return not surface.can_scry(c)), "wrap: nothing left to scry")
+	# Move costs: free near the landing tile (measured across the wrap); past that, aether tiles
+	# cost 1 and the rest 1, or occasionally 2.
+	var free_radius := surface.generator.free_move_radius
+	var near := func(c: Vector2i) -> bool: return Hex.distance(g.nearest(c, Vector2i.ZERO)) <= free_radius
+	_check(free_radius == 5 and g.tiles.keys().filter(near).all(func(c: Vector2i) -> bool: return g.move_cost(c) == 0),
+		"cost: tiles within 5 of the landing tile are free")
+	var far: Array = g.tiles.keys().filter(func(c: Vector2i) -> bool: return not near.call(c))
+	_check(far.all(func(c: Vector2i) -> bool:
+		return g.move_cost(c) == (1 if Aether.ITEM in g.get_tile(c).elements else g.move_cost(c)) and g.move_cost(c) in [1, 2]),
+		"cost: farther tiles cost 1, aether ones always")
+	_check(far.any(func(c: Vector2i) -> bool: return g.move_cost(c) == 2), "cost: some farther tiles cost 2")
+	_check(g.move_cost(Vector2i(7, 0)) == g.move_cost(Vector2i(7 + 16, 0)), "cost: any copy of a coord has its cost")
+	var rough: Vector2i = far.filter(func(c: Vector2i) -> bool: return g.move_cost(c) == 2)[0]
+	var rough_neighbor := g.canonical(rough + Vector2i(1, 0))
+	var neighbor_cost := g.move_cost(rough_neighbor)
+	g.try_swap(rough, rough_neighbor)
+	_check(g.move_cost(rough) == 2 and g.move_cost(rough_neighbor) == neighbor_cost, "cost: stays put when tiles swap")
 	# Odd radius: edges have 4 tiles, so either middle one scries.
 	var odd := PlanetSurface.new(3, 3, 2)
 	_check(Hex.hexagon(3).filter(odd.can_scry).size() == 12 and odd.scry_target(Vector2i(3, -1)) == Vector2i(6, -3)
@@ -506,6 +525,11 @@ func _test_enter_planet() -> void:
 	var aether := func() -> int: return _game().state.inventory.count(Aether.ITEM)
 	_check(aether.call() == 10 and aether_bar.value == 10 and aether_bar.max_value == 10
 		and aether_label.text == "Aether: 10", "aether: land with 10, shown on the bar (%s)" % aether_label.text)
+	_check(tiles.grid.move_costs.is_empty() and tiles.landing == Vector2i.ZERO,
+		"cost: the landing patch is free to walk, and the landing tile is outlined")
+	# The checks below count aether spent per step, so give the landing patch real costs.
+	for c in Hex.hexagon(radius):
+		tiles.grid.set_move_cost(c, 1)
 	var header: Control = current_scene.get_node("UI/SidePanel/Margin/Layout/Top/Header")
 	_check(aether_bar.global_position.y >= header.get_global_rect().end.y
 		and aether_bar.get_global_rect().end.y <= (current_scene.get_node("%Actions") as Control).global_position.y,
@@ -665,6 +689,11 @@ func _test_enter_planet() -> void:
 	_check(tiles.grid.cooldown(Vector2i.ZERO) == 3, "tapped: each move counts down (%d)" % tiles.grid.cooldown(Vector2i.ZERO))
 	_check(aether.call() == 8 and aether_bar.value == 8 and aether_label.text == "Aether: 8",
 		"aether: each move spends 1, turning is free (%d)" % aether.call())
+	tiles.grid.set_move_cost(Vector2i(0, 1), 2)
+	_press(KEY_W)
+	_check(aether.call() == 6, "aether: a move spends the cost of the tile stepped onto (%d)" % aether.call())
+	tiles.grid.set_move_cost(Vector2i(0, 1), 1)
+	_press(KEY_X)
 	# Extract comes from the focus: with none equipped, R does nothing.
 	tiles.grid.set_tile(Vector2i(0, -1), timber)
 	_game().state.equipped_focus = &""
