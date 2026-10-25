@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scripts/core/enterable.gd" id="5_enterable"]
 [ext_resource type="PackedScene" path="res://scenes/enter_prompt.tscn" id="6_prompt"]
 [ext_resource type="PackedScene" path="res://scenes/ui/inventory_panel.tscn" id="7_inventory"]
+[ext_resource type="Texture2D" uid="uid://c5vjocj1uk3l1" path="res://art/urizen_onebit_tileset__v1d1_trans.png" id="8_tiles"]
 
 [sub_resource type="Resource" id="Resource_planet_a"]
 script = ExtResource("5_enterable")
@@ -15,6 +16,10 @@ display_name = "Planet A"
 destination = "planet"
 coord = Vector2i(1, 1)
 color = Color(1, 0, 0, 1)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_planet_a"]
+atlas = ExtResource("8_tiles")
+region = Rect2(1106, 248, 12, 12)
 
 [node name="Play" type="Node2D" unique_id=1874703422]
 script = ExtResource("1_play")
@@ -28,6 +33,7 @@ pointy_top = false
 [node name="PlanetA" type="Node2D" parent="HexBoard"]
 script = ExtResource("4_marker")
 enterable = SubResource("Resource_planet_a")
+icon = SubResource("AtlasTexture_planet_a")
 
 [node name="Wizard" parent="HexBoard" unique_id=1532436726 instance=ExtResource("3_wizard")]
 
