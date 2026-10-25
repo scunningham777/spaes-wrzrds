@@ -365,8 +365,9 @@ func _test_ley_lines() -> void:
 	# Resonance, with one hand-placed NE line through the origin.
 	var ley := LeyLines.new(torus)
 	ley.add_line(Vector2i.ZERO, Vector2i(1, 0))
-	_check(ley.is_on_line(Vector2i(5, 0)) and ley.is_on_line(Vector2i(48, -24)) and not ley.is_on_line(Vector2i(0, 1)),
-		"ley: is_on_line, across the wrap too")
+	var on_line := func(c: Vector2i) -> bool: return ley.lines[0].tiles.has(torus.canonical(c))
+	_check(on_line.call(Vector2i(5, 0)) and on_line.call(Vector2i(48, -24)) and not on_line.call(Vector2i(0, 1)),
+		"ley: add_line covers the line, across the wrap too")
 	var iron := TileKind.new(&"iron_deposit", "Iron Deposit", &"iron_deposit", [&"iron"])
 	var gold := TileKind.new(&"gold_ore", "Gold Ore", &"gold_ore", [&"gold"])
 	var g := TileGrid.new(torus)
@@ -512,23 +513,23 @@ func _test_enter_planet() -> void:
 	# Entering fades space to black first, with input blocked, then the planet fades in.
 	_press(KEY_ENTER)
 	await process_frame
-	var space_out_fade: ColorRect = play.get_node("%Fade")
+	var space_out_fade: ScreenFade = play.get_node("Fade")
 	_press(KEY_X)  # would step off the planet
 	_press(KEY_ENTER)
 	_check(current_scene == play and _game().state.space_coord == planet_a.coord and _game().state.current_location == null,
 		"enter: space stays up, input blocked, while it fades out")
 	await create_timer(play.fade_out_seconds / 2.0).timeout
-	_check(current_scene == play and space_out_fade.color.a > 0.0 and space_out_fade.color.a < 1.0,
-		"enter: space fades to black (%.2f)" % space_out_fade.color.a)
+	_check(current_scene == play and space_out_fade.alpha > 0.0 and space_out_fade.alpha < 1.0,
+		"enter: space fades to black (%.2f)" % space_out_fade.alpha)
 	await _await_scene("res://scenes/planet.tscn")
 	_check(current_scene != null and current_scene.scene_file_path == "res://scenes/planet.tscn",
 		"enter: Enter loads the planet scene")
-	if current_scene != null and current_scene.has_node("%Fade"):
-		var planet_in_fade: ColorRect = current_scene.get_node("%Fade")
-		_check(planet_in_fade.color.a > 0.5 and not _game().fade_in,
-			"enter: the planet fades in (%.2f)" % planet_in_fade.color.a)
+	if current_scene != null and current_scene.has_node("Fade"):
+		var planet_in_fade: ScreenFade = current_scene.get_node("Fade")
+		_check(planet_in_fade.alpha > 0.5 and not _game().fade_in,
+			"enter: the planet fades in (%.2f)" % planet_in_fade.alpha)
 		await create_timer(current_scene.fade_in_seconds + 0.1).timeout
-		_check(planet_in_fade.color.a == 0.0, "enter: planet fade-in finishes clear")
+		_check(planet_in_fade.alpha == 0.0, "enter: planet fade-in finishes clear")
 	_check(_game().state.current_location == planet_a, "enter: current location recorded")
 	if current_scene == null or current_scene.scene_file_path != "res://scenes/planet.tscn":
 		return
@@ -867,12 +868,12 @@ func _test_enter_planet() -> void:
 	_check(current_scene == esc_scene and planet_wizard.mover.coord == esc_coord,
 		"planet: after Esc, the planet stays up with input blocked while it fades out")
 	await create_timer(esc_scene.fade_out_seconds / 2.0).timeout
-	var esc_fade: ColorRect = esc_scene.get_node("%Fade")
-	_check(current_scene == esc_scene and esc_fade.color.a > 0.0 and esc_fade.color.a < 1.0,
-		"planet: Esc fades to black (%.2f)" % esc_fade.color.a)
+	var esc_fade: ScreenFade = esc_scene.get_node("Fade")
+	_check(current_scene == esc_scene and esc_fade.alpha > 0.0 and esc_fade.alpha < 1.0,
+		"planet: Esc fades to black (%.2f)" % esc_fade.alpha)
 	await _await_scene("res://scenes/play.tscn")
 	_check(current_scene.scene_file_path == "res://scenes/play.tscn", "planet: Esc returns to space")
-	_check((current_scene.get_node("%Fade") as ColorRect).color.a > 0.5, "space: fades in after Esc")
+	_check((current_scene.get_node("Fade") as ScreenFade).alpha > 0.5, "space: fades in after Esc")
 	var wizard: HexPlayerController = current_scene.get_node("HexBoard/Wizard")
 	_check(wizard.mover.coord == planet_a.coord, "planet: back on the planet's tile (got %s)" % wizard.mover.coord)
 	_check((current_scene.get_node("EnterPrompt") as CanvasLayer).is_showing(), "planet: prompt shows again on return")
@@ -896,20 +897,20 @@ func _test_enter_planet() -> void:
 	# Running out: a message first, with everything (inventory and Esc too) blocked, then a fade.
 	var out_scene := current_scene
 	var out_message: Label = out_scene.get_node("%OutOfAetherMessage")
-	var fade: ColorRect = out_scene.get_node("%Fade")
+	var fade: ScreenFade = out_scene.get_node("Fade")
 	var out_wizard: HexPlayerController = out_scene.get_node("HexBoard/Wizard")
 	var out_coord := out_wizard.mover.coord
 	for key: Key in [KEY_W, KEY_I, KEY_ESCAPE]:
 		_press(key)
 	await process_frame
 	_check(current_scene == out_scene and revisit_inv.count(Aether.ITEM) == 0 and out_message.visible
-		and out_message.text.begins_with("Out of aether.") and fade.color.a == 0.0,
+		and out_message.text.begins_with("Out of aether.") and fade.alpha == 0.0,
 		"aether: running out shows a message before leaving")
 	_check(out_wizard.mover.coord == out_coord and not (out_scene.get_node("UI/InventoryPanel") as Control).visible,
 		"aether: moving, the inventory and Esc are blocked while it shows")
 	await create_timer(out_scene.out_of_aether_message_seconds + out_scene.out_of_aether_fade_seconds / 2.0).timeout
-	_check(current_scene == out_scene and fade.color.a > 0.0 and fade.color.a < 1.0,
-		"aether: then fades to black (%.2f)" % fade.color.a)
+	_check(current_scene == out_scene and fade.alpha > 0.0 and fade.alpha < 1.0,
+		"aether: then fades to black (%.2f)" % fade.alpha)
 	var waited := 0.0
 	while current_scene == out_scene and waited < out_scene.out_of_aether_fade_seconds + 0.5:
 		await process_frame
@@ -918,10 +919,10 @@ func _test_enter_planet() -> void:
 	_check(revisit_inv.count(Aether.ITEM) == 0 and current_scene.scene_file_path == "res://scenes/play.tscn"
 		and _game().state.current_location == null, "aether: running out kicks the wizard back to space")
 	# Space fades back in from black, just this once.
-	var space_fade: ColorRect = current_scene.get_node("%Fade")
-	_check(space_fade.color.a > 0.5 and not _game().fade_in, "space: fades in after running out (%.2f)" % space_fade.color.a)
+	var space_fade: ScreenFade = current_scene.get_node("Fade")
+	_check(space_fade.alpha > 0.5 and not _game().fade_in, "space: fades in after running out (%.2f)" % space_fade.alpha)
 	await create_timer(current_scene.fade_in_seconds + 0.1).timeout
-	_check(space_fade.color.a == 0.0, "space: fade-in finishes clear")
+	_check(space_fade.alpha == 0.0, "space: fade-in finishes clear")
 	_press(KEY_ENTER)
 	await _await_scene("res://scenes/planet.tscn")
 	_check(current_scene.scene_file_path == "res://scenes/planet.tscn" and revisit_inv.count(Aether.ITEM) == 10,

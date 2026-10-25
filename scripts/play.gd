@@ -11,7 +11,7 @@ extends Node2D
 @onready var _board: HexBoard = $HexBoard
 @onready var _wizard: HexPlayerController = $HexBoard/Wizard
 @onready var _prompt := $EnterPrompt
-@onready var _fade: ColorRect = %Fade
+@onready var _fade: ScreenFade = $Fade
 @onready var _lock: ActionLock = $ActionLock
 
 var _enterables: Array[Enterable] = []
@@ -31,10 +31,8 @@ func _ready() -> void:
 	_wizard.mover.moved.connect(_on_wizard_moved)
 	_prompt.enter_requested.connect(_enter_available)
 	_on_wizard_moved(_wizard.mover.coord)
-	if Game.fade_in:
-		Game.fade_in = false
-		_fade.color.a = 1.0
-		create_tween().tween_property(_fade, "color:a", 0.0, fade_in_seconds)
+	if Game.take_fade_in():
+		_fade.fade_in(fade_in_seconds)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -62,7 +60,6 @@ func _enter_available() -> void:
 	if _available == null or _lock.busy:
 		return
 	_lock.allowed_actions = []
-	var tween := create_tween()
-	tween.tween_property(_fade, "color:a", 1.0, fade_out_seconds)
+	var tween := _fade.fade_out(fade_out_seconds)
 	tween.tween_callback(Game.enter.bind(_available, true))
 	_lock.run(tween)

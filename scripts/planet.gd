@@ -28,6 +28,8 @@ extends Node2D
 @onready var _interaction: TileInteraction = $TileInteraction
 @onready var _aether_bar: ProgressBar = %AetherBar
 @onready var _aether_label: Label = %AetherLabel
+@onready var _lock: ActionLock = $ActionLock
+@onready var _fade: ScreenFade = $Fade
 
 # Focus action hint labels by action, so their status suffixes can be refreshed.
 var _focus_hints: Dictionary[StringName, Label] = {}
@@ -80,14 +82,12 @@ func _ready() -> void:
 	_wizard.mover.moved.connect(_pay_for_move)
 
 	# Dim the action lists while an action plays out and input is blocked.
-	($ActionLock as ActionLock).busy_changed.connect(func(busy: bool) -> void:
+	_lock.busy_changed.connect(func(busy: bool) -> void:
 		for list: Control in [%Actions, %FocusBox]:
 			list.modulate.a = 0.35 if busy else 1.0)
 
-	if Game.fade_in:
-		Game.fade_in = false
-		(%Fade as ColorRect).color.a = 1.0
-		create_tween().tween_property(%Fade, "color:a", 0.0, fade_in_seconds)
+	if Game.take_fade_in():
+		_fade.fade_in(fade_in_seconds)
 
 
 # Fills the outlined focus box with the focus's name and the actions it grants; hidden if none.
@@ -163,14 +163,10 @@ func _leave_out_of_aether() -> void:
 # After delay seconds, fades to black over seconds and returns to space (which fades in). All
 # input is blocked meanwhile, the inventory too (it would pause the fade).
 func _fade_out_and_leave(delay: float, seconds: float) -> void:
-	var lock := $ActionLock as ActionLock
-	lock.allowed_actions = []
-	var tween := create_tween()
-	if delay > 0.0:
-		tween.tween_interval(delay)
-	tween.tween_property(%Fade, "color:a", 1.0, seconds)
+	_lock.allowed_actions = []
+	var tween := _fade.fade_out(seconds, delay)
 	tween.tween_callback(Game.leave_location.bind(true))
-	lock.run(tween)
+	_lock.run(tween)
 
 
 # The bar fills against Aether.START; the label has the exact count, which extraction can push past it.

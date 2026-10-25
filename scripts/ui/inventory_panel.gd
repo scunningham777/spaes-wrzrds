@@ -4,9 +4,6 @@ extends PanelContainer
 # Grid inventory (I). Pauses the game while open. Clicking a slot selects it and shows the
 # item's description. Ported from the Viking demo's InventoryPanel, minus crafting mode.
 
-signal opened
-signal closed
-
 @export var slot_count := 12
 @export var slot_size := Vector2(72, 72)
 
@@ -65,7 +62,6 @@ func open() -> void:
 	var focus_slot := _slot_for(selected_item)
 	if focus_slot:
 		focus_slot.grab_focus()
-	opened.emit()
 
 
 func close() -> void:
@@ -73,7 +69,6 @@ func close() -> void:
 		return
 	hide()
 	get_tree().paused = false
-	closed.emit()
 
 
 func select(item: StringName) -> void:

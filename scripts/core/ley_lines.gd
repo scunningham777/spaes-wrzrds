@@ -59,11 +59,6 @@ func add_line(start: Vector2i, direction: Vector2i) -> void:
 	lines.append(line)
 
 
-func is_on_line(coord: Vector2i) -> bool:
-	var key := torus.canonical(coord)
-	return lines.any(func(line: Line) -> bool: return line.tiles.has(key))
-
-
 # Whether the tile at coord is part of a run of at least MIN_RUN revealed RESONANT_ELEMENT tiles
 # in a row along a line through it.
 func is_resonant(grid: TileGrid, coord: Vector2i) -> bool:

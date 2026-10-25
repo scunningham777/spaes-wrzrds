@@ -197,10 +197,9 @@ func _draw() -> void:
 	var swapping_keys := [grid.canonical(_swap_from), grid.canonical(_swap_to)] if _swapping else []
 	for coord in grid.tiles:
 		var center := board.hex_to_local(grid.nearest(coord, view_center))
-		var points := PackedVector2Array()
-		for p in tile:
-			points.append(center + p)
-		draw_colored_polygon(points, fill_color(coord))
+		draw_set_transform(center)
+		draw_colored_polygon(tile, fill_color(coord))
+		draw_set_transform(Vector2.ZERO)
 		if not coord in swapping_keys:
 			_draw_contents(coord, center)
 	if _swapping:
@@ -211,11 +210,9 @@ func _draw() -> void:
 		_draw_contents(_swap_to, from_pos.lerp(to_pos, swap_progress))
 	if landing != null and grid.has_tile(landing):
 		# Inset, so it still shows inside the player's outline while they stand on it.
-		var outline := board.corner_points(board.tile_scale * landing_inset)
-		var center := board.hex_to_local(grid.nearest(landing, view_center))
-		for i in outline.size():
-			outline[i] += center
-		draw_polyline(outline, landing_color, landing_line_width)
+		draw_set_transform(board.hex_to_local(grid.nearest(landing, view_center)))
+		draw_polyline(board.corner_points(board.tile_scale * landing_inset), landing_color, landing_line_width)
+		draw_set_transform(Vector2.ZERO)
 
 
 # Hex fill for the tile at coord: resonant tiles stand out, everything else is hex_color. The ley
@@ -271,10 +268,10 @@ func _draw_cooldown(remaining: int, center: Vector2) -> void:
 # Cost number with a blue dot after it, in the tile's upper left.
 func _draw_move_cost(cost: int, center: Vector2) -> void:
 	var font := ThemeDB.fallback_font
-	var tile := board.corner_points(board.tile_scale)
-	var half := Vector2.ZERO
-	for p in tile:
-		half = half.max(p.abs())
+	# Half the drawn tile's width and height: corner radius across the pointed axis, edge radius
+	# across the flat one.
+	var radii := Vector2(board.layout.size, board.layout.inner_radius()) * board.tile_scale
+	var half := Vector2(radii.y, radii.x) if board.pointy_top else radii
 	var text := str(cost)
 	var text_width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, move_cost_font_size).x
 	var pos := center + Vector2(-0.68 * half.x, -0.32 * half.y)  # baseline start
