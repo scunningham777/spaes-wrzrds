@@ -463,6 +463,9 @@ func _test_enter_planet() -> void:
 
 	var prompt: CanvasLayer = play.get_node("EnterPrompt")
 	var planet_a: Enterable = (play.get_node("HexBoard/PlanetA") as EnterableMarker).enterable
+	var planet_a_icon := (play.get_node("HexBoard/PlanetA") as EnterableMarker).icon as AtlasTexture
+	_check(planet_a_icon != null and planet_a_icon.region == Rect2(1106, 248, 12, 12),
+		"enter: Planet A drawn with sheet tile (85, 19)")
 	_check(not prompt.is_showing(), "enter: no prompt at start")
 	_press(KEY_ENTER)
 	await process_frame
