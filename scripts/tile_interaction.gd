@@ -38,7 +38,8 @@ func extract_preview() -> Array[StringName]:
 
 
 # Each successful action ticks tapped-tile cooldowns before taking effect, so the action that taps
-# a tile doesn't count toward its own cooldown. (Moves tick too; the scene wires that up.)
+# a tile doesn't count toward its own cooldown. (Moves tick too; the scene wires that up.) Pushes
+# don't: pushing a tile back and forth would otherwise untap it for free.
 # Extraction needs the player's tile plus the focus's distance in tiles straight ahead, all
 # untapped and sharing at least one element. Success taps them all and yields the focus's extract
 # amount of each shared element, not one per tile.
@@ -65,7 +66,6 @@ func _try_swap() -> void:
 	if not tiles.grid.can_swap(here, front):
 		print("Can't swap tiles %s and %s" % [here, front])
 		return
-	tiles.grid.tick_cooldowns()
 	tiles.grid.try_swap(here, front)
 	print("Swapped tiles %s and %s" % [here, front])
 	lock.run(tiles.animate_swap(here, front, swap_seconds))

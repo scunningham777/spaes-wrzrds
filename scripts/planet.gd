@@ -10,7 +10,7 @@ extends Node2D
 @export var patches_across: int = 12
 @export var patches_down: int = 4
 @export_range(0.0, 1.0) var empty_tile_probability: float = 0.0
-## Player actions (moves, extracts, swaps) an extracted tile stays tapped.
+## Player actions (moves, extracts, scrying; not pushes) an extracted tile stays tapped.
 @export var tap_cooldown_actions: int = 5
 
 @onready var _tiles: TileGridView = $HexBoard/TileGridView

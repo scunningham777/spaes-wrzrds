@@ -689,6 +689,17 @@ func _test_enter_planet() -> void:
 	_press(KEY_D)
 	_press(KEY_A)
 	_check(tiles.grid.cooldown(Vector2i.ZERO) == 5, "tapped: turning doesn't count down")
+	# Pushing doesn't either, or pushing a tapped tile back and forth would untap it for free.
+	_press(KEY_D)  # face NE, toward the Gold at (1,0)
+	_press(KEY_F)
+	await create_timer(0.5).timeout
+	_check(tiles.grid.get_tile(Vector2i(1, 0)) == iron and tiles.grid.cooldown(Vector2i(1, 0)) == 5,
+		"tapped: pushing a tapped tile doesn't count down")
+	_press(KEY_F)  # and back
+	await create_timer(0.5).timeout
+	_press(KEY_A)
+	_check(tiles.grid.get_tile(Vector2i.ZERO) == iron and tiles.grid.cooldown(Vector2i.ZERO) == 5
+		and tiles.grid.cooldown(Vector2i(0, 1)) == 5, "tapped: pushing back and forth doesn't count down")
 	_press(KEY_W)
 	_press(KEY_X)
 	_check(tiles.grid.cooldown(Vector2i.ZERO) == 3, "tapped: each move counts down (%d)" % tiles.grid.cooldown(Vector2i.ZERO))
