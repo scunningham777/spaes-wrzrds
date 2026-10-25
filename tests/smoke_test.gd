@@ -418,6 +418,7 @@ func _test_play_scene(pointy_top: bool) -> void:
 	_check(board.layout.pointy_top == pointy_top and board.layout.size == board.hex_size,
 		"%s: layout matches board settings" % tag)
 	_check(wizard.position == Vector2.ZERO, "%s: wizard starts at origin" % tag)
+	_check(sprite.region_rect == Rect2(1015, 66, 12, 12), "%s: in space the player is the ship, cell (78, 5)" % tag)
 
 	# Inventory default selection: nothing when empty, the first item once there is one.
 	var panel: InventoryPanel = play.get_node("UI/InventoryPanel")

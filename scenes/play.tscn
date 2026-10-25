@@ -37,6 +37,9 @@ icon = SubResource("AtlasTexture_planet_a")
 
 [node name="Wizard" parent="HexBoard" unique_id=1532436726 instance=ExtResource("3_wizard")]
 
+[node name="Sprite2D" parent="HexBoard/Wizard" index="0"]
+region_rect = Rect2(1015, 66, 12, 12)
+
 [node name="EnterPrompt" parent="." instance=ExtResource("6_prompt")]
 
 [node name="UI" type="CanvasLayer" parent="."]
