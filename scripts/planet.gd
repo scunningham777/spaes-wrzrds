@@ -151,7 +151,7 @@ func _leave_out_of_aether() -> void:
 	var tween := create_tween()
 	tween.tween_interval(out_of_aether_message_seconds)
 	tween.tween_property(%Fade, "color:a", 1.0, out_of_aether_fade_seconds)
-	tween.tween_callback(Game.leave_location)
+	tween.tween_callback(Game.leave_location.bind(true))
 	lock.run(tween)
 
 

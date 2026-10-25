@@ -10,6 +10,9 @@ const SCENES: Dictionary[String, String] = {
 }
 
 var state := GameState.new()
+## Set when a scene left by fading to black, so the next one fades in from black; that scene
+## clears it.
+var fade_in := false
 
 
 func new_game() -> void:
@@ -22,8 +25,10 @@ func enter(location: Enterable) -> void:
 	go_to(location.destination)
 
 
-func leave_location() -> void:
+# faded: the location faded to black on its way out, so space fades in.
+func leave_location(faded: bool = false) -> void:
 	state.current_location = null
+	fade_in = faded
 	go_to("space")
 
 

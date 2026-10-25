@@ -826,6 +826,7 @@ func _test_enter_planet() -> void:
 	await process_frame
 	await process_frame
 	_check(current_scene.scene_file_path == "res://scenes/play.tscn", "planet: Esc returns to space")
+	_check((current_scene.get_node("%Fade") as ColorRect).color.a == 0.0, "space: no fade-in after Esc")
 	var wizard: HexPlayerController = current_scene.get_node("HexBoard/Wizard")
 	_check(wizard.mover.coord == planet_a.coord, "planet: back on the planet's tile (got %s)" % wizard.mover.coord)
 	_check((current_scene.get_node("EnterPrompt") as CanvasLayer).is_showing(), "planet: prompt shows again on return")
@@ -863,10 +864,18 @@ func _test_enter_planet() -> void:
 	await create_timer(out_scene.out_of_aether_message_seconds + out_scene.out_of_aether_fade_seconds / 2.0).timeout
 	_check(current_scene == out_scene and fade.color.a > 0.0 and fade.color.a < 1.0,
 		"aether: then fades to black (%.2f)" % fade.color.a)
-	await create_timer(out_scene.out_of_aether_fade_seconds).timeout
+	var waited := 0.0
+	while current_scene == out_scene and waited < out_scene.out_of_aether_fade_seconds + 0.5:
+		await process_frame
+		waited += 1.0 / 60.0
 	await process_frame
 	_check(revisit_inv.count(Aether.ITEM) == 0 and current_scene.scene_file_path == "res://scenes/play.tscn"
 		and _game().state.current_location == null, "aether: running out kicks the wizard back to space")
+	# Space fades back in from black, just this once.
+	var space_fade: ColorRect = current_scene.get_node("%Fade")
+	_check(space_fade.color.a > 0.5 and not _game().fade_in, "space: fades in after running out (%.2f)" % space_fade.color.a)
+	await create_timer(current_scene.fade_in_seconds + 0.1).timeout
+	_check(space_fade.color.a == 0.0, "space: fade-in finishes clear")
 	_press(KEY_ENTER)
 	await process_frame
 	await process_frame

@@ -3,9 +3,13 @@ extends Node2D
 # Space map: offers entry to any Enterable the wizard is standing on (Unity's Overworld
 # Enterable trigger + Enter Button), and remembers the wizard's position across scenes.
 
+## Fade in from black, when arriving from a scene that faded out (Game.fade_in).
+@export var fade_in_seconds: float = 0.3
+
 @onready var _board: HexBoard = $HexBoard
 @onready var _wizard: HexPlayerController = $HexBoard/Wizard
 @onready var _prompt := $EnterPrompt
+@onready var _fade: ColorRect = %Fade
 
 var _enterables: Array[Enterable] = []
 var _available: Enterable = null
@@ -24,6 +28,10 @@ func _ready() -> void:
 	_wizard.mover.moved.connect(_on_wizard_moved)
 	_prompt.enter_requested.connect(_enter_available)
 	_on_wizard_moved(_wizard.mover.coord)
+	if Game.fade_in:
+		Game.fade_in = false
+		_fade.color.a = 1.0
+		create_tween().tween_property(_fade, "color:a", 0.0, fade_in_seconds)
 
 
 func _unhandled_input(event: InputEvent) -> void:
