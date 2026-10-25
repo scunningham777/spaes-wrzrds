@@ -3,8 +3,9 @@ extends Node
 
 # Ported from Unity TileExplore.TileInteractionManager: maps interaction keys to TileGrid
 # operations at the player's position/facing. R extracts, F swaps the player's tile with the
-# one it faces, V scries (reveals the next patch of the planet). Animated actions hand their
-# tween to the ActionLock, which blocks input until they finish.
+# one it faces, V scries (reveals the next patch of the planet), B builds a tower (on a detected
+# iron tile where ley lines cross). Animated actions hand their tween to the ActionLock, which
+# blocks input until they finish.
 
 @export var player: HexPlayerController
 @export var tiles: TileGridView
@@ -25,11 +26,20 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("scry"):
 		_try_scry()
 		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("build_tower"):
+		_try_build_tower()
+		get_viewport().set_input_as_handled()
 
 
 # The tiles R would extract: the player's tile plus the equipped focus's distance straight ahead.
 func extract_line() -> Array[Vector2i]:
 	return Hex.line(player.mover.coord, player.mover.facing, Foci.distance(Game.state.equipped_focus))
+
+
+# Whether the player's tile is a tower site (affordability aside). Uses the ley lines as the map
+# shows them, so building agrees with the grey tiles.
+func can_build_tower_here() -> bool:
+	return Towers.can_build_at(tiles.grid, tiles.ley_lines, player.mover.coord)
 
 
 # The elements R would extract right now; empty if the line shares none (or a tile is tapped).
@@ -82,3 +92,17 @@ func _try_scry() -> void:
 	var target: Vector2i = surface.scry_target(here)
 	surface.try_scry(here)
 	print("Scried the patch around %s" % [target])
+
+
+# Replaces the detected iron tile under the player with a tower, spending its cost.
+func _try_build_tower() -> void:
+	var here := player.mover.coord
+	if not can_build_tower_here():
+		print("Can't build a tower at %s" % [here])
+		return
+	if not Towers.can_afford(Towers.BASIC, Game.state.inventory):
+		print("Building a tower needs %s" % Towers.cost_text(Towers.BASIC))
+		return
+	tiles.grid.tick_cooldowns()
+	Towers.try_build(Towers.BASIC, tiles.grid, tiles.ley_lines, Game.state.inventory, here)
+	print("Built a %s at %s" % [Towers.display_name(Towers.BASIC), here])

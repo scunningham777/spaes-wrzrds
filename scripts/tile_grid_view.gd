@@ -4,10 +4,10 @@ extends Node2D
 # Draws a TileGrid as filled hexes, ported from Unity's TileVisualManager/TileVisual. Must be a
 # child of a HexBoard. Draws nothing until a grid is assigned. Every tile is a filled hex
 # (hex_color, or resonant_color where it resonates with a ley line); kinds whose icon has an entry
-# in ICONS draw that sprite-sheet icon over it. Icons with an entry in ICON_ANIMS step through it,
-# all in sync off one clock. Tile size comes from the board's tile_scale. Tiles that cost aether
-# to step onto show the cost as a number and a blue dot in their upper left; the landing tile is
-# outlined.
+# in ICONS draw that sprite-sheet icon over it, and placeholders in SQUARE_ICONS a plain square.
+# Icons with an entry in ICON_ANIMS step through it, all in sync off one clock. Tile size comes
+# from the board's tile_scale. Tiles that cost aether to step onto show the cost as a number and
+# a blue dot in their upper left; the landing tile is outlined.
 
 ## Sprite sheet that ICONS regions are cut from.
 @export var icon_sheet: Texture2D
@@ -41,6 +41,14 @@ const ICONS: Dictionary[StringName, Rect2] = {
 	&"sapling": Rect2(144, 118, 12, 12),  # Cell (11, 9)
 	&"stone_outcrop": Rect2(92, 183, 12, 12),  # Cell (7, 14)
 }
+
+# Placeholder pictures by TileKind.icon, until they get art: a plain square of this color, the
+# size of a sprite-sheet icon.
+const SQUARE_ICONS: Dictionary[StringName, Color] = {
+	&"basic_tower": Color(0.6, 0.6, 0.6),
+}
+## Side of a SQUARE_ICONS square in sprite pixels, matching the sheet's cells.
+const SQUARE_ICON_PIXELS := 12
 
 # Per-icon animation: one channel stepped through `values`, `step` seconds per value.
 # Channels: x / y (sprite pixels, y-down), scale_y (height factor), alpha, rotation (degrees,
@@ -106,13 +114,17 @@ var _grey_icons: Dictionary[StringName, Texture2D] = {}
 
 
 func has_icon(kind: TileKind) -> bool:
-	return icon_sheet != null and ICONS.has(kind.icon)
+	return SQUARE_ICONS.has(kind.icon) or (icon_sheet != null and ICONS.has(kind.icon))
 
 
 # The kind's icon as a standalone texture (also for UI), greyscale if tapped; null if it has none.
 func icon_texture(kind: TileKind, tapped: bool = false) -> Texture2D:
 	if not has_icon(kind):
 		return null
+	if SQUARE_ICONS.has(kind.icon):
+		var image := Image.create(SQUARE_ICON_PIXELS, SQUARE_ICON_PIXELS, false, Image.FORMAT_RGBA8)
+		image.fill(SQUARE_ICONS[kind.icon])
+		return ImageTexture.create_from_image(image)
 	if tapped:
 		return _grey_icon(kind.icon)
 	var atlas := AtlasTexture.new()
@@ -237,6 +249,10 @@ func _draw_contents(coord: Vector2i, center: Vector2) -> void:
 
 # Tapped icons are greyscale and hold still.
 func _draw_icon(icon: StringName, center: Vector2, tapped: bool) -> void:
+	if SQUARE_ICONS.has(icon):
+		var side := SQUARE_ICON_PIXELS * icon_scale
+		draw_rect(Rect2(center - Vector2(side, side) / 2.0, Vector2(side, side)), SQUARE_ICONS[icon])
+		return
 	var region := ICONS[icon]
 	var icon_size := region.size * icon_scale
 	var anim := func(channel: StringName) -> float:

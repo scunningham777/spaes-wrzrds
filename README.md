@@ -8,13 +8,13 @@ Open `project.godot` in Godot 4.7.x (standard build, not .NET) and press **F5**.
 
 Controls (flat-top hexes): **Q/W/E/Z/X/C** or numpad move · **A/D** turn · **Enter** enter a planet ·
 **R** extract the tile you're on (needs the staff; taps the tile for a few actions) · **F** swap your tile with
-the one you face · **V** scry (from the middle of the explored area's edge) · **I** inventory · **Esc** back.
+the one you face · **V** scry (from the middle of the explored area's edge) · **B** build a tower (see below) ·
+**I** inventory · **Esc** back.
 
 On a planet each move costs the aether (the blue bar) of the tile you step onto, shown as a number
 and blue dot in its upper left. Most tiles cost 1, occasionally 2 (never for aether tiles); the
 landing tile is outlined in yellow. Pushing a tile takes its cost with it. You land with at least
-10; extracting aether refills it, and running out sends you back to
-space.
+10; extracting aether refills it, and running out sends you back to space.
 
 A planet is a large hex map that wraps around both ways, but you only see what you've explored: you land in a
 small hexagon of tiles, and scrying reveals the next hexagon over, sharing the edge you stand on. Tiles are
@@ -22,6 +22,9 @@ generated as they're revealed.
 
 Each planet also has hidden ley lines, 1–2 along each hex axis. Two or more iron tiles in a row along one get a grey
 background; the lines themselves are never shown.
+
+Where two or more ley lines cross, a grey iron tile can be turned into a tower with **B** (10 wood and 10
+stone). Towers can't be pushed, yield nothing yet, and cost 1 aether to step onto.
 
 ## Tests
 

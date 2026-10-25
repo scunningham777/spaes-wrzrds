@@ -14,11 +14,14 @@ var display_name: String
 var icon: StringName
 ## Items extraction can yield from this kind; empty if it yields nothing.
 var elements: Array[StringName] = []
+## Whether pushing (TileGrid.try_swap) can move tiles of this kind, or swap another onto them.
+var movable: bool = true
 
 
 func _init(p_id: StringName, p_display_name: String, p_icon: StringName = &"",
-		p_elements: Array[StringName] = []) -> void:
+		p_elements: Array[StringName] = [], p_movable: bool = true) -> void:
 	id = p_id
 	display_name = p_display_name
 	icon = p_icon
 	elements.assign(p_elements)
+	movable = p_movable

@@ -363,6 +363,31 @@ func _test_ley_lines() -> void:
 	_check(ley.is_resonant(seam, Vector2i.ZERO) and ley.is_resonant(seam, Vector2i(-1, 0)),
 		"ley: runs carry across the wrap")
 
+	# Towers: built on a detected iron tile where two or more lines cross.
+	_check(not ley.is_intersection(Vector2i.ZERO), "ley: one line through a tile is no intersection")
+	ley.add_line(Vector2i.ZERO, Vector2i(0, 1))
+	_check(ley.is_intersection(Vector2i.ZERO) and ley.is_intersection(Vector2i(48, -24))
+		and not ley.is_intersection(Vector2i(1, 0)), "ley: two lines crossing make an intersection, across the wrap too")
+	var lone := TileGrid.new(torus)
+	lone.add_tile(Vector2i.ZERO, iron)
+	_check(Towers.can_build_at(g, ley, Vector2i.ZERO) and not Towers.can_build_at(g, ley, Vector2i(1, 0))
+		and not Towers.can_build_at(lone, ley, Vector2i.ZERO) and not Towers.can_build_at(g, null, Vector2i.ZERO),
+		"tower: site needs detected iron where lines cross")
+	var stock := Inventory.new()
+	stock.add(&"wood", 10)
+	stock.add(&"stone", 9)
+	_check(Towers.cost_text(Towers.BASIC) == "10 Wood, 10 Stone" and not Towers.try_build(Towers.BASIC, g, ley, stock, Vector2i.ZERO)
+		and g.get_tile(Vector2i.ZERO) == iron and stock.count(&"wood") == 10, "tower: can't build short of stone, no change")
+	stock.add(&"stone", 1)
+	_check(Towers.try_build(Towers.BASIC, g, ley, stock, Vector2i.ZERO) and g.get_tile(Vector2i.ZERO) == Towers.kind(Towers.BASIC)
+		and stock.count(&"wood") == 0 and stock.count(&"stone") == 0, "tower: building spends 10 wood and 10 stone")
+	var tower := g.get_tile(Vector2i.ZERO)
+	_check(tower.display_name == "Basic Tower" and tower.elements.is_empty() and not tower.movable
+		and g.move_cost(Vector2i.ZERO) == 1, "tower: a Basic Tower yields nothing, can't move, and costs 1 to enter")
+	_check(not g.try_swap(Vector2i.ZERO, Vector2i(1, 0)) and not g.try_swap(Vector2i(1, 0), Vector2i.ZERO)
+		and g.get_tile(Vector2i.ZERO) == tower, "tower: can't be pushed, or have a tile pushed onto it")
+	_check(not Towers.can_build_at(g, ley, Vector2i.ZERO), "tower: its tile is no longer a site")
+
 
 # A plane grid with a radius-sized hexagon of Empty tiles.
 static func _hexagon_grid(radius: int) -> TileGrid:
@@ -800,6 +825,38 @@ func _test_enter_planet() -> void:
 	tiles.grid.set_tile(Vector2i(0, -1), gold)
 	_check(ley_info.shown_ley_line() == "", "ley: badge goes when the run is broken")
 	tiles.grid.set_tile(Vector2i(0, -1), iron)
+
+	# Tower: where a second line crosses, B turns the detected iron tile into a Basic Tower.
+	var build_hint: Label = current_scene.get_node("%BuildHint")
+	_check(not build_hint.visible, "tower: no build hint where only one line runs")
+	test_ley.add_line(Vector2i.ZERO, Vector2i(1, 0))
+	tiles.grid.set_tile(Vector2i.ZERO, iron)  # refreshes the side panel
+	_check(build_hint.visible and build_hint.text == "B – Build Tower (needs 10 Wood, 10 Stone)"
+		and build_hint.get_index() == (current_scene.get_node("%ScryHint") as Label).get_index() + 1,
+		"tower: hint shows where lines cross, with the cost, below Scry (%s)" % build_hint.text)
+	var stock: Inventory = _game().state.inventory
+	for item: StringName in [&"wood", &"stone"]:
+		if stock.count(item) > 0:
+			stock.spend(item, stock.count(item))
+	stock.add(&"wood", 10)
+	stock.add(&"stone", 9)
+	_press(KEY_B)
+	_check(tiles.grid.get_tile(Vector2i.ZERO) == iron and stock.count(&"wood") == 10,
+		"tower: B does nothing without enough stone")
+	stock.add(&"stone", 1)
+	_press(KEY_B)
+	await process_frame
+	_check(tiles.grid.get_tile(Vector2i.ZERO).id == Towers.BASIC and stock.count(&"wood") == 0
+		and stock.count(&"stone") == 0 and tiles.grid.move_cost(Vector2i.ZERO) == 1,
+		"tower: B builds a Basic Tower, spending 10 wood and 10 stone")
+	_check(ley_info.shown_name() == "Basic Tower" and ley_info.shown_yield() == "Element: none" and not build_hint.visible,
+		"tower: standing on it shows Basic Tower with no elements, and the hint goes")
+	_check(tiles.has_icon(tiles.grid.get_tile(Vector2i.ZERO))
+		and tiles.icon_texture(tiles.grid.get_tile(Vector2i.ZERO)).get_image().get_pixel(0, 0) == Color(0.6, 0.6, 0.6),
+		"tower: drawn as a grey square")
+	_press(KEY_F)
+	_check(tiles.grid.get_tile(Vector2i.ZERO).id == Towers.BASIC, "tower: F can't push it")
+	tiles.grid.set_tile(Vector2i.ZERO, iron)  # back to iron for the tests below
 	_press(KEY_W)
 	_press(KEY_W)  # back to (0, 2)
 	tiles.ley_lines = planet_ley

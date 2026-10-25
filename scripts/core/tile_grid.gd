@@ -134,12 +134,12 @@ func try_extract(coords: Array[Vector2i]) -> Array[StringName]:
 
 
 func can_swap(a: Vector2i, b: Vector2i) -> bool:
-	return has_tile(a) and has_tile(b) and (get_tile(a) != get_tile(b) or cooldown(a) != cooldown(b)
-		or move_cost(a) != move_cost(b))
+	return has_tile(a) and has_tile(b) and get_tile(a).movable and get_tile(b).movable \
+		and (get_tile(a) != get_tile(b) or cooldown(a) != cooldown(b) or move_cost(a) != move_cost(b))
 
 
 # Swaps the tiles at a and b, tapped state and move cost included. Returns false (no change) if
-# either isn't part of the grid, or a swap would change nothing.
+# either isn't part of the grid or isn't movable, or a swap would change nothing.
 func try_swap(a: Vector2i, b: Vector2i) -> bool:
 	if not can_swap(a, b):
 		return false

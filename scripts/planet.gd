@@ -138,6 +138,10 @@ func _update_side_panel() -> void:
 	var scry_hint := %ScryHint as Label
 	scry_hint.text = "%s – Scry" % _key_name(&"scry")
 	scry_hint.visible = _surface.can_scry(coord)
+	# Build is only listed where it works: a detected iron tile where ley lines cross.
+	var build_hint := %BuildHint as Label
+	build_hint.text = "%s – Build Tower (needs %s)" % [_key_name(&"build_tower"), Towers.cost_text(Towers.BASIC)]
+	build_hint.visible = _interaction.can_build_tower_here()
 
 
 # The camera tracks the wizard, and the tile view draws the wrapping map around them.

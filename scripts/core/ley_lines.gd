@@ -71,6 +71,12 @@ func is_resonant(grid: TileGrid, coord: Vector2i) -> bool:
 	return false
 
 
+# Whether two or more lines cross at coord.
+func is_intersection(coord: Vector2i) -> bool:
+	var key := torus.canonical(coord)
+	return lines.filter(func(line: Line) -> bool: return line.tiles.has(key)).size() >= 2
+
+
 # Length of the run of resonant-element tiles through key along direction, both ways; counts
 # stop at MIN_RUN, which is all is_resonant needs (and keeps an all-iron line from looping).
 func _run_length(grid: TileGrid, key: Vector2i, direction: Vector2i) -> int:
