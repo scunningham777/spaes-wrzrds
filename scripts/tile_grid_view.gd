@@ -209,9 +209,6 @@ func _draw() -> void:
 		# Last drawn is on top.
 		_draw_contents(_swap_from, to_pos.lerp(from_pos, swap_progress))
 		_draw_contents(_swap_to, from_pos.lerp(to_pos, swap_progress))
-	# Move costs belong to the spot rather than the tile, so they stay put (and on top) during swaps.
-	for coord in grid.move_costs:
-		_draw_move_cost(grid.move_costs[coord], board.hex_to_local(grid.nearest(coord, view_center)))
 	if landing != null and grid.has_tile(landing):
 		# Inset, so it still shows inside the player's outline while they stand on it.
 		var outline := board.corner_points(board.tile_scale * landing_inset)
@@ -229,15 +226,16 @@ func fill_color(coord: Vector2i) -> Color:
 	return hex_color
 
 
-# Draws the icon (and tapped cooldown) of the tile at coord, centered on center.
+# Draws the icon (and tapped cooldown) and move cost of the tile at coord, centered on center.
 func _draw_contents(coord: Vector2i, center: Vector2) -> void:
 	var kind := grid.get_tile(coord)
-	if not has_icon(kind):
-		return
-	var tapped := grid.is_tapped(coord)
-	_draw_icon(kind.icon, center, tapped)
-	if tapped:
-		_draw_cooldown(grid.cooldown(coord), center)
+	if has_icon(kind):
+		var tapped := grid.is_tapped(coord)
+		_draw_icon(kind.icon, center, tapped)
+		if tapped:
+			_draw_cooldown(grid.cooldown(coord), center)
+	if grid.move_cost(coord) > 0:
+		_draw_move_cost(grid.move_cost(coord), center)
 
 
 # Tapped icons are greyscale and hold still.

@@ -12,8 +12,8 @@ extends RefCounted
 # cooldown, counted in player actions, runs out: whoever runs the actions calls tick_cooldowns()
 # once per action.
 #
-# Each tile also has a move cost: the aether it takes to step onto it. It belongs to the spot, not
-# the tile kind, so it stays put when tiles are replaced or swapped.
+# Each tile also has a move cost: the aether it takes to step onto it. It's the tile's own, not
+# its kind's, and travels with it when tiles are swapped; replacing a tile (set_tile) keeps it.
 
 ## Fires for revealed tiles too (add_tile).
 signal tile_changed(coord: Vector2i, kind: TileKind)
@@ -134,17 +134,21 @@ func try_extract(coords: Array[Vector2i]) -> Array[StringName]:
 
 
 func can_swap(a: Vector2i, b: Vector2i) -> bool:
-	return has_tile(a) and has_tile(b) and (get_tile(a) != get_tile(b) or cooldown(a) != cooldown(b))
+	return has_tile(a) and has_tile(b) and (get_tile(a) != get_tile(b) or cooldown(a) != cooldown(b)
+		or move_cost(a) != move_cost(b))
 
 
-# Swaps the tiles at a and b, tapped state included. Returns false (no change) if either isn't
-# part of the grid, or a swap would change nothing.
+# Swaps the tiles at a and b, tapped state and move cost included. Returns false (no change) if
+# either isn't part of the grid, or a swap would change nothing.
 func try_swap(a: Vector2i, b: Vector2i) -> bool:
 	if not can_swap(a, b):
 		return false
 	var a_kind := get_tile(a)
 	var a_cooldown := cooldown(a)
 	var b_cooldown := cooldown(b)
+	var a_cost := move_cost(a)
+	set_move_cost(a, move_cost(b))
+	set_move_cost(b, a_cost)
 	set_tile(a, get_tile(b))
 	set_tile(b, a_kind)
 	_set_cooldown(canonical(a), b_cooldown)

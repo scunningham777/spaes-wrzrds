@@ -322,7 +322,12 @@ func _test_planet_surface() -> void:
 	var rough_neighbor := g.canonical(rough + Vector2i(1, 0))
 	var neighbor_cost := g.move_cost(rough_neighbor)
 	g.try_swap(rough, rough_neighbor)
-	_check(g.move_cost(rough) == 2 and g.move_cost(rough_neighbor) == neighbor_cost, "cost: stays put when tiles swap")
+	_check(g.move_cost(rough_neighbor) == 2 and g.move_cost(rough) == neighbor_cost, "cost: travels with the tile in a swap")
+	var same := TileGrid.new()
+	same.add_tile(Vector2i.ZERO, TileKind.EMPTY, 2)
+	same.add_tile(Vector2i(1, 0), TileKind.EMPTY)
+	_check(same.try_swap(Vector2i.ZERO, Vector2i(1, 0)) and same.move_cost(Vector2i(1, 0)) == 2
+		and same.move_cost(Vector2i.ZERO) == 0, "cost: tiles differing only in cost can swap")
 	# Odd radius: edges have 4 tiles, so either middle one scries.
 	var odd := PlanetSurface.new(3, 3, 2)
 	_check(Hex.hexagon(3).filter(odd.can_scry).size() == 12 and odd.scry_target(Vector2i(3, -1)) == Vector2i(6, -3)
