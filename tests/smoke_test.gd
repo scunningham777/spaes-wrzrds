@@ -799,7 +799,10 @@ func _test_enter_planet() -> void:
 	# Facing N on the flat-top planet: the marker's triangle sits on the top edge, tip pointing up.
 	var marker: HexFacingMarker = current_scene.get_node("HexBoard/Wizard/FacingMarker")
 	var tri := marker.triangle_points()
-	_check(not planet_wizard.has_node("Sprite2D"), "planet: wizard shown by a marker, not a sprite")
+	# The wizard sprite stands upright over the tile's icon; the marker shows the facing.
+	var planet_sprite := planet_wizard.get_node_or_null("Sprite2D") as Sprite2D
+	_check(planet_sprite != null and is_zero_approx(planet_sprite.rotation), "planet: upright wizard sprite on the wizard's tile")
+	_check(planet_wizard.get_index() > tiles.get_index(), "planet: wizard sprite drawn over the tile icons")
 	_check(is_zero_approx(tri[2].x) and tri[2].y < tri[0].y and tri[0].y < 0.0,
 		"planet: facing triangle points N from the top edge (%s)" % tri)
 	_press(KEY_D)  # turn clockwise to NE

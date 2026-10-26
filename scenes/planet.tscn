@@ -130,6 +130,12 @@ icon_sheet = ExtResource("7_icons")
 [node name="Wizard" type="Node2D" parent="HexBoard" unique_id=1758725873]
 script = ExtResource("4_player")
 
+[node name="Sprite2D" type="Sprite2D" parent="HexBoard/Wizard"]
+scale = Vector2(4, 4)
+texture = ExtResource("7_icons")
+region_enabled = true
+region_rect = Rect2(378, 1, 12, 12)
+
 [node name="FacingMarker" type="Node2D" parent="HexBoard/Wizard" unique_id=1879602032]
 script = ExtResource("8_marker")
 
