@@ -37,6 +37,14 @@ size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 24
 text = "Play"
 
+[node name="CreditsButton" type="Button" parent="Center/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 48)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 24
+text = "Credits"
+
 [node name="QuitButton" type="Button" parent="Center/VBox"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(200, 48)
@@ -45,5 +53,53 @@ size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 24
 text = "Quit"
 
+[node name="Credits" type="CenterContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Credits"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="Credits/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 48
+text = "Credits"
+horizontal_alignment = 1
+
+[node name="Design" type="Label" parent="Credits/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Design by Sean Cunningham"
+horizontal_alignment = 1
+
+[node name="Graphics" type="Label" parent="Credits/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Graphics by urizen"
+horizontal_alignment = 1
+
+[node name="Code" type="Label" parent="Credits/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Code by Claude"
+horizontal_alignment = 1
+
+[node name="BackButton" type="Button" parent="Credits/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 48)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 24
+text = "Back"
+
 [connection signal="pressed" from="Center/VBox/PlayButton" to="." method="_on_play_pressed"]
+[connection signal="pressed" from="Center/VBox/CreditsButton" to="." method="show_credits"]
 [connection signal="pressed" from="Center/VBox/QuitButton" to="." method="_on_quit_pressed"]
+[connection signal="pressed" from="Credits/VBox/BackButton" to="." method="show_menu"]

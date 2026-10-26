@@ -23,6 +23,10 @@ func _run() -> void:
 	root.add_child(menu)
 	await process_frame
 	_check(menu.get_node("%PlayButton") is Button, "menu has Play button")
+	(menu.get_node("%CreditsButton") as Button).pressed.emit()
+	_check(menu.get_node("%Credits").visible and not menu.get_node("Center").visible, "menu: Credits shows the credits")
+	(menu.get_node("%BackButton") as Button).pressed.emit()
+	_check(menu.get_node("Center").visible and not menu.get_node("%Credits").visible, "menu: Back returns to the menu")
 	menu.queue_free()
 
 	await _test_play_scene(true)
