@@ -24,9 +24,9 @@ extends Node2D
 @export var occupied_icon_shift: float = 8.0
 ## Play the ICON_ANIMS icon animations.
 @export var animate_icons: bool = true
-## Tapped-tile cooldown number size, and its baseline's distance above the tile's bottom edge.
+## Tapped-tile cooldown number size and color (yellow, to stand out from the white wizard).
 @export var cooldown_font_size: int = 16
-@export var cooldown_margin: float = 6.0
+@export var cooldown_color: Color = Color(1.0, 0.8, 0.2)
 ## Move cost number size, and the dot beside it.
 @export var move_cost_font_size: int = 14
 @export var move_cost_dot_color: Color = Color(0.3, 0.6, 1.0)
@@ -275,28 +275,31 @@ func _draw_icon(icon: StringName, center: Vector2, tapped: bool) -> void:
 	draw_set_transform(Vector2.ZERO)
 
 
-# Actions left, centered just inside the bottom edge: clear of the player outline and of a
-# facing triangle poking in from the hex below.
+# Half the drawn tile's width and height: corner radius across the pointed axis, edge radius
+# across the flat one.
+func _tile_half() -> Vector2:
+	var radii := Vector2(board.layout.size, board.layout.inner_radius()) * board.tile_scale
+	return Vector2(radii.y, radii.x) if board.pointy_top else radii
+
+
+# Actions left, in the tile's lower left (mirroring the move cost above it): clear of the player's
+# sprite and outline, and of facing triangles, which sit mid-edge.
 func _draw_cooldown(remaining: int, center: Vector2) -> void:
 	var font := ThemeDB.fallback_font
-	var width := board.layout.size * 2.0
-	var baseline := center.y + board.layout.inner_radius() * board.tile_scale - cooldown_margin
-	var pos := Vector2(center.x - width / 2.0, baseline)
+	var half := _tile_half()
+	var pos := center + Vector2(-0.63 * half.x, 0.70 * half.y)  # baseline start
 	var text := str(remaining)
-	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, width, cooldown_font_size, 4, Color.BLACK)
-	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, width, cooldown_font_size, Color.WHITE)
+	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, cooldown_font_size, 4, Color.BLACK)
+	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, cooldown_font_size, cooldown_color)
 
 
 # Cost number with a blue dot after it, in the tile's upper left.
 func _draw_move_cost(cost: int, center: Vector2) -> void:
 	var font := ThemeDB.fallback_font
-	# Half the drawn tile's width and height: corner radius across the pointed axis, edge radius
-	# across the flat one.
-	var radii := Vector2(board.layout.size, board.layout.inner_radius()) * board.tile_scale
-	var half := Vector2(radii.y, radii.x) if board.pointy_top else radii
+	var half := _tile_half()
 	var text := str(cost)
 	var text_width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, move_cost_font_size).x
-	var pos := center + Vector2(-0.68 * half.x, -0.32 * half.y)  # baseline start
+	var pos := center + Vector2(-0.63 * half.x, -0.38 * half.y)  # baseline start
 	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, move_cost_font_size, 4, Color.BLACK)
 	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, move_cost_font_size, Color.WHITE)
 	var dot := pos + Vector2(text_width + move_cost_dot_radius + 2.0, -font.get_ascent(move_cost_font_size) * 0.35)
