@@ -46,3 +46,6 @@ godot --headless --path . --export-release "Windows Desktop" builds/windows/spae
 `builds/` holds a `.gdignore` so Godot doesn't import the exported files back into the project; everything else in
 it is git-ignored. For itch.io, zip the *contents* of `builds/web/` (index.html at the root) and upload it as an HTML
 game; zip the .exe for the Windows download.
+
+Export → *Convert Text Resources to Binary* is off: in 4.7.2 the conversion dropped the ship's override
+of the wizard sprite in `play.tscn`, so exports showed the wizard in space. Keep it off.
