@@ -13,31 +13,48 @@
 [ext_resource type="Script" path="res://scripts/ui/screen_fade.gd" id="11_fade"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_side"]
-bg_color = Color(0, 0, 0, 1)
+bg_color = Color(0.1, 0.105, 0.12, 0.97)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.5, 0.42, 0.28, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_focus"]
 content_margin_left = 12.0
 content_margin_top = 8.0
 content_margin_right = 12.0
 content_margin_bottom = 12.0
-bg_color = Color(0, 0, 0, 1)
+bg_color = Color(0.2, 0.21, 0.24, 1)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(1, 1, 1, 1)
+border_color = Color(0.3, 0.31, 0.34, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
 
 [sub_resource type="StyleBoxLine" id="StyleBoxLine_divider"]
-color = Color(1, 1, 1, 1)
+color = Color(0.5, 0.42, 0.28, 1)
 thickness = 2
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_aether_bg"]
-bg_color = Color(0, 0, 0, 1)
+bg_color = Color(0.14, 0.145, 0.16, 1)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(1, 1, 1, 1)
+border_color = Color(0.3, 0.31, 0.34, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_aether_fill"]
 bg_color = Color(0.3, 0.6, 1, 1)
@@ -45,7 +62,11 @@ border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(1, 1, 1, 1)
+border_color = Color(0.55, 0.75, 1, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_wizard"]
 atlas = ExtResource("7_icons")
@@ -69,6 +90,10 @@ content_margin_top = 2.0
 content_margin_right = 8.0
 content_margin_bottom = 2.0
 bg_color = Color(0.38, 0.03, 0.41, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
 
 [node name="Planet" type="Node2D" unique_id=73139735]
 script = ExtResource("1_planet")
@@ -121,6 +146,9 @@ anchors_preset = -1
 anchor_left = 0.6666667
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = -8.0
 grow_horizontal = 0
 grow_vertical = 2
 mouse_filter = 2
@@ -128,9 +156,9 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_side")
 
 [node name="Margin" type="MarginContainer" parent="UI/SidePanel" unique_id=2021790129]
 layout_mode = 2
-theme_override_constants/margin_left = 16
+theme_override_constants/margin_left = 12
 theme_override_constants/margin_top = 16
-theme_override_constants/margin_right = 16
+theme_override_constants/margin_right = 12
 theme_override_constants/margin_bottom = 16
 
 [node name="Layout" type="VBoxContainer" parent="UI/SidePanel/Margin" unique_id=1860729979]
