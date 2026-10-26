@@ -25,6 +25,14 @@ func _run() -> void:
 	_check(menu.get_node("%PlayButton") is Button, "menu has Play button")
 	(menu.get_node("%CreditsButton") as Button).pressed.emit()
 	_check(menu.get_node("%Credits").visible and not menu.get_node("Center").visible, "menu: Credits shows the credits")
+	_check((menu.get_node("%Version") as Label).text == "Version %s" % ProjectSettings.get_setting("application/config/version"),
+		"menu: credits show the project version")
+	(menu.get_node("%LicensesButton") as Button).pressed.emit()
+	var license_text := (menu.get_node("%LicenseText") as RichTextLabel).text
+	_check(menu.get_node("%Licenses").visible and license_text.begins_with("This game uses Godot Engine")
+		and "FreeType" in license_text, "menu: Licenses shows Godot's and third-party licenses")
+	(menu.get_node("%LicensesBackButton") as Button).pressed.emit()
+	_check(menu.get_node("%Credits").visible and not menu.get_node("%Licenses").visible, "menu: Back from Licenses returns to the credits")
 	(menu.get_node("%BackButton") as Button).pressed.emit()
 	_check(menu.get_node("Center").visible and not menu.get_node("%Credits").visible, "menu: Back returns to the menu")
 	menu.queue_free()

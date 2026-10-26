@@ -79,11 +79,12 @@ theme_override_font_sizes/font_size = 24
 text = "Design by Sean Cunningham"
 horizontal_alignment = 1
 
-[node name="Graphics" type="Label" parent="Credits/VBox"]
+[node name="Graphics" type="LinkButton" parent="Credits/VBox"]
 layout_mode = 2
+size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 24
-text = "Graphics by urizen"
-horizontal_alignment = 1
+text = "Graphics: Urizen 1Bit Tileset by vurmux"
+uri = "https://vurmux.itch.io/urizen-onebit-tilesets"
 
 [node name="Code" type="Label" parent="Credits/VBox"]
 layout_mode = 2
@@ -91,7 +92,77 @@ theme_override_font_sizes/font_size = 24
 text = "Code by Claude"
 horizontal_alignment = 1
 
+[node name="Godot" type="Label" parent="Credits/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Made with Godot Engine"
+horizontal_alignment = 1
+
+[node name="Fine" type="VBoxContainer" parent="Credits/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Copyright" type="Label" parent="Credits/VBox/Fine"]
+modulate = Color(1, 1, 1, 0.6)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "© 2026 Sean Cunningham"
+horizontal_alignment = 1
+
+[node name="Version" type="Label" parent="Credits/VBox/Fine"]
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0.6)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Version 0.0"
+horizontal_alignment = 1
+
+[node name="LicensesButton" type="Button" parent="Credits/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 48)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 24
+text = "Licenses"
+
 [node name="BackButton" type="Button" parent="Credits/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 48)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 24
+text = "Back"
+
+[node name="Licenses" type="CenterContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Licenses"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="Licenses/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 48
+text = "Licenses"
+horizontal_alignment = 1
+
+[node name="LicenseText" type="RichTextLabel" parent="Licenses/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(900, 460)
+layout_mode = 2
+focus_mode = 2
+theme_override_font_sizes/normal_font_size = 16
+bbcode_enabled = false
+selection_enabled = true
+
+[node name="LicensesBackButton" type="Button" parent="Licenses/VBox"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(200, 48)
 layout_mode = 2
@@ -103,3 +174,5 @@ text = "Back"
 [connection signal="pressed" from="Center/VBox/CreditsButton" to="." method="show_credits"]
 [connection signal="pressed" from="Center/VBox/QuitButton" to="." method="_on_quit_pressed"]
 [connection signal="pressed" from="Credits/VBox/BackButton" to="." method="show_menu"]
+[connection signal="pressed" from="Credits/VBox/LicensesButton" to="." method="show_licenses"]
+[connection signal="pressed" from="Licenses/VBox/LicensesBackButton" to="." method="show_credits"]
