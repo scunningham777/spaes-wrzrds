@@ -150,6 +150,7 @@ func _update_side_panel() -> void:
 func _follow_wizard() -> void:
 	_camera.position = _wizard.position
 	_tiles.view_center = _wizard.mover.coord
+	_tiles.occupied = _wizard.mover.coord
 
 
 # Successful moves cost the aether of the tile stepped onto; running out kicks the player back to

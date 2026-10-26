@@ -6,7 +6,8 @@ extends Node2D
 # (hex_color, or ley_color where it resonates with a ley line or is on an activated one); kinds
 # whose icon has an entry in ICONS draw that sprite-sheet icon over it. Icons with an entry in ICON_ANIMS step through it, all in sync off one clock. Tile size comes
 # from the board's tile_scale. Tiles that cost aether to step onto show the cost as a number and
-# a blue dot in their upper left; the landing tile is outlined.
+# a blue dot in their upper left; the landing tile is outlined. The occupied (player's) tile's icon
+# sits higher, clear of the player's sprite.
 
 ## Sprite sheet that ICONS regions are cut from.
 @export var icon_sheet: Texture2D
@@ -18,6 +19,9 @@ extends Node2D
 @export var ley_color: Color = Color(0.38, 0.03, 0.41)
 ## Icon pixel scale; matches the wizard sprite's.
 @export var icon_scale: float = 4.0
+## How far up the icon of the tile the player stands on (occupied) moves, in pixels, to make room
+## for the player's sprite below it.
+@export var occupied_icon_shift: float = 8.0
 ## Play the ICON_ANIMS icon animations.
 @export var animate_icons: bool = true
 ## Tapped-tile cooldown number size, and its baseline's distance above the tile's bottom edge.
@@ -87,6 +91,11 @@ var ley_lines: LeyLines:
 var landing: Variant = null:
 	set(value):
 		landing = value
+		queue_redraw()
+## The tile the player stands on (its icon moves up by occupied_icon_shift), or null for none.
+var occupied: Variant = null:
+	set(value):
+		occupied = value
 		queue_redraw()
 ## Seconds since the animations started.
 var anim_time: float = 0.0
@@ -203,13 +212,16 @@ func _draw() -> void:
 		draw_colored_polygon(tile, fill_color(coord))
 		draw_set_transform(Vector2.ZERO)
 		if not coord in swapping_keys:
-			_draw_contents(coord, center)
+			_draw_contents(coord, center, icon_shift(coord))
 	if _swapping:
 		var from_pos := board.hex_to_local(_swap_from)
 		var to_pos := board.hex_to_local(_swap_to)
+		# The icon shift travels with the icon, so one leaving the player's tile eases back to center.
+		var from_shift := icon_shift(_swap_from)
+		var to_shift := icon_shift(_swap_to)
 		# Last drawn is on top.
-		_draw_contents(_swap_from, to_pos.lerp(from_pos, swap_progress))
-		_draw_contents(_swap_to, from_pos.lerp(to_pos, swap_progress))
+		_draw_contents(_swap_from, to_pos.lerp(from_pos, swap_progress), to_shift.lerp(from_shift, swap_progress))
+		_draw_contents(_swap_to, from_pos.lerp(to_pos, swap_progress), from_shift.lerp(to_shift, swap_progress))
 	if landing != null and grid.has_tile(landing):
 		# Inset, so it still shows inside the player's outline while they stand on it.
 		draw_set_transform(board.hex_to_local(grid.nearest(landing, view_center)))
@@ -225,12 +237,20 @@ func fill_color(coord: Vector2i) -> Color:
 	return hex_color
 
 
-# Draws the icon (and tapped cooldown) and move cost of the tile at coord, centered on center.
-func _draw_contents(coord: Vector2i, center: Vector2) -> void:
+# Offset of the icon on the tile at coord from the tile's center: up on the occupied tile, else none.
+func icon_shift(coord: Vector2i) -> Vector2:
+	if occupied != null and grid.canonical(coord) == grid.canonical(occupied):
+		return Vector2(0.0, -occupied_icon_shift)
+	return Vector2.ZERO
+
+
+# Draws the icon (offset by icon_offset, and tapped cooldown) and move cost of the tile at coord,
+# centered on center.
+func _draw_contents(coord: Vector2i, center: Vector2, icon_offset: Vector2) -> void:
 	var kind := grid.get_tile(coord)
 	if has_icon(kind):
 		var tapped := grid.is_tapped(coord)
-		_draw_icon(kind.icon, center, tapped)
+		_draw_icon(kind.icon, center + icon_offset, tapped)
 		if tapped:
 			_draw_cooldown(grid.cooldown(coord), center)
 	if grid.move_cost(coord) > 0:

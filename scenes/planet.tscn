@@ -121,17 +121,21 @@ position_smoothing_speed = 8.0
 [node name="HexBoard" type="Node2D" parent="." unique_id=401960176]
 script = ExtResource("2_board")
 pointy_top = false
+hex_size = 40.0
 draw_outlines = false
 
 [node name="TileGridView" type="Node2D" parent="HexBoard" unique_id=1952379980]
 script = ExtResource("3_tiles")
 icon_sheet = ExtResource("7_icons")
+icon_scale = 3.5
+occupied_icon_shift = 8.0
 
 [node name="Wizard" type="Node2D" parent="HexBoard" unique_id=1758725873]
 script = ExtResource("4_player")
 
 [node name="Sprite2D" type="Sprite2D" parent="HexBoard/Wizard"]
-scale = Vector2(4, 4)
+position = Vector2(0, 8)
+scale = Vector2(3.5, 3.5)
 texture = ExtResource("7_icons")
 region_enabled = true
 region_rect = Rect2(378, 1, 12, 12)
