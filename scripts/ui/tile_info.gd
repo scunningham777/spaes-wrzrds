@@ -2,8 +2,8 @@ class_name TileInfo
 extends Control
 
 # Side-panel block describing one tile: its icon, name, and elements (the items it yields), plus its
-# tapped state, and a "ley line detected" badge under the elements when it resonates with a ley
-# line. The scene decides which tile to show (e.g. the one under the player) and calls show_tile().
+# tapped state, and a badge under the elements when it's on a ley line the player has found:
+# "ley line activated" on an activated line, otherwise "ley line detected" when it resonates. The scene decides which tile to show (e.g. the one under the player) and calls show_tile().
 
 @onready var _icon: TextureRect = %TileIcon
 @onready var _name: Label = %TileName
@@ -14,8 +14,11 @@ extends Control
 
 # cooldown: actions until a tapped tile can be extracted again; 0 if it isn't tapped.
 # resonant: the tile resonates with a ley line (LeyLines.is_resonant).
-func show_tile(kind: TileKind, icon: Texture2D, cooldown: int = 0, resonant: bool = false) -> void:
-	_ley_line.visible = resonant
+# activated: the tile is on an activated ley line (LeyLines.is_active).
+func show_tile(kind: TileKind, icon: Texture2D, cooldown: int = 0, resonant: bool = false,
+		activated: bool = false) -> void:
+	_ley_line.visible = resonant or activated
+	_ley_line.text = "ley line activated" if activated else "ley line detected"
 	_icon.texture = icon
 	_name.text = kind.display_name
 	# Tapped affects the whole tile, so it sits beside the name rather than the element.

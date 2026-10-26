@@ -379,6 +379,7 @@ func _test_ley_lines() -> void:
 	_check(Towers.cost_text(Towers.BASIC) == "10 Wood, 10 Stone" and not Towers.try_build(Towers.BASIC, g, ley, stock, Vector2i.ZERO)
 		and g.get_tile(Vector2i.ZERO) == iron and stock.count(&"wood") == 10, "tower: can't build short of stone, no change")
 	stock.add(&"stone", 1)
+	_check(not ley.is_active(Vector2i.ZERO), "ley: lines start inactive")
 	_check(Towers.try_build(Towers.BASIC, g, ley, stock, Vector2i.ZERO) and g.get_tile(Vector2i.ZERO) == Towers.kind(Towers.BASIC)
 		and stock.count(&"wood") == 0 and stock.count(&"stone") == 0, "tower: building spends 10 wood and 10 stone")
 	var tower := g.get_tile(Vector2i.ZERO)
@@ -387,6 +388,9 @@ func _test_ley_lines() -> void:
 	_check(not g.try_swap(Vector2i.ZERO, Vector2i(1, 0)) and not g.try_swap(Vector2i(1, 0), Vector2i.ZERO)
 		and g.get_tile(Vector2i.ZERO) == tower, "tower: can't be pushed, or have a tile pushed onto it")
 	_check(not Towers.can_build_at(g, ley, Vector2i.ZERO), "tower: its tile is no longer a site")
+	_check(ley.lines.all(func(l: LeyLines.Line) -> bool: return l.active) and ley.is_active(Vector2i(10, 0))
+		and ley.is_active(Vector2i(0, 7)) and ley.is_active(Vector2i(48, -24)) and not ley.is_active(Vector2i(1, 1)),
+		"tower: building activates every line through it, and only tiles on them")
 
 
 # A plane grid with a radius-sized hexagon of Empty tiles.
@@ -790,7 +794,7 @@ func _test_enter_planet() -> void:
 	tri = marker.triangle_points()
 	_check(tri[2].x > 0.0 and tri[2].y < 0.0, "planet: facing triangle follows a turn to NE (%s)" % tri)
 
-	# Ley lines: hidden, but iron runs along one turn grey.
+	# Ley lines: hidden, but iron runs along one turn plum.
 	_check(tiles.ley_lines != null and tiles.ley_lines.lines.size() >= 3, "ley: the planet view has the planet's lines")
 	var planet_ley := tiles.ley_lines
 	var test_ley := LeyLines.new(tiles.grid.torus)
@@ -804,10 +808,10 @@ func _test_enter_planet() -> void:
 	_check(tiles.fill_color(Vector2i(0, -1)) == tiles.hex_color and tiles.fill_color(Vector2i(1, 0)) == tiles.hex_color,
 		"ley: lines themselves don't show")
 	tiles.grid.set_tile(Vector2i.ZERO, iron)
-	_check(tiles.fill_color(Vector2i.ZERO) == tiles.resonant_color and tiles.fill_color(Vector2i(0, -1)) == tiles.resonant_color
-		and tiles.resonant_color == Color(0.5, 0.5, 0.5) and tiles.fill_color(Vector2i(1, 0)) == tiles.hex_color,
-		"ley: an iron run along the line turns medium grey")
-	# Standing on a resonating tile, the tile info says so, in a grey badge under the elements.
+	_check(tiles.fill_color(Vector2i.ZERO) == tiles.ley_color and tiles.fill_color(Vector2i(0, -1)) == tiles.ley_color
+		and tiles.ley_color == Color(0.38, 0.03, 0.41) and tiles.fill_color(Vector2i(1, 0)) == tiles.hex_color,
+		"ley: an iron run along the line turns plum")
+	# Standing on a resonating tile, the tile info says so, in a plum badge under the elements.
 	var ley_info: TileInfo = current_scene.get_node("%TileInfo")
 	var ley_badge: Label = current_scene.get_node("%TileLeyLine")
 	_check(ley_info.shown_ley_line() == "", "ley: no badge on a tile that doesn't resonate")
@@ -820,8 +824,8 @@ func _test_enter_planet() -> void:
 		and ley_badge.get_global_rect().position.y >= yield_label.get_global_rect().end.y
 		and absf(ley_badge.get_global_rect().get_center().x - yield_label.get_global_rect().get_center().x) < 1.0,
 		"ley: resonating tile shows the badge, centered under the elements")
-	_check((ley_badge.get_theme_stylebox(&"normal") as StyleBoxFlat).bg_color == Color(0.5, 0.5, 0.5)
-		and ley_badge.get_theme_color(&"font_color") == Color.BLACK, "ley: badge is black on grey")
+	_check((ley_badge.get_theme_stylebox(&"normal") as StyleBoxFlat).bg_color == tiles.ley_color
+		and ley_badge.get_theme_color(&"font_color") == Color.WHITE, "ley: badge is white on the ley color")
 	tiles.grid.set_tile(Vector2i(0, -1), gold)
 	_check(ley_info.shown_ley_line() == "", "ley: badge goes when the run is broken")
 	tiles.grid.set_tile(Vector2i(0, -1), iron)
@@ -852,13 +856,21 @@ func _test_enter_planet() -> void:
 	_check(ley_info.shown_name() == "Basic Tower" and ley_info.shown_yield() == "Element: none" and not build_hint.visible,
 		"tower: standing on it shows Basic Tower with no elements, and the hint goes")
 	_check(tiles.has_icon(tiles.grid.get_tile(Vector2i.ZERO))
-		and tiles.icon_texture(tiles.grid.get_tile(Vector2i.ZERO)).get_image().get_pixel(0, 0) == Color(0.6, 0.6, 0.6),
-		"tower: drawn as a grey square")
+		and (tiles.icon_texture(tiles.grid.get_tile(Vector2i.ZERO)) as AtlasTexture).region == Rect2(443, 508, 12, 12),
+		"tower: drawn with sprite cell (34, 39)")
+	# Both lines through it light up end to end: every tile on them turns plum and shows the badge.
+	_check(ley_info.shown_ley_line() == "ley line activated", "tower: its tile shows ley line activated")
+	_check(tiles.fill_color(Vector2i.ZERO) == tiles.ley_color and tiles.fill_color(Vector2i(0, 2)) == tiles.ley_color
+		and tiles.fill_color(Vector2i(0, -2)) == tiles.ley_color and tiles.fill_color(Vector2i(2, 0)) == tiles.ley_color
+		and tiles.fill_color(Vector2i(-2, 0)) == tiles.ley_color and tiles.fill_color(Vector2i(-1, 2)) == tiles.hex_color,
+		"tower: every tile on both lines turns plum, not just iron runs")
 	_press(KEY_F)
 	_check(tiles.grid.get_tile(Vector2i.ZERO).id == Towers.BASIC, "tower: F can't push it")
 	tiles.grid.set_tile(Vector2i.ZERO, iron)  # back to iron for the tests below
 	_press(KEY_W)
 	_press(KEY_W)  # back to (0, 2)
+	_check(tiles.grid.get_tile(Vector2i(0, 2)) == gold and ley_info.shown_ley_line() == "ley line activated",
+		"tower: a non-iron tile on an activated line shows ley line activated")
 	tiles.ley_lines = planet_ley
 
 	# Scry: from the middle of the landing patch's edge, V reveals the next patch over.

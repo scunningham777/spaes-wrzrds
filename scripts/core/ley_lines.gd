@@ -3,7 +3,8 @@ extends RefCounted
 
 # A planet's ley lines: straight lines of tiles, a few along each hex axis, picked when the planet
 # is made. They're hidden; the player can only spot one where RESONANT_ELEMENT tiles run along it,
-# which makes those tiles resonate (see is_resonant).
+# which makes those tiles resonate (see is_resonant). Building a tower where lines cross activates
+# them, showing every tile along them (see is_active).
 #
 # A line runs all the way around the torus back to its start. It closes in one lap if the torus
 # width is a multiple of twice its height; otherwise the diagonal lines wind around several times
@@ -20,10 +21,11 @@ const MIN_RUN := 2
 const PLACEMENT_TRIES := 50
 
 
-# One line: its axis, and the stored copy of every tile on it.
+# One line: its axis, the stored copy of every tile on it, and whether it's been activated.
 class Line:
 	var direction: Vector2i
 	var tiles: Dictionary[Vector2i, bool] = {}
+	var active := false
 
 
 var torus: HexTorus
@@ -73,8 +75,25 @@ func is_resonant(grid: TileGrid, coord: Vector2i) -> bool:
 
 # Whether two or more lines cross at coord.
 func is_intersection(coord: Vector2i) -> bool:
+	return lines_through(coord).size() >= 2
+
+
+func lines_through(coord: Vector2i) -> Array[Line]:
 	var key := torus.canonical(coord)
-	return lines.filter(func(line: Line) -> bool: return line.tiles.has(key)).size() >= 2
+	var result: Array[Line] = []
+	result.assign(lines.filter(func(line: Line) -> bool: return line.tiles.has(key)))
+	return result
+
+
+# Activates every line through coord.
+func activate_at(coord: Vector2i) -> void:
+	for line in lines_through(coord):
+		line.active = true
+
+
+# Whether coord is on an activated line.
+func is_active(coord: Vector2i) -> bool:
+	return lines_through(coord).any(func(line: Line) -> bool: return line.active)
 
 
 # Length of the run of resonant-element tiles through key along direction, both ways; counts

@@ -37,7 +37,7 @@ func extract_line() -> Array[Vector2i]:
 
 
 # Whether the player's tile is a tower site (affordability aside). Uses the ley lines as the map
-# shows them, so building agrees with the grey tiles.
+# shows them, so building agrees with the plum tiles.
 func can_build_tower_here() -> bool:
 	return Towers.can_build_at(tiles.grid, tiles.ley_lines, player.mover.coord)
 

@@ -2,8 +2,9 @@ class_name Towers
 extends RefCounted
 
 # Static tower definitions. A tower is built where two or more ley lines cross, on an iron tile
-# that's been detected there (resonating with a line), and replaces that tile. Towers can't be
-# pushed. Same structure as Items and Foci: ids and data here.
+# that's been detected there (resonating with a line), and replaces that tile, activating every
+# line through it (LeyLines.activate_at). Towers can't be pushed. Same structure as Items and
+# Foci: ids and data here.
 
 const BASIC := &"basic_tower"
 
@@ -69,6 +70,8 @@ static func try_build(tower: StringName, grid: TileGrid, ley_lines: LeyLines, in
 	var items := cost(tower)
 	for item: StringName in items:
 		inventory.spend(item, items[item])
-	grid.set_move_cost(coord, MOVE_COSTS.get(tower, 0))  # before set_tile, so listeners see the tower whole
+	# Before set_tile, so listeners see the tower and its lines whole.
+	grid.set_move_cost(coord, MOVE_COSTS.get(tower, 0))
+	ley_lines.activate_at(coord)
 	grid.set_tile(coord, kind(tower))
 	return true
