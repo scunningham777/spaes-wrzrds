@@ -954,7 +954,7 @@ func _test_enter_planet() -> void:
 	var all_elements := ["1 – Aether", "2 – Gold", "3 – Iron", "4 – Stone", "5 – Wood"]
 	_check(detect_labels.call() == all_elements, "detect: every element on the planet listed with number keys (%s)"
 		% [detect_labels.call()])
-	await _settle(tiles, &"detect_shrink")
+	await _until(func() -> bool: return tiles.detect_shrink == 1.0)
 	await _until(func() -> bool: return not lock.busy)
 	_check(wizard_icon.visible and not wizard_sprite.visible and not current_scene.get_node("UI").get_children().any(
 		func(n: Node) -> bool: return n is TextureRect), "detect: the wizard lands in the side panel's corner")
@@ -965,7 +965,7 @@ func _test_enter_planet() -> void:
 	_check(not interaction.detecting and not planet_wizard.mover.frozen and tiles.detection == null and marker.visible
 		and aether_bar.visible and not detect_panel.visible and current_scene.scene_file_path == "res://scenes/planet.tscn",
 		"detect: Esc leaves detect mode, not the planet")
-	await _settle(tiles, &"detect_shrink")
+	await _until(func() -> bool: return tiles.detect_shrink == 0.0)
 	await _until(func() -> bool: return not lock.busy)
 	_check(wizard_sprite.visible and not wizard_icon.visible and tiles.occupied == planet_wizard.mover.coord,
 		"detect: the wizard flies back to the board")
@@ -1019,7 +1019,7 @@ func _test_enter_planet() -> void:
 		"detect: Space submits too, and detect mode ends once the ring is known")
 	for kind in tiles.grid.kinds:
 		tiles.grid.set_kind_known(kind)
-	await _settle(tiles, &"detect_shrink")
+	await _until(func() -> bool: return tiles.detect_shrink == 0.0)
 	await _until(func() -> bool: return not lock.busy and tiles.correct_flash == 0.0)
 
 	# Ley lines: hidden, but iron runs along one turn plum.
@@ -1214,16 +1214,6 @@ func _await_scene(path: String) -> void:
 func _until(condition: Callable) -> void:
 	var deadline := Time.get_ticks_msec() + 2000
 	while not condition.call() and Time.get_ticks_msec() < deadline:
-		await process_frame
-	await process_frame
-
-
-# Waits (up to 2 seconds) for a tweened property of node to stop changing, plus a frame.
-func _settle(node: Object, property: StringName) -> void:
-	var deadline := Time.get_ticks_msec() + 2000
-	var last: Variant = null
-	while node.get(property) != last and Time.get_ticks_msec() < deadline:
-		last = node.get(property)
 		await process_frame
 	await process_frame
 

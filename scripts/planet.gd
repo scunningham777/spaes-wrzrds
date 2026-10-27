@@ -99,7 +99,7 @@ func _ready() -> void:
 # Fills the outlined focus box with the focus's name and the actions it grants; hidden if none.
 func _show_focus(focus: StringName) -> void:
 	var box := %FocusBox as Control
-	box.visible = not focus.is_empty() and not _interaction.detecting
+	box.visible = not focus.is_empty()
 	(%FocusName as Label).text = Foci.display_name(focus)
 	var list := %FocusActions as Control
 	for child in list.get_children():
@@ -176,10 +176,8 @@ func _on_detecting_changed(detecting: bool) -> void:
 		child.queue_free()
 	if not detecting:
 		return
-	var letters := "QEADZCS" if (_wizard.board as HexBoard).pointy_top else "QWEZXCS"
+	var letters := "QEADZCS" if _wizard.board.pointy_top else "QWEZXCS"
 	(%SelectHint as Label).text = "Numpad / %s – Select" % letters
-	(%SubmitHint as Label).text = "Enter / Space – Submit"
-	(%LeaveHint as Label).text = "Esc – Leave"
 	var detection := _interaction.detection
 	for i in mini(detection.elements.size(), Detection.MAX_ELEMENTS):
 		var label := Label.new()

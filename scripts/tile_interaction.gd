@@ -166,6 +166,7 @@ func _end_detect() -> void:
 func _detect_input(event: InputEvent) -> bool:
 	var pointy_top := player.board.pointy_top
 	var dir: Variant = HexPlayerController.move_direction(event, pointy_top)
+	var guess := _guess_index(event)
 	if event.is_action_pressed("ui_cancel"):
 		_end_detect()
 	elif event.is_action_pressed("submit_guess"):
@@ -182,8 +183,8 @@ func _detect_input(event: InputEvent) -> bool:
 		detection.select(player.mover.coord)
 	elif dir != null:
 		detection.select(player.mover.coord + Hex.delta(dir, pointy_top))
-	elif _guess_index(event) >= 0:
-		detection.toggle(_guess_index(event))
+	elif guess >= 0:
+		detection.toggle(guess)
 	else:
 		return HexPlayerController.turn_step(event, pointy_top) != 0 \
 			or [&"extract", &"push", &"scry", &"build_tower"].any(event.is_action_pressed)

@@ -60,10 +60,6 @@ func is_target(coord: Vector2i) -> bool:
 	return grid.canonical(coord) in targets()
 
 
-func in_area(coord: Vector2i) -> bool:
-	return grid.canonical(coord) in area
-
-
 # Whether nothing's left to detect.
 func is_done() -> bool:
 	return targets().is_empty()
