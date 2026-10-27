@@ -287,7 +287,7 @@ func _tile_half() -> Vector2:
 func _draw_cooldown(remaining: int, center: Vector2) -> void:
 	var font := ThemeDB.fallback_font
 	var half := _tile_half()
-	var pos := center + Vector2(-0.63 * half.x, 0.70 * half.y)  # baseline start
+	var pos := center + Vector2(-0.52 * half.x, 0.83 * half.y)  # baseline start
 	var text := str(remaining)
 	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, cooldown_font_size, 4, Color.BLACK)
 	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, cooldown_font_size, cooldown_color)
@@ -299,7 +299,7 @@ func _draw_move_cost(cost: int, center: Vector2) -> void:
 	var half := _tile_half()
 	var text := str(cost)
 	var text_width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, move_cost_font_size).x
-	var pos := center + Vector2(-0.63 * half.x, -0.38 * half.y)  # baseline start
+	var pos := center + Vector2(-0.52 * half.x, -0.51 * half.y)  # baseline start
 	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, move_cost_font_size, 4, Color.BLACK)
 	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, move_cost_font_size, Color.WHITE)
 	var dot := pos + Vector2(text_width + move_cost_dot_radius + 2.0, -font.get_ascent(move_cost_font_size) * 0.35)
