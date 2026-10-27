@@ -24,7 +24,7 @@ A planet is a large hex map that wraps around both ways, but you only see what y
 small hexagon of tiles, and scrying reveals the next hexagon over, sharing the edge you stand on. Tiles are
 generated as they're revealed.
 
-Each planet also has hidden ley lines, 1–2 along each hex axis. Two or more iron tiles in a row along one get a plum
+Each planet also has hidden ley lines, 1–2 along each hex axis. Two or more known iron tiles in a row along one get a plum
 background; the lines themselves are never shown.
 
 Where two or more ley lines cross, a plum iron tile can be turned into a tower with **B** (10 wood and 10

@@ -393,6 +393,10 @@ func _test_ley_lines() -> void:
 	_check(ley.is_resonant(g, Vector2i.ZERO) and ley.is_resonant(g, Vector2i(1, 0))
 		and not ley.is_resonant(g, Vector2i(0, 1)) and not ley.is_resonant(g, Vector2i(-1, 0)),
 		"ley: two iron in a row along the line both resonate, nothing else")
+	g.set_known(Vector2i(1, 0), false)
+	_check(not ley.is_resonant(g, Vector2i.ZERO) and not ley.is_resonant(g, Vector2i(1, 0)),
+		"ley: iron only counts once it's known")
+	g.set_known(Vector2i(1, 0))
 	g.set_tile(Vector2i(5, 0), iron)
 	g.set_tile(Vector2i(6, 0), iron)
 	var off := LeyLines.new(torus)
@@ -402,6 +406,8 @@ func _test_ley_lines() -> void:
 	var seam := TileGrid.new(torus)
 	seam.add_tile(Vector2i(47, 0), iron)  # (-1, 0), one step back from (0, 0) along NE, stored across the wrap
 	seam.add_tile(Vector2i.ZERO, iron)
+	for c: Vector2i in seam.tiles:
+		seam.set_known(c)
 	_check(ley.is_resonant(seam, Vector2i.ZERO) and ley.is_resonant(seam, Vector2i(-1, 0)),
 		"ley: runs carry across the wrap")
 
@@ -925,6 +931,10 @@ func _test_enter_planet() -> void:
 	_check(tiles.fill_color(Vector2i.ZERO) == tiles.ley_color and tiles.fill_color(Vector2i(0, -1)) == tiles.ley_color
 		and tiles.ley_color == Color(0.38, 0.03, 0.41) and tiles.fill_color(Vector2i(1, 0)) == tiles.hex_color,
 		"ley: an iron run along the line turns plum")
+	tiles.grid.set_known(Vector2i(0, -1), false)
+	_check(tiles.fill_color(Vector2i.ZERO) == tiles.hex_color and tiles.fill_color(Vector2i(0, -1)) == tiles.hex_color,
+		"ley: unknown iron doesn't turn plum")
+	tiles.grid.set_known(Vector2i(0, -1))
 	# Standing on a resonating tile, the tile info says so, in a plum badge under the elements.
 	var ley_info: TileInfo = current_scene.get_node("%TileInfo")
 	var ley_badge: Label = current_scene.get_node("%TileLeyLine")

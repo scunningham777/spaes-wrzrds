@@ -2,9 +2,9 @@ class_name LeyLines
 extends RefCounted
 
 # A planet's ley lines: straight lines of tiles, a few along each hex axis, picked when the planet
-# is made. They're hidden; the player can only spot one where RESONANT_ELEMENT tiles run along it,
-# which makes those tiles resonate (see is_resonant). Building a tower where lines cross activates
-# them, showing every tile along them (see is_active).
+# is made. They're hidden; the player can only spot one where known RESONANT_ELEMENT tiles
+# (TileGrid.is_known) run along it, which makes those tiles resonate (see is_resonant). Building a
+# tower where lines cross activates them, showing every tile along them (see is_active).
 #
 # A line runs all the way around the torus back to its start. It closes in one lap if the torus
 # width is a multiple of twice its height; otherwise the diagonal lines wind around several times
@@ -61,7 +61,7 @@ func add_line(start: Vector2i, direction: Vector2i) -> void:
 	lines.append(line)
 
 
-# Whether the tile at coord is part of a run of at least MIN_RUN revealed RESONANT_ELEMENT tiles
+# Whether the tile at coord is part of a run of at least MIN_RUN known RESONANT_ELEMENT tiles
 # in a row along a line through it.
 func is_resonant(grid: TileGrid, coord: Vector2i) -> bool:
 	var key := torus.canonical(coord)
@@ -109,7 +109,7 @@ func _run_length(grid: TileGrid, key: Vector2i, direction: Vector2i) -> int:
 
 
 func _yields(grid: TileGrid, coord: Vector2i) -> bool:
-	return grid.has_tile(coord) and RESONANT_ELEMENT in grid.get_tile(coord).elements
+	return grid.is_known(coord) and RESONANT_ELEMENT in grid.get_tile(coord).elements
 
 
 # Whether coord is on, or next to, a line along axis.
