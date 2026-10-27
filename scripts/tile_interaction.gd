@@ -7,8 +7,10 @@ extends Node
 # iron tile where ley lines cross). Animated actions hand their tween to the ActionLock, which
 # blocks input until they finish.
 #
-# S enters detect mode, where there's an unknown tile within detect_radius of the player: the
-# player can't move or take other actions (turning still works) until S or Esc leaves it.
+# S enters detect mode, where there's an unknown tile within detect_radius of the player (see
+# Detection). The player can't move, turn, or take other actions there: the direction keys (and S,
+# for the player's own tile) select a tile, the number keys guess its elements, Enter or Space
+# submits, and Esc leaves. It ends by itself once every tile in reach is known.
 
 signal detecting_changed(detecting: bool)
 
@@ -21,15 +23,16 @@ signal detecting_changed(detecting: bool)
 
 ## The planet being explored, for scrying; assigned by the scene. tiles shows its grid.
 var surface: PlanetSurface
-var detecting := false
+## The detect mode session, or null outside detect mode.
+var detection: Detection
+var detecting: bool:
+	get:
+		return detection != null
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if detecting:
-		if event.is_action_pressed("detect") or event.is_action_pressed("ui_cancel"):
-			_set_detecting(false)
-			get_viewport().set_input_as_handled()
-		elif [&"extract", &"push", &"scry", &"build_tower"].any(event.is_action_pressed):
+		if _detect_input(event):
 			get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("detect"):
@@ -60,11 +63,12 @@ func can_build_tower_here() -> bool:
 	return Towers.can_build_at(tiles.grid, tiles.ley_lines, player.mover.coord)
 
 
-# The tiles detect mode covers, around the player.
+# The tiles detect mode covers, around the player: the player's own first.
 func detect_area() -> Array[Vector2i]:
-	var coords: Array[Vector2i] = []
+	var coords: Array[Vector2i] = [player.mover.coord]
 	for offset in Hex.hexagon(detect_radius):
-		coords.append(player.mover.coord + offset)
+		if offset != Vector2i.ZERO:
+			coords.append(player.mover.coord + offset)
 	return coords
 
 
@@ -143,12 +147,47 @@ func _try_detect() -> void:
 	if not can_detect_here():
 		print("Nothing unknown to detect around %s" % [player.mover.coord])
 		return
-	_set_detecting(true)
+	detection = Detection.new(tiles.grid, detect_area())
+	player.mover.frozen = true
+	print("Detecting %s" % [detection.elements])
+	detecting_changed.emit(true)
 
 
-# Detect mode holds the player in place.
-func _set_detecting(value: bool) -> void:
-	detecting = value
-	player.mover.frozen = value
-	print("Detect mode %s" % ["on" if value else "off"])
-	detecting_changed.emit(value)
+# Discards the session's guesses and results.
+func _end_detect() -> void:
+	detection = null
+	player.mover.frozen = false
+	print("Stopped detecting")
+	detecting_changed.emit(false)
+
+
+# Detect mode's keys; returns whether event was one of them (or one it blocks). The inventory still
+# gets through.
+func _detect_input(event: InputEvent) -> bool:
+	var pointy_top := player.board.pointy_top
+	var dir: Variant = HexPlayerController.move_direction(event, pointy_top)
+	if event.is_action_pressed("ui_cancel"):
+		_end_detect()
+	elif event.is_action_pressed("submit_guess"):
+		var learned := detection.submit()
+		print("Detected %s" % [learned.map(func(k: TileKind) -> String: return k.display_name)])
+		if detection.is_done():
+			_end_detect()
+	elif event.is_action_pressed("detect"):
+		detection.select(player.mover.coord)
+	elif dir != null:
+		detection.select(player.mover.coord + Hex.delta(dir, pointy_top))
+	elif _guess_index(event) >= 0:
+		detection.toggle(_guess_index(event))
+	else:
+		return HexPlayerController.turn_step(event, pointy_top) != 0 \
+			or [&"extract", &"push", &"scry", &"build_tower"].any(event.is_action_pressed)
+	return true
+
+
+# Index in the element list of the number key pressed (guess_1 ... guess_10, for 1-9 then 0), or -1.
+func _guess_index(event: InputEvent) -> int:
+	for i in Detection.MAX_ELEMENTS:
+		if event.is_action_pressed("guess_%d" % (i + 1)):
+			return i
+	return -1

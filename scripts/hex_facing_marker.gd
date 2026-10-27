@@ -3,19 +3,13 @@ extends Node2D
 
 # Shows a HexPlayerController's position and facing without a sprite: a white outline around its
 # hex, plus a small triangle centered on the faced edge, pointing out of the hex. Attach as a child
-# of the controller; it defaults to this node's parent. With outline_radius above 0 the outline
-# grows to take in every hex that many steps around (e.g. the detect mode area).
+# of the controller; it defaults to this node's parent.
 
 @export var controller: HexPlayerController
 @export var color: Color = Color.WHITE
 @export var line_width: float = 3.0
 ## Triangle base width and height, in pixels.
 @export var triangle_size: Vector2 = Vector2(14.0, 9.0)
-## Steps out from the controller's hex the outline takes in; 0 outlines just its hex.
-@export var outline_radius: int = 0:
-	set(value):
-		outline_radius = value
-		queue_redraw()
 
 var _board: HexBoard
 
@@ -43,16 +37,9 @@ func triangle_points() -> PackedVector2Array:
 	return PackedVector2Array([edge_mid + side, edge_mid - side, edge_mid + dir * triangle_size.y])
 
 
-# The outline, local to the hex center: at the board's tile size so it hugs a single tile, or
-# around the cells of the whole area.
-func outline_points() -> PackedVector2Array:
-	if outline_radius <= 0:
-		return _board.corner_points(_board.tile_scale)
-	return _board.region_outline(Hex.hexagon(outline_radius))
-
-
 func _draw() -> void:
 	if controller.mover == null:
 		return
-	draw_polyline(outline_points(), color, line_width)
+	# Outline at the board's tile size so it hugs the tile.
+	draw_polyline(_board.corner_points(_board.tile_scale), color, line_width)
 	draw_colored_polygon(triangle_points(), color)

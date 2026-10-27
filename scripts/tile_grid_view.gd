@@ -6,7 +6,9 @@ extends Node2D
 # (hex_color, or ley_color where it resonates with a ley line or is on an activated one); kinds
 # whose icon has an entry in ICONS draw that sprite-sheet icon over it. Icons with an entry in ICON_ANIMS step through it, all in sync off one clock. Tile size comes
 # from the board's tile_scale. Tiles whose elements are unknown draw their icon in unknown_icon_color
-# (still animated). Tiles that cost aether to step onto show the cost as a number and
+# (still animated). In detect mode (detection) tiles outside its area shrink and hold still, tiles
+# partly guessed right fill with partial_color, guesses show as their number keys in the lower
+# right, and the selected tile is outlined. Tiles that cost aether to step onto show the cost as a number and
 # a blue dot in their upper left; the landing tile is outlined. The occupied (player's) tile's icon
 # sits higher, clear of the player's sprite.
 
@@ -34,6 +36,15 @@ extends Node2D
 @export var move_cost_font_size: int = 14
 @export var move_cost_dot_color: Color = Color(0.3, 0.6, 1.0)
 @export var move_cost_dot_radius: float = 3.5
+## Detect mode: drawn size of tiles outside its area, how long they take to shrink or grow back,
+## fill of tiles partly guessed right, guess numbers, and the selected tile's outline.
+@export var detect_outside_scale: float = 0.25
+@export var detect_shrink_seconds: float = 0.15
+@export var partial_color: Color = Color(0.72, 0.53, 0.04)
+@export var guess_font_size: int = 14
+@export var guess_color: Color = Color(0.55, 0.85, 1.0)
+@export var selection_color: Color = Color.WHITE
+@export var selection_line_width: float = 3.0
 ## Outline around the landing tile.
 @export var landing_color: Color = Color(1.0, 0.85, 0.1)
 @export var landing_line_width: float = 3.0
@@ -105,6 +116,24 @@ var occupied: Variant = null:
 		queue_redraw()
 ## Seconds since the animations started.
 var anim_time: float = 0.0
+## The detect mode session to show, or null outside detect mode.
+var detection: Detection:
+	set(value):
+		if detection != null:
+			detection.changed.disconnect(queue_redraw)
+		detection = value
+		if detection != null:
+			detection.changed.connect(queue_redraw)
+			_detect_area.clear()
+			for c in detection.area:
+				_detect_area[c] = true
+		_shrink_tween(1.0 if detection != null else 0.0)
+		queue_redraw()
+## 0..1: how far tiles outside the detect area have shrunk toward detect_outside_scale.
+var detect_shrink: float = 0.0:
+	set(value):
+		detect_shrink = value
+		queue_redraw()
 ## 0..1 progress of the swap animation, if one is playing (see animate_swap).
 var swap_progress: float = 1.0:
 	set(value):
@@ -124,6 +153,10 @@ var _unknown_icons: Dictionary[StringName, Texture2D] = {}
 # [remaining, center] so they follow their icons through swaps.
 var _overlay: Node2D
 var _cooldown_labels: Array[Array] = []
+var _guess_labels: Array[Array] = []
+# Stored copies of the detect area's coords; kept while outside tiles grow back after detect mode.
+var _detect_area: Dictionary[Vector2i, bool] = {}
+var _shrink: Tween
 
 @onready var board: HexBoard = get_parent() as HexBoard
 
@@ -233,12 +266,34 @@ func _on_tapped_changed(_coord: Vector2i, _remaining: int) -> void:
 	queue_redraw()
 
 
-func _on_known_changed(_coord: Vector2i, _known: bool) -> void:
+func _on_known_changed(_kind: TileKind, _known: bool) -> void:
 	queue_redraw()
+
+
+func _shrink_tween(to: float) -> void:
+	if _shrink != null:
+		_shrink.kill()
+	_shrink = create_tween()
+	_shrink.tween_property(self, "detect_shrink", to, detect_shrink_seconds)
+	if to == 0.0:
+		_shrink.tween_callback(func() -> void:
+			if detection == null:
+				_detect_area.clear())
+
+
+# Whether coord is outside detect mode's area (shrunk, or shrinking back); false outside detect mode.
+func is_outside_detect(coord: Vector2i) -> bool:
+	return not _detect_area.is_empty() and not _detect_area.has(grid.canonical(coord))
+
+
+# Drawn size of the tile at coord, relative to normal.
+func tile_scale_at(coord: Vector2i) -> float:
+	return lerpf(1.0, detect_outside_scale, detect_shrink) if is_outside_detect(coord) else 1.0
 
 
 func _draw() -> void:
 	_cooldown_labels.clear()
+	_guess_labels.clear()
 	_overlay.queue_redraw()  # deferred, so it runs after this, still this frame
 	if grid == null:
 		return
@@ -247,7 +302,8 @@ func _draw() -> void:
 	var swapping_keys := [grid.canonical(_swap_from), grid.canonical(_swap_to)] if _swapping else []
 	for coord in grid.tiles:
 		var center := board.hex_to_local(grid.nearest(coord, view_center))
-		draw_set_transform(center)
+		var tile_size := tile_scale_at(coord)
+		draw_set_transform(center, 0.0, Vector2(tile_size, tile_size))
 		draw_colored_polygon(tile, fill_color(coord))
 		draw_set_transform(Vector2.ZERO)
 		if not coord in swapping_keys:
@@ -263,18 +319,26 @@ func _draw() -> void:
 		_draw_contents(_swap_to, from_pos.lerp(to_pos, swap_progress), from_shift.lerp(to_shift, swap_progress))
 	if landing != null and grid.has_tile(landing):
 		draw_set_transform(board.hex_to_local(grid.nearest(landing, view_center)))
-		draw_polyline(board.corner_points(landing_scale), landing_color, landing_line_width)
+		draw_polyline(board.corner_points(landing_scale * tile_scale_at(landing)), landing_color, landing_line_width)
+		draw_set_transform(Vector2.ZERO)
+	if detection != null:
+		draw_set_transform(board.hex_to_local(grid.nearest(detection.selected, view_center)))
+		draw_polyline(board.corner_points(board.tile_scale), selection_color, selection_line_width)
 		draw_set_transform(Vector2.ZERO)
 
 
 func _draw_overlay() -> void:
 	for label in _cooldown_labels:
 		_draw_cooldown(label[0], label[1])
+	for label in _guess_labels:
+		_draw_guesses(label[0], label[1])
 
 
-# Hex fill for the tile at coord: resonant tiles stand out, everything else is hex_color. The ley
-# lines themselves are never drawn.
+# Hex fill for the tile at coord: partly guessed tiles in detect mode, then resonant tiles, stand
+# out; everything else is hex_color. The ley lines themselves are never drawn.
 func fill_color(coord: Vector2i) -> Color:
+	if detection != null and detection.is_partial(coord):
+		return partial_color
 	if ley_lines != null and (ley_lines.is_active(coord) or ley_lines.is_resonant(grid, coord)):
 		return ley_color
 	return hex_color
@@ -288,25 +352,36 @@ func icon_shift(coord: Vector2i) -> Vector2:
 
 
 # Draws the icon (offset by icon_offset, and tapped cooldown) and move cost of the tile at coord,
-# centered on center.
+# centered on center, plus its guesses in detect mode. Tiles outside the detect area only draw
+# their icon, shrunk and still.
 func _draw_contents(coord: Vector2i, center: Vector2, icon_offset: Vector2) -> void:
 	var kind := grid.get_tile(coord)
+	var outside := is_outside_detect(coord)
 	if has_icon(kind):
 		var tapped := grid.is_tapped(coord)
-		_draw_icon(kind.icon, center + icon_offset, tapped, grid.is_known(coord))
-		if tapped:
+		_draw_icon(kind.icon, center + icon_offset, tapped, grid.is_known(coord), tile_scale_at(coord), outside)
+		if tapped and not outside:
 			_cooldown_labels.append([grid.cooldown(coord), center])
+	if outside:
+		return
 	if grid.move_cost(coord) > 0:
 		_draw_move_cost(grid.move_cost(coord), center)
+	if detection != null and not detection.guessed(coord).is_empty():
+		var numbers: Array[String] = []
+		for element in detection.guessed(coord):
+			numbers.append(str(Detection.number(detection.elements.find(element))))
+		_guess_labels.append([" ".join(numbers), center])
 
 
-# Tapped icons are greyscale and hold still; unknown ones are flat unknown_icon_color.
-func _draw_icon(icon: StringName, center: Vector2, tapped: bool, known: bool = true) -> void:
+# Tapped icons are greyscale and hold still; unknown ones are flat unknown_icon_color. size scales
+# the icon about center; still ones hold their default pose.
+func _draw_icon(icon: StringName, center: Vector2, tapped: bool, known: bool = true, size: float = 1.0,
+		still: bool = false) -> void:
 	var region := ICONS[icon]
-	var icon_size := region.size * icon_scale
+	var icon_size := region.size * icon_scale * size
 	var anim := func(channel: StringName) -> float:
-		return ANIM_DEFAULTS[channel] if tapped else anim_value(icon, channel)
-	var shift := Vector2(anim.call(&"x"), anim.call(&"y")) * icon_scale
+		return ANIM_DEFAULTS[channel] if tapped or still else anim_value(icon, channel)
+	var shift := Vector2(anim.call(&"x"), anim.call(&"y")) * icon_scale * size
 	var pivot := center + Vector2(0.0, icon_size.y / 2.0) + shift  # bottom center
 	draw_set_transform(pivot, deg_to_rad(anim.call(&"rotation")), Vector2(1.0, anim.call(&"scale_y")))
 	var rect := Rect2(Vector2(-icon_size.x / 2.0, -icon_size.y), icon_size)
@@ -336,6 +411,17 @@ func _draw_cooldown(remaining: int, center: Vector2) -> void:
 	var text := str(remaining)
 	_overlay.draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, cooldown_font_size, 4, Color.BLACK)
 	_overlay.draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, cooldown_font_size, cooldown_color)
+
+
+# Number keys of a tile's guesses (e.g. "1 3"), in its lower right, mirroring the cooldown. Drawn on
+# the overlay, over the player's sprite.
+func _draw_guesses(text: String, center: Vector2) -> void:
+	var font := ThemeDB.fallback_font
+	var half := _tile_half()
+	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, guess_font_size).x
+	var pos := center + Vector2(0.52 * half.x - width, 0.83 * half.y)  # baseline start
+	_overlay.draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, guess_font_size, 4, Color.BLACK)
+	_overlay.draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, guess_font_size, guess_color)
 
 
 # Cost number with a blue dot after it, in the tile's upper left.

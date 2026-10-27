@@ -215,6 +215,23 @@ horizontal_alignment = 1
 vertical_alignment = 1
 text_overrun_behavior = 3
 
+[node name="DetectPanel" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout/Top"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="DetectTitle" type="Label" parent="UI/SidePanel/Margin/Layout/Top/DetectPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Detecting"
+horizontal_alignment = 1
+
+[node name="DetectElements" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout/Top/DetectPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
 [node name="AetherBar" type="ProgressBar" parent="UI/SidePanel/Margin/Layout/Top"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 28)
@@ -382,6 +399,30 @@ theme_override_font_sizes/font_size = 16
 theme_override_styles/normal = SubResource("StyleBoxFlat_ley_line")
 text = "ley line detected"
 horizontal_alignment = 1
+
+[node name="DetectHints" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout/Bottom"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SelectHint" type="Label" parent="UI/SidePanel/Margin/Layout/Bottom/DetectHints"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Numpad – Select"
+
+[node name="SubmitHint" type="Label" parent="UI/SidePanel/Margin/Layout/Bottom/DetectHints"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Enter / Space – Submit"
+
+[node name="LeaveHint" type="Label" parent="UI/SidePanel/Margin/Layout/Bottom/DetectHints"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Esc – Leave"
 
 [node name="InventoryPanel" parent="UI" unique_id=189433725 instance=ExtResource("6_inventory")]
 

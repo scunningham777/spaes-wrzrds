@@ -10,7 +10,8 @@ extends Node2D
 # (NW/NE/SW/SE) in both orientations.
 # Flat-top hexes have no E/W neighbors, so W/X are the N/S movement keys and A/D turn.
 # Pointy-top hexes have no N/S neighbors, so A/D are the E/W movement keys and W/X turn.
-# S / Numpad5 is the detect action (TileInteraction), not movement.
+# S / Numpad5 is the detect action (TileInteraction), not movement; in detect mode it selects the
+# player's own tile.
 #
 # Input actions are named by key position (hex_up = W/Numpad8/Up, etc.) since their meaning
 # depends on orientation.
@@ -35,31 +36,40 @@ func _ready() -> void:
 	_on_facing_changed(mover.facing)
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	var move_dir: Variant = null  # Hex.Compass, or null
-	var turn_step := 0
-
+# The direction (Hex.Compass) a key press moves in, or null if it doesn't move.
+static func move_direction(event: InputEvent, pointy_top: bool) -> Variant:
 	# Diagonals: same four compass labels in both orientations.
-	if event.is_action_pressed("hex_nw"): move_dir = Hex.Compass.NW
-	elif event.is_action_pressed("hex_ne"): move_dir = Hex.Compass.NE
-	elif event.is_action_pressed("hex_sw"): move_dir = Hex.Compass.SW
-	elif event.is_action_pressed("hex_se"): move_dir = Hex.Compass.SE
-	elif board.pointy_top:
-		if event.is_action_pressed("hex_left"): move_dir = Hex.Compass.W
-		elif event.is_action_pressed("hex_right"): move_dir = Hex.Compass.E
-		elif event.is_action_pressed("hex_up"): turn_step = -1
-		elif event.is_action_pressed("hex_down"): turn_step = 1
+	if event.is_action_pressed("hex_nw"): return Hex.Compass.NW
+	if event.is_action_pressed("hex_ne"): return Hex.Compass.NE
+	if event.is_action_pressed("hex_sw"): return Hex.Compass.SW
+	if event.is_action_pressed("hex_se"): return Hex.Compass.SE
+	if pointy_top:
+		if event.is_action_pressed("hex_left"): return Hex.Compass.W
+		if event.is_action_pressed("hex_right"): return Hex.Compass.E
 	else:
-		if event.is_action_pressed("hex_up"): move_dir = Hex.Compass.N
-		elif event.is_action_pressed("hex_down"): move_dir = Hex.Compass.S
-		elif event.is_action_pressed("hex_left"): turn_step = -1
-		elif event.is_action_pressed("hex_right"): turn_step = 1
+		if event.is_action_pressed("hex_up"): return Hex.Compass.N
+		if event.is_action_pressed("hex_down"): return Hex.Compass.S
+	return null
+
+
+# The turn (+1 clockwise, -1 counter-clockwise) a key press makes, or 0 if it doesn't turn.
+static func turn_step(event: InputEvent, pointy_top: bool) -> int:
+	var back := &"hex_up" if pointy_top else &"hex_left"
+	var on := &"hex_down" if pointy_top else &"hex_right"
+	if event.is_action_pressed(back): return -1
+	if event.is_action_pressed(on): return 1
+	return 0
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	var move_dir: Variant = move_direction(event, board.pointy_top)  # Hex.Compass, or null
+	var turn := turn_step(event, board.pointy_top)
 
 	if move_dir != null:
 		mover.move(move_dir)
 		get_viewport().set_input_as_handled()
-	elif turn_step != 0:
-		mover.turn(turn_step)
+	elif turn != 0:
+		mover.turn(turn)
 		print("Facing %s (%s)" % [Hex.Compass.keys()[mover.facing_compass()], mover.facing])
 		get_viewport().set_input_as_handled()
 

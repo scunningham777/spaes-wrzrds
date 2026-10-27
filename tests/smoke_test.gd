@@ -142,6 +142,11 @@ func _test_core_logic() -> void:
 	var gold := TileKind.new(&"gold_ore", "Gold Ore", &"gold_ore", [&"gold"])
 	var iron := TileKind.new(&"iron_deposit", "Iron Deposit", &"iron_deposit", [&"iron"])
 	var rusty_gold := TileKind.new(&"rusty_gold", "Rusty Gold", &"gold_ore", [&"gold", &"iron"])
+	# The extraction grids below know these kinds, so their tiles can be extracted.
+	var know_all := func(grid: TileGrid) -> TileGrid:
+		for kind: TileKind in [timber, gold, iron, rusty_gold]:
+			grid.set_kind_known(kind)
+		return grid
 
 	# Swap (TileGrid.try_swap).
 	var pg := _hexagon_grid(2)
@@ -170,7 +175,7 @@ func _test_core_logic() -> void:
 		"core: Hex.line is the start plus n steps")
 
 	# Extract + inventory.
-	var eg := _hexagon_grid(1)
+	var eg: TileGrid = know_all.call(_hexagon_grid(1))
 	var at := func(c: Vector2i) -> Array[Vector2i]: return [c]
 	eg.set_tile(Vector2i.ZERO, timber)
 	_check(eg.try_extract(at.call(Vector2i.ZERO)) == [&"wood"] and eg.get_tile(Vector2i.ZERO) == timber
@@ -179,7 +184,7 @@ func _test_core_logic() -> void:
 	_check(eg.try_extract(at.call(Vector2i(1, 0))).is_empty(), "extract: Empty tile yields nothing")
 	_check(eg.try_extract(at.call(Vector2i(9, 9))).is_empty(), "extract: off-grid yields nothing")
 	# Lines: every tile must be free and share an element; success taps them all.
-	var lg := _hexagon_grid(2)
+	var lg: TileGrid = know_all.call(_hexagon_grid(2))
 	var line := Hex.line(Vector2i.ZERO, Vector2i(0, 1), 2)  # (0,0) (0,1) (0,2)
 	for c in line:
 		lg.set_tile(c, iron)
@@ -195,7 +200,7 @@ func _test_core_logic() -> void:
 		"extract: a matching line taps every tile")
 	_check(not lg.can_extract(Hex.line(Vector2i(0, 1), Vector2i(0, 1), 2)), "extract: a line running off the grid fails")
 	# Multiple elements: the line yields whatever every tile has, in the first tile's order.
-	var mg := _hexagon_grid(2)
+	var mg: TileGrid = know_all.call(_hexagon_grid(2))
 	var pair := Hex.line(Vector2i.ZERO, Vector2i(0, 1), 1)  # (0,0) (0,1)
 	mg.set_tile(pair[0], rusty_gold)
 	mg.set_tile(pair[1], rusty_gold)
@@ -221,28 +226,23 @@ func _test_core_logic() -> void:
 	eg.tick_cooldowns()
 	_check(not eg.is_tapped(Vector2i(1, 0)) and untapped == [Vector2i(1, 0)]
 		and eg.try_extract(at.call(Vector2i(1, 0))) == [&"wood"], "tapped: 5th tick untaps it, extractable again")
-	# Known: revealed tiles start unknown and yield nothing; knowing moves with the tile on a swap,
-	# and a replaced tile is known.
+	# Known: the player learns kinds, not tiles. Until then a kind's tiles are unknown and yield
+	# nothing; kinds that yield nothing are always known.
 	var kg := _hexagon_grid(1)
 	var stone_kind := TileKind.new(&"stone_outcrop", "Stone Outcrop", &"", [&"stone"] as Array[StringName])
-	kg.add_tile(Vector2i(5, 5), stone_kind)
-	var known_changes: Array[Vector2i] = []
-	kg.known_changed.connect(func(c: Vector2i, _known: bool) -> void: known_changes.append(c))
-	_check(not kg.is_known(Vector2i(5, 5)) and not kg.can_extract(at.call(Vector2i(5, 5)))
-		and kg.any_unknown(at.call(Vector2i(5, 5))), "known: a revealed tile is unknown and yields nothing")
-	kg.set_known(Vector2i(5, 5))
-	_check(kg.is_known(Vector2i(5, 5)) and kg.try_extract(at.call(Vector2i(5, 5))) == [&"stone"]
-		and known_changes == [Vector2i(5, 5)], "known: once known it yields its element")
-	kg.set_known(Vector2i(9, 9))
-	_check(not kg.is_known(Vector2i(9, 9)) and known_changes.size() == 1
-		and not kg.any_unknown(at.call(Vector2i(9, 9))), "known: off-grid coords are never known or unknown")
-	kg.set_tile(Vector2i.ZERO, timber)
-	_check(kg.is_known(Vector2i.ZERO) and not kg.is_known(Vector2i(1, 0)), "known: a replaced tile is known")
-	# (1, 0) is Empty and unknown; swap it with the known timber.
-	_check(kg.try_swap(Vector2i.ZERO, Vector2i(1, 0)) and kg.is_known(Vector2i(1, 0))
-		and not kg.is_known(Vector2i.ZERO), "known: state moves with the tile on a swap")
-	_check(not kg.any_unknown([Vector2i(1, 0), Vector2i(5, 5)] as Array[Vector2i])
-		and kg.any_unknown([Vector2i(1, 0), Vector2i.ZERO] as Array[Vector2i]), "known: any_unknown finds an unknown tile")
+	kg.set_tile(Vector2i.ZERO, stone_kind)
+	kg.set_tile(Vector2i(1, 0), stone_kind)
+	var known_changes: Array[TileKind] = []
+	kg.known_changed.connect(func(k: TileKind, _known: bool) -> void: known_changes.append(k))
+	_check(not kg.is_known(Vector2i.ZERO) and not kg.can_extract(at.call(Vector2i.ZERO))
+		and kg.any_unknown(at.call(Vector2i.ZERO)), "known: a kind starts unknown, and its tiles yield nothing")
+	_check(kg.is_known(Vector2i(0, 1)) and not kg.any_unknown(at.call(Vector2i(0, 1)))
+		and kg.is_kind_known(Towers.kind(Towers.BASIC)), "known: Empty tiles and towers are always known")
+	_check(not kg.is_known(Vector2i(9, 9)) and not kg.any_unknown(at.call(Vector2i(9, 9))),
+		"known: off-grid coords are never known or unknown")
+	kg.set_kind_known(stone_kind)
+	_check(kg.is_known(Vector2i.ZERO) and kg.is_known(Vector2i(1, 0)) and kg.try_extract(at.call(Vector2i.ZERO)) == [&"stone"]
+		and known_changes == [stone_kind], "known: knowing a kind knows all its tiles")
 	var frozen := HexMover.new(HexLayout.new(false))
 	frozen.frozen = true
 	var frozen_facing := frozen.facing
@@ -251,6 +251,48 @@ func _test_core_logic() -> void:
 		"core: a frozen mover can't move but can turn")
 	frozen.frozen = false
 	_check(frozen.move(Hex.Compass.N), "core: an unfrozen mover moves again")
+	# Detection: Wordle-style guessing of the unknown kinds in an area, the player's tile first.
+	var dg := _hexagon_grid(1)
+	dg.set_tile(Vector2i.ZERO, iron)
+	dg.set_tile(Vector2i(0, 1), iron)
+	dg.set_tile(Vector2i(1, 0), rusty_gold)
+	dg.set_tile(Vector2i(-1, 0), timber)
+	var det_area: Array[Vector2i] = [Vector2i.ZERO]
+	for d in Hex.hexagon(1):
+		if d != Vector2i.ZERO:
+			det_area.append(d)
+	var det := Detection.new(dg, det_area)
+	_check(det.elements == [&"gold", &"iron", &"wood"] and det.selected == Vector2i.ZERO and det.targets().size() == 4,
+		"detect: elements of the unknown tiles, alphabetical; starts on the first coord (%s)" % [det.elements])
+	_check(Detection.number(0) == 1 and Detection.number(9) == 0, "detect: elements are numbered 1-9, then 0")
+	_check(not det.select(Vector2i(1, -1)) and not det.select(Vector2i(5, 5)) and det.selected == Vector2i.ZERO,
+		"detect: only unknown tiles in the area can be selected")
+	det.toggle(1)  # iron, for (0, 0)
+	_check(det.guessed(Vector2i(0, 1)) == [&"iron"], "detect: a guess counts for every tile of the kind")
+	det.select(Vector2i(1, 0))  # rusty gold: gold and iron
+	det.toggle(1)
+	det.toggle(1)
+	_check(det.guessed(Vector2i(1, 0)).is_empty(), "detect: toggling again takes a guess back")
+	det.toggle(1)  # iron only: partly right
+	det.select(Vector2i(-1, 0))
+	det.toggle(0)  # gold on timber: all wrong
+	_check(det.submit() == [iron] and dg.is_kind_known(iron) and not dg.is_kind_known(rusty_gold)
+		and det.guessed(Vector2i.ZERO).is_empty(), "detect: an exact guess makes the kind known")
+	_check(det.is_partial(Vector2i(1, 0)) and not det.is_partial(Vector2i(-1, 0)) and not det.is_partial(Vector2i.ZERO),
+		"detect: some right is partial, all wrong isn't")
+	_check(det.guessed(Vector2i(1, 0)) == [&"iron"] and det.is_available(&"iron"), "detect: wrong guesses stay to adjust")
+	det.select(Vector2i(1, 0))
+	det.toggle(0)
+	det.select(Vector2i(-1, 0))
+	det.toggle(2)  # gold and wood on timber: right, plus an extra
+	_check(det.guessed(Vector2i(1, 0)) == [&"gold", &"iron"] and det.submit() == [rusty_gold]
+		and det.is_partial(Vector2i(-1, 0)) and not det.is_partial(Vector2i(1, 0)),
+		"detect: a new submit replaces the results; right plus an extra is partial")
+	_check(not det.is_available(&"gold") and not det.is_available(&"iron") and det.is_available(&"wood")
+		and det.elements.size() == 3 and det.guessed(Vector2i(-1, 0)) == [&"wood"],
+		"detect: elements nothing unknown has any more stay listed but drop out, guesses of them too")
+	_check(not det.toggle(0) and det.guessed(Vector2i(-1, 0)) == [&"wood"], "detect: dropped elements can't be guessed")
+	_check(det.submit() == [timber] and det.is_done() and det.partial.is_empty(), "detect: done once everything is known")
 	var inv := Inventory.new()
 	var inv_changes := [0]
 	inv.changed.connect(func() -> void: inv_changes[0] += 1)
@@ -382,6 +424,7 @@ func _test_ley_lines() -> void:
 	var iron := TileKind.new(&"iron_deposit", "Iron Deposit", &"iron_deposit", [&"iron"])
 	var gold := TileKind.new(&"gold_ore", "Gold Ore", &"gold_ore", [&"gold"])
 	var g := TileGrid.new(torus)
+	g.set_kind_known(iron)
 	for c in [Vector2i(-1, 0), Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(5, 0), Vector2i(6, 0)]:
 		g.add_tile(c, gold)
 	g.set_tile(Vector2i.ZERO, iron)
@@ -393,10 +436,10 @@ func _test_ley_lines() -> void:
 	_check(ley.is_resonant(g, Vector2i.ZERO) and ley.is_resonant(g, Vector2i(1, 0))
 		and not ley.is_resonant(g, Vector2i(0, 1)) and not ley.is_resonant(g, Vector2i(-1, 0)),
 		"ley: two iron in a row along the line both resonate, nothing else")
-	g.set_known(Vector2i(1, 0), false)
+	g.set_kind_known(iron, false)
 	_check(not ley.is_resonant(g, Vector2i.ZERO) and not ley.is_resonant(g, Vector2i(1, 0)),
 		"ley: iron only counts once it's known")
-	g.set_known(Vector2i(1, 0))
+	g.set_kind_known(iron)
 	g.set_tile(Vector2i(5, 0), iron)
 	g.set_tile(Vector2i(6, 0), iron)
 	var off := LeyLines.new(torus)
@@ -406,8 +449,7 @@ func _test_ley_lines() -> void:
 	var seam := TileGrid.new(torus)
 	seam.add_tile(Vector2i(47, 0), iron)  # (-1, 0), one step back from (0, 0) along NE, stored across the wrap
 	seam.add_tile(Vector2i.ZERO, iron)
-	for c: Vector2i in seam.tiles:
-		seam.set_known(c)
+	seam.set_kind_known(iron)
 	_check(ley.is_resonant(seam, Vector2i.ZERO) and ley.is_resonant(seam, Vector2i(-1, 0)),
 		"ley: runs carry across the wrap")
 
@@ -587,7 +629,8 @@ func _test_enter_planet() -> void:
 		"planet: %d tiles for radius %d" % [tiles.grid.tiles.size(), radius])
 	_check(tiles.grid.tiles.values().any(func(k: TileKind) -> bool: return k != TileKind.EMPTY),
 		"planet: tiles are generated, not all Empty")
-	_check(tiles.grid.known.is_empty() and (current_scene.get_node("%TileInfo") as TileInfo).shown_yield() == "Elements: unknown",
+	_check(tiles.grid.known_kinds.is_empty() and not tiles.grid.tiles.keys().any(tiles.grid.is_known)
+		and (current_scene.get_node("%TileInfo") as TileInfo).shown_yield() == "Elements: unknown",
 		"known: every tile's elements are unknown on landing")
 	var detect_hint: Label = current_scene.get_node("%DetectHint")
 	_check(detect_hint.visible and detect_hint.text == "S – Detect", "detect: hint shows next to unknown tiles")
@@ -601,6 +644,10 @@ func _test_enter_planet() -> void:
 	_check(not unknown_pixels.is_empty() and unknown_pixels.all(func(c: Color) -> bool:
 		return absf(c.r - tiles.unknown_icon_color.r) < 0.01 and c.r == c.g and c.g == c.b),  # 8-bit channels
 		"known: unknown icons draw in light gray")
+	# The checks below extract, so learn every kind (detect mode gets its own unknown tiles later).
+	for kind in tiles.grid.kinds:
+		tiles.grid.set_kind_known(kind)
+	_check(not detect_hint.visible, "detect: no hint with nothing unknown around")
 	var aether_bar: ProgressBar = current_scene.get_node("%AetherBar")
 	var aether_label: Label = current_scene.get_node("%AetherLabel")
 	var aether := func() -> int: return _game().state.inventory.count(Aether.ITEM)
@@ -755,7 +802,7 @@ func _test_enter_planet() -> void:
 		"focus: box shows Staff with R – Extract (%s)" % [focus_hints])
 	var general_hints: Array = current_scene.get_node("%Actions").get_children().filter(
 		func(l: Label) -> bool: return l.visible).map(func(l: Label) -> String: return l.text)
-	_check(general_hints == ["S – Detect", "F – Push"], "focus: Extract moved out of the general actions (%s)" % [general_hints])
+	_check(general_hints == ["F – Push"], "focus: Extract moved out of the general actions (%s)" % [general_hints])
 	_check(focus_box.global_position.y > (current_scene.get_node("%Actions") as Control).global_position.y
 		and focus_box.get_global_rect().end.y < divider.global_position.y, "focus: box sits between Push and the divider")
 	_press(KEY_R)
@@ -818,6 +865,7 @@ func _test_enter_planet() -> void:
 
 	# Two elements: tiles that both yield gold and iron give the staff's amount (1) of each.
 	var rusty_gold := TileKind.new(&"rusty_gold", "Rusty Gold", &"gold_ore", [&"gold", &"iron"])
+	tiles.grid.set_kind_known(rusty_gold)
 	tiles.grid.set_tile(Vector2i.ZERO, rusty_gold)  # setting also clears the tapped state
 	tiles.grid.set_tile(Vector2i(0, 1), rusty_gold)
 	_check(tile_info.shown_yield() == "Elements: Gold, Iron" and extract_hint.call() == "R – Extract: Gold, Iron",
@@ -869,50 +917,84 @@ func _test_enter_planet() -> void:
 	tri = marker.triangle_points()
 	_check(tri[2].x > 0.0 and tri[2].y < 0.0, "planet: facing triangle follows a turn to NE (%s)" % tri)
 
-	# Detect: next to an unknown tile S enters detect mode. The wizard's outline takes in the ring of
-	# tiles around them, and they can't move or take other actions (turning still works) until S or
-	# Esc leaves it.
+	# Detect: next to an unknown tile S enters detect mode, a guessing game for the ring around the
+	# wizard (flat-top, at (0, 2) on the edge: N, NE and NW are off the grid).
 	var interaction: Node = current_scene.get_node("TileInteraction")  # untyped: its script uses the Game autoload
-	var single_outline := marker.outline_points()
-	_check(interaction.can_detect_here() and detect_hint.visible, "detect: available at the edge, next to unknown tiles")
+	var detect_center := Vector2i(0, 2)
+	var detect_kinds := {Vector2i(0, 2): iron, Vector2i(0, 1): gold, Vector2i(1, 1): iron, Vector2i(-1, 2): timber}
+	for c: Vector2i in detect_kinds:
+		tiles.grid.set_tile(c, detect_kinds[c])
+	for kind in tiles.grid.kinds:
+		tiles.grid.set_kind_known(kind, false)
+	_check_coord(planet_wizard, detect_center, "detect: wizard at the edge")
+	_check(interaction.can_detect_here() and detect_hint.visible and detect_hint.text == "S – Detect",
+		"detect: hint shows next to unknown tiles")
+	var detect_panel: Control = current_scene.get_node("%DetectPanel")
+	var detect_list: Control = current_scene.get_node("%DetectElements")
+	var detect_labels := func() -> Array: return detect_list.get_children().map(func(l: Label) -> String: return l.text)
+	var outside := Vector2i(0, -2)
 	_press(KEY_S)
-	var ring := marker.outline_points()
-	_check(interaction.detecting and planet_wizard.mover.frozen and marker.outline_radius == interaction.detect_radius,
-		"detect: S enters detect mode")
-	# The 18 outer edges of the wizard's tile and its ring, closed, all clear of the wizard's own tile.
-	_check(ring.size() == 19 and ring[0] == ring[18] and Array(ring).all(func(p: Vector2) -> bool:
-		return p.length() > planet_board.hex_size * 1.5), "detect: outline takes in the ring around the wizard (%d points)" % ring.size())
-	_check(detect_hint.text == "S / Esc – Stop Detecting" and focus_box.modulate.a < 1.0
-		and (current_scene.get_node("%PushHint") as Control).modulate.a < 1.0,
-		"detect: hint says how to stop, blocked actions dim (%s)" % detect_hint.text)
-	var detect_coord := planet_wizard.mover.coord
-	var detect_aether: int = aether.call()
-	var detect_tiles := tiles.grid.tiles.duplicate()
-	var detect_cooldowns := tiles.grid.cooldowns.duplicate()
-	for key: Key in [KEY_W, KEY_X, KEY_Q, KEY_E, KEY_Z, KEY_C, KEY_KP_8, KEY_R, KEY_F, KEY_V, KEY_B]:
-		_press(key)
-	_check(planet_wizard.mover.coord == detect_coord and aether.call() == detect_aether and not lock.busy
-		and tiles.grid.tiles == detect_tiles and tiles.grid.cooldowns == detect_cooldowns and interaction.detecting,
-		"detect: moves and other actions are blocked")
-	var detect_facing := planet_wizard.mover.facing
-	_press(KEY_D)
-	_check(planet_wizard.mover.facing != detect_facing and interaction.detecting, "detect: turning still works")
-	_press(KEY_A)
-	_press(KEY_S)
-	_check(not interaction.detecting and not planet_wizard.mover.frozen and marker.outline_points() == single_outline
-		and focus_box.modulate.a == 1.0 and detect_hint.text == "S – Detect", "detect: S again leaves detect mode")
-	_press(KEY_S)
+	_check(interaction.detecting and planet_wizard.mover.frozen and tiles.detection == interaction.detection
+		and interaction.detection.selected == tiles.grid.canonical(detect_center), "detect: S enters detect mode, on the wizard's tile")
+	_check(detect_panel.visible and (current_scene.get_node("%DetectHints") as Control).visible and not aether_bar.visible
+		and not actions.visible and not focus_box.visible and not (current_scene.get_node("%TileInfo") as Control).visible
+		and not marker.visible, "detect: the side panel shows detecting instead, and the wizard's outline hides")
+	_check(detect_labels.call() == ["1 – Gold", "2 – Iron", "3 – Wood"], "detect: elements listed with number keys (%s)"
+		% [detect_labels.call()])
+	await _settle(tiles, &"detect_shrink")
+	_check(is_equal_approx(tiles.tile_scale_at(outside), tiles.detect_outside_scale) and tiles.tile_scale_at(Vector2i(0, 1)) == 1.0
+		and tiles.is_outside_detect(outside) and not tiles.is_outside_detect(detect_center),
+		"detect: tiles outside the ring shrink")
 	_press(KEY_ESCAPE)
-	_check(not interaction.detecting and current_scene.scene_file_path == "res://scenes/planet.tscn",
-		"detect: Esc leaves detect mode without leaving the planet")
-	var known_before_detect := tiles.grid.known.duplicate()
-	for c in interaction.detect_area():
-		tiles.grid.set_known(c)
+	_check(not interaction.detecting and not planet_wizard.mover.frozen and tiles.detection == null and marker.visible
+		and aether_bar.visible and not detect_panel.visible and current_scene.scene_file_path == "res://scenes/planet.tscn",
+		"detect: Esc leaves detect mode, not the planet")
+	await _settle(tiles, &"detect_shrink")
+	_check(tiles.tile_scale_at(outside) == 1.0 and not tiles.is_outside_detect(outside), "detect: outside tiles grow back")
+
 	_press(KEY_S)
-	_check(not interaction.can_detect_here() and not detect_hint.visible and not interaction.detecting,
-		"detect: unavailable with nothing unknown around")
-	for c in interaction.detect_area():
-		tiles.grid.set_known(c, known_before_detect.has(tiles.grid.canonical(c)))
+	var detection: Detection = interaction.detection
+	_check(detection.guesses.is_empty() and detection.partial.is_empty(), "detect: a new session starts fresh")
+	_press(KEY_2)  # Iron, on the wizard's iron tile
+	_check(detection.guessed(Vector2i(1, 1)) == [&"iron"], "detect: a guess counts for every like icon")
+	_press(KEY_X)  # S: the gold at (0, 1)
+	_press(KEY_W)  # N: off the grid, selection stays
+	_check(detection.selected == tiles.grid.canonical(Vector2i(0, 1)), "detect: direction keys select around the wizard")
+	_press(KEY_1)
+	_press(KEY_2)
+	_press(KEY_2)
+	_check(detection.guessed(Vector2i(0, 1)) == [&"gold"], "detect: number keys toggle guesses")
+	_check((detect_list.get_child(0) as Label).modulate.r == tiles.guess_color.r
+		and (detect_list.get_child(1) as Label).modulate == Color.WHITE, "detect: the selected tile's guesses are highlighted")
+	_press(KEY_Z)  # SW: the timber at (-1, 2)
+	_press(KEY_1)
+	_press(KEY_3)  # Gold and Wood: right, plus an extra
+	var detect_facing := planet_wizard.mover.facing
+	var detect_aether: int = aether.call()
+	for key: Key in [KEY_D, KEY_A, KEY_R, KEY_F, KEY_V, KEY_B]:
+		_press(key)
+	_check(planet_wizard.mover.coord == detect_center and planet_wizard.mover.facing == detect_facing
+		and aether.call() == detect_aether and not lock.busy and interaction.detecting,
+		"detect: no moving, turning, or other actions")
+	_press(KEY_ENTER)
+	_check(tiles.grid.is_known(detect_center) and tiles.grid.is_known(Vector2i(1, 1)) and tiles.grid.is_known(Vector2i(0, 1))
+		and not tiles.grid.is_known(Vector2i(-1, 2)) and interaction.detecting, "detect: Enter submits; exact guesses become known")
+	_check(tiles.fill_color(Vector2i(-1, 2)) == tiles.partial_color and tiles.fill_color(Vector2i(0, 1)) != tiles.partial_color,
+		"detect: a partly right tile turns gold")
+	_check(tiles.grid.tiles.keys().filter(func(c: Vector2i) -> bool: return tiles.grid.get_tile(c) == iron)
+		.all(tiles.grid.is_known), "detect: a detected icon is known across the planet")
+	_check((detect_list.get_child(0) as Label).modulate.a < 1.0 and (detect_list.get_child(1) as Label).modulate.a < 1.0
+		and (detect_list.get_child(2) as Label).modulate.a == 1.0 and detect_list.get_child_count() == 3,
+		"detect: detected elements stay listed, greyed out")
+	_press(KEY_1)  # Gold: greyed out
+	_check(detection.guessed(Vector2i(-1, 2)) == [&"wood"], "detect: greyed-out elements can't be guessed")
+	_press(KEY_SPACE)
+	_check(tiles.grid.is_known(Vector2i(-1, 2)) and not interaction.detecting and not planet_wizard.mover.frozen
+		and tiles.fill_color(Vector2i(-1, 2)) != tiles.partial_color and not detect_hint.visible,
+		"detect: Space submits too, and detect mode ends once the ring is known")
+	for kind in tiles.grid.kinds:
+		tiles.grid.set_kind_known(kind)
+	await _settle(tiles, &"detect_shrink")
 
 	# Ley lines: hidden, but iron runs along one turn plum.
 	_check(tiles.ley_lines != null and tiles.ley_lines.lines.size() >= 3, "ley: the planet view has the planet's lines")
@@ -931,10 +1013,10 @@ func _test_enter_planet() -> void:
 	_check(tiles.fill_color(Vector2i.ZERO) == tiles.ley_color and tiles.fill_color(Vector2i(0, -1)) == tiles.ley_color
 		and tiles.ley_color == Color(0.38, 0.03, 0.41) and tiles.fill_color(Vector2i(1, 0)) == tiles.hex_color,
 		"ley: an iron run along the line turns plum")
-	tiles.grid.set_known(Vector2i(0, -1), false)
+	tiles.grid.set_kind_known(iron, false)
 	_check(tiles.fill_color(Vector2i.ZERO) == tiles.hex_color and tiles.fill_color(Vector2i(0, -1)) == tiles.hex_color,
 		"ley: unknown iron doesn't turn plum")
-	tiles.grid.set_known(Vector2i(0, -1))
+	tiles.grid.set_kind_known(iron)
 	# Standing on a resonating tile, the tile info says so, in a plum badge under the elements.
 	var ley_info: TileInfo = current_scene.get_node("%TileInfo")
 	var ley_badge: Label = current_scene.get_node("%TileLeyLine")
@@ -1012,9 +1094,8 @@ func _test_enter_planet() -> void:
 	var camera: Camera2D = current_scene.get_node("Camera2D")
 	_check(camera.position == planet_wizard.position and tiles.view_center == planet_wizard.mover.coord,
 		"planet: camera and view follow the wizard")
-	var known_before_scry := tiles.grid.known.size()
 	_press(KEY_V)
-	_check(tiles.grid.known.size() == known_before_scry, "known: scried tiles are unknown")
+	_check(tiles.grid.tiles.keys().all(tiles.grid.is_known), "known: scried tiles of known kinds are known")
 	_check(tiles.grid.tiles.size() == 2 * Hex.hexagon(radius).size() - (radius + 1),
 		"scry: V reveals a second patch sharing an edge (%d tiles)" % tiles.grid.tiles.size())
 	_check(not scry_hint.visible, "scry: hint hides once the edge is explored")
@@ -1099,6 +1180,16 @@ func _test_enter_planet() -> void:
 func _await_scene(path: String) -> void:
 	var deadline := Time.get_ticks_msec() + 2000
 	while (current_scene == null or current_scene.scene_file_path != path) and Time.get_ticks_msec() < deadline:
+		await process_frame
+	await process_frame
+
+
+# Waits (up to 2 seconds) for a tweened property of node to stop changing, plus a frame.
+func _settle(node: Object, property: StringName) -> void:
+	var deadline := Time.get_ticks_msec() + 2000
+	var last: Variant = null
+	while node.get(property) != last and Time.get_ticks_msec() < deadline:
+		last = node.get(property)
 		await process_frame
 	await process_frame
 

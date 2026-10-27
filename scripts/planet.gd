@@ -77,15 +77,9 @@ func _ready() -> void:
 	_wizard.facing_changed.connect(func(_facing: Vector2i) -> void: _update_side_panel())
 	_tiles.grid.tile_changed.connect(func(_coord: Vector2i, _kind: TileKind) -> void: _update_side_panel())
 	_tiles.grid.tapped_changed.connect(func(_coord: Vector2i, _remaining: int) -> void: _update_side_panel())
-	_tiles.grid.known_changed.connect(func(_coord: Vector2i, _known: bool) -> void: _update_side_panel())
+	_tiles.grid.known_changed.connect(func(_kind: TileKind, _known: bool) -> void: _update_side_panel())
 	_update_side_panel()
-
-	# Detect mode: the wizard's outline takes in the area, and the actions it blocks dim.
-	_interaction.detecting_changed.connect(func(detecting: bool) -> void:
-		_marker.outline_radius = _interaction.detect_radius if detecting else 0
-		for blocked: Control in [%FocusBox, %PushHint, %ScryHint, %BuildHint]:
-			blocked.modulate.a = 0.35 if detecting else 1.0
-		_update_side_panel())
+	_interaction.detecting_changed.connect(_on_detecting_changed)
 
 	# Connected last, so a move that runs out of aether has updated everything else before leaving.
 	_wizard.mover.moved.connect(_pay_for_move)
@@ -102,7 +96,7 @@ func _ready() -> void:
 # Fills the outlined focus box with the focus's name and the actions it grants; hidden if none.
 func _show_focus(focus: StringName) -> void:
 	var box := %FocusBox as Control
-	box.visible = not focus.is_empty()
+	box.visible = not focus.is_empty() and not _interaction.detecting
 	(%FocusName as Label).text = Foci.display_name(focus)
 	var list := %FocusActions as Control
 	for child in list.get_children():
@@ -146,11 +140,10 @@ func _update_side_panel() -> void:
 		_tiles.grid.cooldown(coord), resonant, activated, known)
 	for action in _focus_hints:
 		_focus_hints[action].text = _focus_hint_text(action)
-	# Detect is only listed where it works (an unknown tile in reach), or to leave detect mode.
+	# Detect is only listed where it works: an unknown tile in reach.
 	var detect_hint := %DetectHint as Label
-	detect_hint.text = "%s / Esc – Stop Detecting" % _key_name(&"detect") if _interaction.detecting \
-		else "%s – Detect" % _key_name(&"detect")
-	detect_hint.visible = _interaction.detecting or _interaction.can_detect_here()
+	detect_hint.text = "%s – Detect" % _key_name(&"detect")
+	detect_hint.visible = _interaction.can_detect_here()
 	# Scry is only listed where it works: the middle of the explored area's edge.
 	var scry_hint := %ScryHint as Label
 	scry_hint.text = "%s – Scry" % _key_name(&"scry")
@@ -159,6 +152,51 @@ func _update_side_panel() -> void:
 	var build_hint := %BuildHint as Label
 	build_hint.text = "%s – Build Tower (needs %s)" % [_key_name(&"build_tower"), Towers.cost_text(Towers.BASIC)]
 	build_hint.visible = _interaction.can_build_tower_here()
+
+
+# Detect mode swaps the side panel's contents (under the planet name) for the elements to guess
+# from, and the wizard's outline for the view's selection outline.
+func _on_detecting_changed(detecting: bool) -> void:
+	_tiles.detection = _interaction.detection
+	_marker.visible = not detecting
+	for normal: Control in [%AetherBar, %Actions, %TileInfo]:
+		normal.visible = not detecting
+	(%FocusBox as Control).visible = not detecting and not Game.state.equipped_focus.is_empty()
+	(%DetectPanel as Control).visible = detecting
+	(%DetectHints as Control).visible = detecting
+	var list := %DetectElements as Control
+	for child in list.get_children():
+		list.remove_child(child)
+		child.queue_free()
+	if not detecting:
+		return
+	var letters := "QEADZCS" if (_wizard.board as HexBoard).pointy_top else "QWEZXCS"
+	(%SelectHint as Label).text = "Numpad / %s – Select" % letters
+	(%SubmitHint as Label).text = "Enter / Space – Submit"
+	(%LeaveHint as Label).text = "Esc – Leave"
+	var detection := _interaction.detection
+	for i in mini(detection.elements.size(), Detection.MAX_ELEMENTS):
+		var label := Label.new()
+		label.add_theme_font_size_override(&"font_size", 20)
+		label.text = "%s – %s" % [_key_name(StringName("guess_%d" % (i + 1))), Items.display_name(detection.elements[i])]
+		list.add_child(label)
+	detection.changed.connect(_update_detect_panel)
+	_update_detect_panel()
+
+
+# Elements nothing unknown in reach has any more grey out; the selected tile's guesses are in the
+# view's guess color.
+func _update_detect_panel() -> void:
+	var detection := _interaction.detection
+	if detection == null:
+		return
+	var guessed := detection.guessed(detection.selected)
+	var list := %DetectElements as Control
+	for i in list.get_child_count():
+		var label := list.get_child(i) as Label
+		var element := detection.elements[i]
+		label.modulate = _tiles.guess_color if element in guessed else Color.WHITE
+		label.modulate.a = 1.0 if detection.is_available(element) else 0.35
 
 
 # The camera tracks the wizard, and the tile view draws the wrapping map around them.

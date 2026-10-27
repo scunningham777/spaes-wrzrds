@@ -17,8 +17,12 @@ landing tile is outlined in yellow. Pushing a tile takes its cost with it. You l
 10; extracting aether refills it, and running out sends you back to space.
 
 When you land, every tile's elements are unknown: their icons are light gray, and only tiles you know can be
-extracted. Next to an unknown tile, **S** enters detect mode: your outline grows to take in the ring of tiles
-around you and you can't move (turning still works) until **S** or **Esc** leaves it.
+extracted. Next to an unknown tile, **S** enters detect mode, a guessing game for the ring of tiles around you
+(the rest of the map shrinks away). The side panel lists the elements on the ring's unknown tiles, numbered.
+Select a tile with the movement keys (**S** / numpad 5 for your own) and toggle element guesses with the number
+keys; a guess counts for every tile with that icon. **Enter** or **Space** submits: an icon guessed exactly
+becomes known everywhere on the planet, one partly right (some of its elements, extras or not) turns gold
+until the next submit. **Esc** leaves; detect mode also ends once the whole ring is known.
 
 A planet is a large hex map that wraps around both ways, but you only see what you've explored: you land in a
 small hexagon of tiles, and scrying reveals the next hexagon over, sharing the edge you stand on. Tiles are
