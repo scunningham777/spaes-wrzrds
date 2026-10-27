@@ -8,7 +8,8 @@ extends Node2D
 # from the board's tile_scale. Tiles whose elements are unknown draw their icon in unknown_icon_color
 # (still animated). In detect mode (detection) tiles outside its area shrink and hold still, tiles
 # partly guessed right fill with partial_color, guesses show as their number keys in the lower
-# right, and the selected tile is outlined. Tiles that cost aether to step onto show the cost as a number and
+# right, the selected tile is outlined, tiles just guessed right flash correct_color (flash_correct),
+# and the landing outline hides. Tiles that cost aether to step onto show the cost as a number and
 # a blue dot in their upper left; the landing tile is outlined. The occupied (player's) tile's icon
 # sits higher, clear of the player's sprite.
 
@@ -45,6 +46,9 @@ extends Node2D
 @export var guess_color: Color = Color(0.55, 0.85, 1.0)
 @export var selection_color: Color = Color.WHITE
 @export var selection_line_width: float = 3.0
+## Fill tiles flash when guessed right, and how long the flash takes to fade back.
+@export var correct_color: Color = Color(0.2, 0.65, 0.25)
+@export var correct_flash_seconds: float = 0.6
 ## Outline around the landing tile.
 @export var landing_color: Color = Color(1.0, 0.85, 0.1)
 @export var landing_line_width: float = 3.0
@@ -134,6 +138,11 @@ var detect_shrink: float = 0.0:
 	set(value):
 		detect_shrink = value
 		queue_redraw()
+## 0..1: how strongly the tiles being flashed (flash_correct) show correct_color.
+var correct_flash: float = 0.0:
+	set(value):
+		correct_flash = value
+		queue_redraw()
 ## 0..1 progress of the swap animation, if one is playing (see animate_swap).
 var swap_progress: float = 1.0:
 	set(value):
@@ -157,6 +166,9 @@ var _guess_labels: Array[Array] = []
 # Stored copies of the detect area's coords; kept while outside tiles grow back after detect mode.
 var _detect_area: Dictionary[Vector2i, bool] = {}
 var _shrink: Tween
+# Stored copies of the tiles flash_correct is flashing.
+var _flashing: Dictionary[Vector2i, bool] = {}
+var _flash: Tween
 
 @onready var board: HexBoard = get_parent() as HexBoard
 
@@ -281,6 +293,20 @@ func _shrink_tween(to: float) -> void:
 				_detect_area.clear())
 
 
+# Flashes the tiles at coords correct_color, then fades them back to their own fill. Replaces any
+# flash still playing.
+func flash_correct(coords: Array[Vector2i]) -> void:
+	if _flash != null:
+		_flash.kill()
+	_flashing.clear()
+	for c in coords:
+		_flashing[grid.canonical(c)] = true
+	correct_flash = 1.0
+	_flash = create_tween()
+	_flash.tween_interval(correct_flash_seconds * 0.25)
+	_flash.tween_property(self, "correct_flash", 0.0, correct_flash_seconds * 0.75)
+
+
 # Whether coord is outside detect mode's area (shrunk, or shrinking back); false outside detect mode.
 func is_outside_detect(coord: Vector2i) -> bool:
 	return not _detect_area.is_empty() and not _detect_area.has(grid.canonical(coord))
@@ -317,7 +343,7 @@ func _draw() -> void:
 		# Last drawn is on top.
 		_draw_contents(_swap_from, to_pos.lerp(from_pos, swap_progress), to_shift.lerp(from_shift, swap_progress))
 		_draw_contents(_swap_to, from_pos.lerp(to_pos, swap_progress), from_shift.lerp(to_shift, swap_progress))
-	if landing != null and grid.has_tile(landing):
+	if landing != null and grid.has_tile(landing) and detection == null:
 		draw_set_transform(board.hex_to_local(grid.nearest(landing, view_center)))
 		draw_polyline(board.corner_points(landing_scale * tile_scale_at(landing)), landing_color, landing_line_width)
 		draw_set_transform(Vector2.ZERO)
@@ -335,13 +361,17 @@ func _draw_overlay() -> void:
 
 
 # Hex fill for the tile at coord: partly guessed tiles in detect mode, then resonant tiles, stand
-# out; everything else is hex_color. The ley lines themselves are never drawn.
+# out; everything else is hex_color. A correct-guess flash blends over it. The ley lines themselves
+# are never drawn.
 func fill_color(coord: Vector2i) -> Color:
+	var fill := hex_color
 	if detection != null and detection.is_partial(coord):
-		return partial_color
-	if ley_lines != null and (ley_lines.is_active(coord) or ley_lines.is_resonant(grid, coord)):
-		return ley_color
-	return hex_color
+		fill = partial_color
+	elif ley_lines != null and (ley_lines.is_active(coord) or ley_lines.is_resonant(grid, coord)):
+		fill = ley_color
+	if correct_flash > 0.0 and _flashing.has(grid.canonical(coord)):
+		fill = fill.lerp(correct_color, correct_flash)
+	return fill
 
 
 # Offset of the icon on the tile at coord from the tile's center: up on the occupied tile, else none.

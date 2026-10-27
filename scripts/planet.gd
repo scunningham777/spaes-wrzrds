@@ -19,6 +19,9 @@ extends Node2D
 @export var fade_in_seconds: float = 0.3
 ## Fade to black on leaving with Esc.
 @export var fade_out_seconds: float = 0.3
+## How long the wizard takes to fly between the board and the side panel's corner, entering and
+## leaving detect mode.
+@export var wizard_fly_seconds: float = 0.3
 
 @onready var _tiles: TileGridView = $HexBoard/TileGridView
 @onready var _wizard: HexPlayerController = $HexBoard/Wizard
@@ -155,9 +158,12 @@ func _update_side_panel() -> void:
 
 
 # Detect mode swaps the side panel's contents (under the planet name) for the elements to guess
-# from, and the wizard's outline for the view's selection outline.
+# from, and the wizard's outline for the view's selection outline. The wizard flies up to the
+# panel's corner, clear of their tile's icon (which moves back to the middle), and back after.
 func _on_detecting_changed(detecting: bool) -> void:
 	_tiles.detection = _interaction.detection
+	_tiles.occupied = null if detecting else _wizard.mover.coord
+	_fly_wizard(detecting)
 	_marker.visible = not detecting
 	for normal: Control in [%AetherBar, %Actions, %TileInfo]:
 		normal.visible = not detecting
@@ -197,6 +203,37 @@ func _update_detect_panel() -> void:
 		var element := detection.elements[i]
 		label.modulate = _tiles.guess_color if element in guessed else Color.WHITE
 		label.modulate.a = 1.0 if detection.is_available(element) else 0.35
+
+
+# Flies a copy of the wizard's sprite from the board to the side panel's wizard icon (to_panel) or
+# back, showing the real one at the end. Input is blocked until it lands.
+func _fly_wizard(to_panel: bool) -> void:
+	var sprite := _wizard.get_node("Sprite2D") as Sprite2D
+	var icon := %WizardIcon as TextureRect
+	var xf := sprite.get_global_transform_with_canvas()
+	var board_size := sprite.region_rect.size * xf.get_scale()
+	var board_rect := Rect2(xf.origin - board_size / 2.0, board_size)
+	var panel_rect := icon.get_global_rect()
+	var from := board_rect if to_panel else panel_rect
+	var to := panel_rect if to_panel else board_rect
+	var flier := TextureRect.new()
+	flier.texture = icon.texture
+	flier.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	flier.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	flier.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flier.position = from.position
+	flier.size = from.size
+	$UI.add_child(flier)
+	sprite.visible = false
+	icon.visible = false
+	var tween := create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(flier, "position", to.position, wizard_fly_seconds)
+	tween.tween_property(flier, "size", to.size, wizard_fly_seconds)
+	tween.chain().tween_callback(func() -> void:
+		flier.queue_free()
+		sprite.visible = not to_panel
+		icon.visible = to_panel)
+	_lock.run(tween)
 
 
 # The camera tracks the wizard, and the tile view draws the wrapping map around them.

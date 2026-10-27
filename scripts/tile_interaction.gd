@@ -171,6 +171,11 @@ func _detect_input(event: InputEvent) -> bool:
 	elif event.is_action_pressed("submit_guess"):
 		var learned := detection.submit()
 		print("Detected %s" % [learned.map(func(k: TileKind) -> String: return k.display_name)])
+		var correct: Array[Vector2i] = []
+		correct.assign(detection.area.filter(func(c: Vector2i) -> bool:
+			return tiles.grid.has_tile(c) and tiles.grid.get_tile(c) in learned))
+		if not correct.is_empty():
+			tiles.flash_correct(correct)
 		if detection.is_done():
 			_end_detect()
 	elif event.is_action_pressed("detect"):

@@ -933,7 +933,13 @@ func _test_enter_planet() -> void:
 	var detect_list: Control = current_scene.get_node("%DetectElements")
 	var detect_labels := func() -> Array: return detect_list.get_children().map(func(l: Label) -> String: return l.text)
 	var outside := Vector2i(0, -2)
+	var wizard_sprite: Sprite2D = planet_wizard.get_node("Sprite2D")
+	_check(not wizard_icon.visible and wizard_sprite.visible and tiles.occupied == planet_wizard.mover.coord,
+		"detect: no wizard icon in the side panel while exploring")
 	_press(KEY_S)
+	_check(not wizard_sprite.visible and not wizard_icon.visible and lock.busy and tiles.occupied == null
+		and tiles.icon_shift(detect_center) == Vector2.ZERO,
+		"detect: the wizard flies off the board, input blocked, and their tile's icon recenters")
 	_check(interaction.detecting and planet_wizard.mover.frozen and tiles.detection == interaction.detection
 		and interaction.detection.selected == tiles.grid.canonical(detect_center), "detect: S enters detect mode, on the wizard's tile")
 	_check(detect_panel.visible and (current_scene.get_node("%DetectHints") as Control).visible and not aether_bar.visible
@@ -942,6 +948,9 @@ func _test_enter_planet() -> void:
 	_check(detect_labels.call() == ["1 – Gold", "2 – Iron", "3 – Wood"], "detect: elements listed with number keys (%s)"
 		% [detect_labels.call()])
 	await _settle(tiles, &"detect_shrink")
+	await _until(func() -> bool: return not lock.busy)
+	_check(wizard_icon.visible and not wizard_sprite.visible and not current_scene.get_node("UI").get_children().any(
+		func(n: Node) -> bool: return n is TextureRect), "detect: the wizard lands in the side panel's corner")
 	_check(is_equal_approx(tiles.tile_scale_at(outside), tiles.detect_outside_scale) and tiles.tile_scale_at(Vector2i(0, 1)) == 1.0
 		and tiles.is_outside_detect(outside) and not tiles.is_outside_detect(detect_center),
 		"detect: tiles outside the ring shrink")
@@ -950,9 +959,13 @@ func _test_enter_planet() -> void:
 		and aether_bar.visible and not detect_panel.visible and current_scene.scene_file_path == "res://scenes/planet.tscn",
 		"detect: Esc leaves detect mode, not the planet")
 	await _settle(tiles, &"detect_shrink")
+	await _until(func() -> bool: return not lock.busy)
+	_check(wizard_sprite.visible and not wizard_icon.visible and tiles.occupied == planet_wizard.mover.coord,
+		"detect: the wizard flies back to the board")
 	_check(tiles.tile_scale_at(outside) == 1.0 and not tiles.is_outside_detect(outside), "detect: outside tiles grow back")
 
 	_press(KEY_S)
+	await _until(func() -> bool: return not lock.busy)
 	var detection: Detection = interaction.detection
 	_check(detection.guesses.is_empty() and detection.partial.is_empty(), "detect: a new session starts fresh")
 	_press(KEY_2)  # Iron, on the wizard's iron tile
@@ -977,10 +990,16 @@ func _test_enter_planet() -> void:
 		and aether.call() == detect_aether and not lock.busy and interaction.detecting,
 		"detect: no moving, turning, or other actions")
 	_press(KEY_ENTER)
+	_check(tiles.fill_color(Vector2i(0, 1)).is_equal_approx(tiles.correct_color)
+		and tiles.fill_color(detect_center).is_equal_approx(tiles.correct_color)
+		and tiles.fill_color(Vector2i(-1, 2)) == tiles.partial_color, "detect: tiles guessed right flash green")
 	_check(tiles.grid.is_known(detect_center) and tiles.grid.is_known(Vector2i(1, 1)) and tiles.grid.is_known(Vector2i(0, 1))
 		and not tiles.grid.is_known(Vector2i(-1, 2)) and interaction.detecting, "detect: Enter submits; exact guesses become known")
 	_check(tiles.fill_color(Vector2i(-1, 2)) == tiles.partial_color and tiles.fill_color(Vector2i(0, 1)) != tiles.partial_color,
 		"detect: a partly right tile turns gold")
+	await _until(func() -> bool: return tiles.correct_flash == 0.0)
+	_check(tiles.correct_flash == 0.0 and not tiles.fill_color(Vector2i(0, 1)).is_equal_approx(tiles.correct_color),
+		"detect: the green flash fades")
 	_check(tiles.grid.tiles.keys().filter(func(c: Vector2i) -> bool: return tiles.grid.get_tile(c) == iron)
 		.all(tiles.grid.is_known), "detect: a detected icon is known across the planet")
 	_check((detect_list.get_child(0) as Label).modulate.a < 1.0 and (detect_list.get_child(1) as Label).modulate.a < 1.0
@@ -995,6 +1014,7 @@ func _test_enter_planet() -> void:
 	for kind in tiles.grid.kinds:
 		tiles.grid.set_kind_known(kind)
 	await _settle(tiles, &"detect_shrink")
+	await _until(func() -> bool: return not lock.busy and tiles.correct_flash == 0.0)
 
 	# Ley lines: hidden, but iron runs along one turn plum.
 	_check(tiles.ley_lines != null and tiles.ley_lines.lines.size() >= 3, "ley: the planet view has the planet's lines")
@@ -1180,6 +1200,14 @@ func _test_enter_planet() -> void:
 func _await_scene(path: String) -> void:
 	var deadline := Time.get_ticks_msec() + 2000
 	while (current_scene == null or current_scene.scene_file_path != path) and Time.get_ticks_msec() < deadline:
+		await process_frame
+	await process_frame
+
+
+# Waits (up to 2 seconds) for condition (() -> bool) to hold, plus a frame.
+func _until(condition: Callable) -> void:
+	var deadline := Time.get_ticks_msec() + 2000
+	while not condition.call() and Time.get_ticks_msec() < deadline:
 		await process_frame
 	await process_frame
 
