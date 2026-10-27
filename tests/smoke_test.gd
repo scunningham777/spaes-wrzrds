@@ -809,6 +809,10 @@ func _test_enter_planet() -> void:
 	_check(tiles.icon_shift(planet_wizard.mover.coord).y < 0.0, "planet: the wizard's tile icon shifts up")
 	_check(tiles.icon_shift(planet_wizard.mover.coord + Vector2i(0, -1)) == Vector2.ZERO,
 		"planet: other tiles' icons stay centered")
+	_check((tiles.get_node("Overlay") as Node2D).z_index > planet_wizard.z_index,
+		"planet: cooldown numbers draw over the wizard")
+	var planet_board := current_scene.get_node("HexBoard") as HexBoard
+	_check(tiles.landing_scale > planet_board.tile_scale, "planet: landing outline sits outside the wizard's outline")
 	_check(is_zero_approx(tri[2].x) and tri[2].y < tri[0].y and tri[0].y < 0.0,
 		"planet: facing triangle points N from the top edge (%s)" % tri)
 	_press(KEY_D)  # turn clockwise to NE

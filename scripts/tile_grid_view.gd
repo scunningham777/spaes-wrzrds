@@ -34,8 +34,9 @@ extends Node2D
 ## Outline around the landing tile.
 @export var landing_color: Color = Color(1.0, 0.85, 0.1)
 @export var landing_line_width: float = 3.0
-## Size of the landing outline relative to the tile.
-@export var landing_inset: float = 0.88
+## Size of the landing outline relative to the hex cell. 1.0 puts it in the gap between tiles, just
+## outside the player's outline (which hugs the tile) while they stand on it.
+@export var landing_scale: float = 1.0
 
 # Tile pictures by TileKind.icon: regions in icon_sheet (12px cells, 1px gutters: cell (col, row)
 # is at 1 + 13 * col/row).
@@ -112,8 +113,20 @@ var _swap_from: Vector2i
 var _swap_to: Vector2i
 # Greyscale copies of the icons, for tapped tiles; built on first use.
 var _grey_icons: Dictionary[StringName, Texture2D] = {}
+# Cooldown numbers draw on this child, above the player's sprite; _draw collects them as
+# [remaining, center] so they follow their icons through swaps.
+var _overlay: Node2D
+var _cooldown_labels: Array[Array] = []
 
 @onready var board: HexBoard = get_parent() as HexBoard
+
+
+func _ready() -> void:
+	_overlay = Node2D.new()
+	_overlay.name = "Overlay"
+	_overlay.z_index = 1  # over later siblings, like the player
+	_overlay.draw.connect(_draw_overlay)
+	add_child(_overlay)
 
 
 func has_icon(kind: TileKind) -> bool:
@@ -201,6 +214,8 @@ func _on_tapped_changed(_coord: Vector2i, _remaining: int) -> void:
 
 
 func _draw() -> void:
+	_cooldown_labels.clear()
+	_overlay.queue_redraw()  # deferred, so it runs after this, still this frame
 	if grid == null:
 		return
 	var tile := board.corner_points(board.tile_scale)
@@ -223,10 +238,14 @@ func _draw() -> void:
 		_draw_contents(_swap_from, to_pos.lerp(from_pos, swap_progress), to_shift.lerp(from_shift, swap_progress))
 		_draw_contents(_swap_to, from_pos.lerp(to_pos, swap_progress), from_shift.lerp(to_shift, swap_progress))
 	if landing != null and grid.has_tile(landing):
-		# Inset, so it still shows inside the player's outline while they stand on it.
 		draw_set_transform(board.hex_to_local(grid.nearest(landing, view_center)))
-		draw_polyline(board.corner_points(board.tile_scale * landing_inset), landing_color, landing_line_width)
+		draw_polyline(board.corner_points(landing_scale), landing_color, landing_line_width)
 		draw_set_transform(Vector2.ZERO)
+
+
+func _draw_overlay() -> void:
+	for label in _cooldown_labels:
+		_draw_cooldown(label[0], label[1])
 
 
 # Hex fill for the tile at coord: resonant tiles stand out, everything else is hex_color. The ley
@@ -252,7 +271,7 @@ func _draw_contents(coord: Vector2i, center: Vector2, icon_offset: Vector2) -> v
 		var tapped := grid.is_tapped(coord)
 		_draw_icon(kind.icon, center + icon_offset, tapped)
 		if tapped:
-			_draw_cooldown(grid.cooldown(coord), center)
+			_cooldown_labels.append([grid.cooldown(coord), center])
 	if grid.move_cost(coord) > 0:
 		_draw_move_cost(grid.move_cost(coord), center)
 
@@ -283,14 +302,14 @@ func _tile_half() -> Vector2:
 
 
 # Actions left, in the tile's lower left (mirroring the move cost above it): clear of the player's
-# sprite and outline, and of facing triangles, which sit mid-edge.
+# outline, and of facing triangles, which sit mid-edge. Drawn on the overlay, over the player's sprite.
 func _draw_cooldown(remaining: int, center: Vector2) -> void:
 	var font := ThemeDB.fallback_font
 	var half := _tile_half()
 	var pos := center + Vector2(-0.52 * half.x, 0.83 * half.y)  # baseline start
 	var text := str(remaining)
-	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, cooldown_font_size, 4, Color.BLACK)
-	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, cooldown_font_size, cooldown_color)
+	_overlay.draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, cooldown_font_size, 4, Color.BLACK)
+	_overlay.draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, cooldown_font_size, cooldown_color)
 
 
 # Cost number with a blue dot after it, in the tile's upper left.
