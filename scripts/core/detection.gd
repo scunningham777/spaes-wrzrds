@@ -7,9 +7,9 @@ extends RefCounted
 # (TileGrid.set_kind_known, planet-wide); some of them, extras or not, makes its tiles partial
 # until the next submit; none leaves them as they were.
 #
-# The elements to guess from are those on the area's unknown tiles when the session starts, in
-# alphabetical order. Each stays in the list, but once no unknown tile in the area has it, it
-# can't be guessed any more (is_available) and leftover guesses of it are dropped.
+# The elements to guess from are every element on the planet (its TileGrid.kinds), in
+# alphabetical order, whether or not the area has it: decoys keep the last unknown kind from being
+# a matter of elimination. The list never changes, and every element can always be guessed.
 
 ## Selection, guesses, or results changed.
 signal changed
@@ -36,8 +36,8 @@ func _init(p_grid: TileGrid, p_area: Array[Vector2i]) -> void:
 	for c in p_area:
 		area.append(grid.canonical(c))
 	selected = area[0]
-	for c in targets():
-		for element in grid.get_tile(c).elements:
+	for kind in grid.kinds:
+		for element in kind.elements:
 			if not element in elements:
 				elements.append(element)
 	elements.sort_custom(func(a: StringName, b: StringName) -> bool:
@@ -69,12 +69,6 @@ func is_done() -> bool:
 	return targets().is_empty()
 
 
-# Whether element can still be guessed: an unknown tile in the area has it.
-func is_available(element: StringName) -> bool:
-	return element in elements and targets().any(func(c: Vector2i) -> bool:
-		return element in grid.get_tile(c).elements)
-
-
 # Moves the selection to coord; false (no change) unless it's an unknown tile in the area.
 func select(coord: Vector2i) -> bool:
 	if not is_target(coord):
@@ -93,13 +87,11 @@ func guessed(coord: Vector2i) -> Array[StringName]:
 
 
 # Guesses the element at index in the list for the selected tile's kind, or takes that guess back.
-# False (no change) if the selected tile is known or the element can't be guessed.
+# False (no change) if the selected tile is known or index is past the guessable elements.
 func toggle(index: int) -> bool:
 	if index < 0 or index >= mini(elements.size(), MAX_ELEMENTS) or not is_target(selected):
 		return false
 	var element := elements[index]
-	if not is_available(element):
-		return false
 	var kind := grid.get_tile(selected)
 	var kind_guesses := guessed(selected)
 	if element in kind_guesses:
@@ -140,12 +132,5 @@ func submit() -> Array[TileKind]:
 	for kind in learned:
 		guesses.erase(kind.id)
 		grid.set_kind_known(kind)
-	# Guesses of elements nothing unknown has any more are wrong, and can't be taken back by hand.
-	for id: StringName in guesses.keys():
-		var kept: Array = guesses[id].filter(is_available)
-		if kept.is_empty():
-			guesses.erase(id)
-		else:
-			guesses[id] = kept
 	changed.emit()
 	return learned

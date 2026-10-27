@@ -251,8 +251,12 @@ func _test_core_logic() -> void:
 		"core: a frozen mover can't move but can turn")
 	frozen.frozen = false
 	_check(frozen.move(Hex.Compass.N), "core: an unfrozen mover moves again")
-	# Detection: Wordle-style guessing of the unknown kinds in an area, the player's tile first.
-	var dg := _hexagon_grid(1)
+	# Detection: Wordle-style guessing of the unknown kinds in an area, the player's tile first, from
+	# every element on the planet (stone is a decoy here).
+	var stone := TileKind.new(&"stone_outcrop", "Stone Outcrop", &"", [&"stone"] as Array[StringName])
+	var dg := TileGrid.new(null, [iron, rusty_gold, timber, stone] as Array[TileKind])
+	for c in Hex.hexagon(1):
+		dg.add_tile(c, TileKind.EMPTY)
 	dg.set_tile(Vector2i.ZERO, iron)
 	dg.set_tile(Vector2i(0, 1), iron)
 	dg.set_tile(Vector2i(1, 0), rusty_gold)
@@ -262,8 +266,9 @@ func _test_core_logic() -> void:
 		if d != Vector2i.ZERO:
 			det_area.append(d)
 	var det := Detection.new(dg, det_area)
-	_check(det.elements == [&"gold", &"iron", &"wood"] and det.selected == Vector2i.ZERO and det.targets().size() == 4,
-		"detect: elements of the unknown tiles, alphabetical; starts on the first coord (%s)" % [det.elements])
+	_check(det.elements == [&"gold", &"iron", &"stone", &"wood"] and det.selected == Vector2i.ZERO
+		and det.targets().size() == 4,
+		"detect: every element on the planet, alphabetical; starts on the first coord (%s)" % [det.elements])
 	_check(Detection.number(0) == 1 and Detection.number(9) == 0, "detect: elements are numbered 1-9, then 0")
 	_check(not det.select(Vector2i(1, -1)) and not det.select(Vector2i(5, 5)) and det.selected == Vector2i.ZERO,
 		"detect: only unknown tiles in the area can be selected")
@@ -275,23 +280,24 @@ func _test_core_logic() -> void:
 	_check(det.guessed(Vector2i(1, 0)).is_empty(), "detect: toggling again takes a guess back")
 	det.toggle(1)  # iron only: partly right
 	det.select(Vector2i(-1, 0))
-	det.toggle(0)  # gold on timber: all wrong
+	det.toggle(2)  # stone on timber: a decoy, all wrong
 	_check(det.submit() == [iron] and dg.is_kind_known(iron) and not dg.is_kind_known(rusty_gold)
 		and det.guessed(Vector2i.ZERO).is_empty(), "detect: an exact guess makes the kind known")
 	_check(det.is_partial(Vector2i(1, 0)) and not det.is_partial(Vector2i(-1, 0)) and not det.is_partial(Vector2i.ZERO),
 		"detect: some right is partial, all wrong isn't")
-	_check(det.guessed(Vector2i(1, 0)) == [&"iron"] and det.is_available(&"iron"), "detect: wrong guesses stay to adjust")
+	_check(det.guessed(Vector2i(1, 0)) == [&"iron"] and det.guessed(Vector2i(-1, 0)) == [&"stone"],
+		"detect: wrong guesses stay to adjust")
 	det.select(Vector2i(1, 0))
 	det.toggle(0)
 	det.select(Vector2i(-1, 0))
-	det.toggle(2)  # gold and wood on timber: right, plus an extra
+	det.toggle(3)  # stone and wood on timber: right, plus an extra
 	_check(det.guessed(Vector2i(1, 0)) == [&"gold", &"iron"] and det.submit() == [rusty_gold]
 		and det.is_partial(Vector2i(-1, 0)) and not det.is_partial(Vector2i(1, 0)),
 		"detect: a new submit replaces the results; right plus an extra is partial")
-	_check(not det.is_available(&"gold") and not det.is_available(&"iron") and det.is_available(&"wood")
-		and det.elements.size() == 3 and det.guessed(Vector2i(-1, 0)) == [&"wood"],
-		"detect: elements nothing unknown has any more stay listed but drop out, guesses of them too")
-	_check(not det.toggle(0) and det.guessed(Vector2i(-1, 0)) == [&"wood"], "detect: dropped elements can't be guessed")
+	_check(det.elements == [&"gold", &"iron", &"stone", &"wood"] and det.toggle(0) and det.toggle(0)
+		and det.guessed(Vector2i(-1, 0)) == [&"stone", &"wood"],
+		"detect: the list never changes, and detected elements can still be guessed")
+	det.toggle(2)  # stone off: just wood
 	_check(det.submit() == [timber] and det.is_done() and det.partial.is_empty(), "detect: done once everything is known")
 	var inv := Inventory.new()
 	var inv_changes := [0]
@@ -945,7 +951,8 @@ func _test_enter_planet() -> void:
 	_check(detect_panel.visible and (current_scene.get_node("%DetectHints") as Control).visible and not aether_bar.visible
 		and not actions.visible and not focus_box.visible and not (current_scene.get_node("%TileInfo") as Control).visible
 		and not marker.visible, "detect: the side panel shows detecting instead, and the wizard's outline hides")
-	_check(detect_labels.call() == ["1 – Gold", "2 – Iron", "3 – Wood"], "detect: elements listed with number keys (%s)"
+	var all_elements := ["1 – Aether", "2 – Gold", "3 – Iron", "4 – Stone", "5 – Wood"]
+	_check(detect_labels.call() == all_elements, "detect: every element on the planet listed with number keys (%s)"
 		% [detect_labels.call()])
 	await _settle(tiles, &"detect_shrink")
 	await _until(func() -> bool: return not lock.busy)
@@ -968,20 +975,20 @@ func _test_enter_planet() -> void:
 	await _until(func() -> bool: return not lock.busy)
 	var detection: Detection = interaction.detection
 	_check(detection.guesses.is_empty() and detection.partial.is_empty(), "detect: a new session starts fresh")
-	_press(KEY_2)  # Iron, on the wizard's iron tile
+	_press(KEY_3)  # Iron, on the wizard's iron tile
 	_check(detection.guessed(Vector2i(1, 1)) == [&"iron"], "detect: a guess counts for every like icon")
 	_press(KEY_X)  # S: the gold at (0, 1)
 	_press(KEY_W)  # N: off the grid, selection stays
 	_check(detection.selected == tiles.grid.canonical(Vector2i(0, 1)), "detect: direction keys select around the wizard")
-	_press(KEY_1)
 	_press(KEY_2)
-	_press(KEY_2)
+	_press(KEY_3)
+	_press(KEY_3)
 	_check(detection.guessed(Vector2i(0, 1)) == [&"gold"], "detect: number keys toggle guesses")
-	_check((detect_list.get_child(0) as Label).modulate.r == tiles.guess_color.r
-		and (detect_list.get_child(1) as Label).modulate == Color.WHITE, "detect: the selected tile's guesses are highlighted")
+	_check((detect_list.get_child(1) as Label).modulate.r == tiles.guess_color.r
+		and (detect_list.get_child(2) as Label).modulate == Color.WHITE, "detect: the selected tile's guesses are highlighted")
 	_press(KEY_Z)  # SW: the timber at (-1, 2)
-	_press(KEY_1)
-	_press(KEY_3)  # Gold and Wood: right, plus an extra
+	_press(KEY_2)
+	_press(KEY_5)  # Gold and Wood: right, plus an extra
 	var detect_facing := planet_wizard.mover.facing
 	var detect_aether: int = aether.call()
 	for key: Key in [KEY_D, KEY_A, KEY_R, KEY_F, KEY_V, KEY_B]:
@@ -1002,11 +1009,10 @@ func _test_enter_planet() -> void:
 		"detect: the green flash fades")
 	_check(tiles.grid.tiles.keys().filter(func(c: Vector2i) -> bool: return tiles.grid.get_tile(c) == iron)
 		.all(tiles.grid.is_known), "detect: a detected icon is known across the planet")
-	_check((detect_list.get_child(0) as Label).modulate.a < 1.0 and (detect_list.get_child(1) as Label).modulate.a < 1.0
-		and (detect_list.get_child(2) as Label).modulate.a == 1.0 and detect_list.get_child_count() == 3,
-		"detect: detected elements stay listed, greyed out")
-	_press(KEY_1)  # Gold: greyed out
-	_check(detection.guessed(Vector2i(-1, 2)) == [&"wood"], "detect: greyed-out elements can't be guessed")
+	_check(detect_labels.call() == all_elements and detect_list.get_children().all(
+		func(l: Label) -> bool: return l.modulate.a == 1.0), "detect: the list stays the same, nothing greyed out")
+	_press(KEY_2)  # Gold off the timber: just Wood
+	_check(detection.guessed(Vector2i(-1, 2)) == [&"wood"], "detect: detected elements can still be toggled")
 	_press(KEY_SPACE)
 	_check(tiles.grid.is_known(Vector2i(-1, 2)) and not interaction.detecting and not planet_wizard.mover.frozen
 		and tiles.fill_color(Vector2i(-1, 2)) != tiles.partial_color and not detect_hint.visible,

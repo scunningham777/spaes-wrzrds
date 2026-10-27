@@ -190,8 +190,7 @@ func _on_detecting_changed(detecting: bool) -> void:
 	_update_detect_panel()
 
 
-# Elements nothing unknown in reach has any more grey out; the selected tile's guesses are in the
-# view's guess color.
+# The selected tile's guesses are in the view's guess color.
 func _update_detect_panel() -> void:
 	var detection := _interaction.detection
 	if detection == null:
@@ -200,9 +199,7 @@ func _update_detect_panel() -> void:
 	var list := %DetectElements as Control
 	for i in list.get_child_count():
 		var label := list.get_child(i) as Label
-		var element := detection.elements[i]
-		label.modulate = _tiles.guess_color if element in guessed else Color.WHITE
-		label.modulate.a = 1.0 if detection.is_available(element) else 0.35
+		label.modulate = _tiles.guess_color if detection.elements[i] in guessed else Color.WHITE
 
 
 # Flies a copy of the wizard's sprite from the board to the side panel's wizard icon (to_panel) or

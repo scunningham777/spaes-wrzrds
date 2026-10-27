@@ -18,7 +18,7 @@ landing tile is outlined in yellow. Pushing a tile takes its cost with it. You l
 
 When you land, every tile's elements are unknown: their icons are light gray, and only tiles you know can be
 extracted. Next to an unknown tile, **S** enters detect mode, a guessing game for the ring of tiles around you
-(the rest of the map shrinks away, and your wizard moves up to the side panel's corner). The side panel lists the elements on the ring's unknown tiles, numbered.
+(the rest of the map shrinks away, and your wizard moves up to the side panel's corner). The side panel lists every element on the planet, numbered (decoys included).
 Select a tile with the movement keys (**S** / numpad 5 for your own) and toggle element guesses with the number
 keys; a guess counts for every tile with that icon. **Enter** or **Space** submits: an icon guessed exactly
 becomes known everywhere on the planet (its tiles flash green), one partly right (some of its elements, extras or not) turns gold
