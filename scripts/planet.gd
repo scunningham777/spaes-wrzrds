@@ -22,6 +22,7 @@ extends Node2D
 
 @onready var _tiles: TileGridView = $HexBoard/TileGridView
 @onready var _wizard: HexPlayerController = $HexBoard/Wizard
+@onready var _marker: HexFacingMarker = $HexBoard/Wizard/FacingMarker
 @onready var _camera: Camera2D = $Camera2D
 @onready var _side_panel: Control = %SidePanel
 @onready var _tile_info: TileInfo = %TileInfo
@@ -76,7 +77,15 @@ func _ready() -> void:
 	_wizard.facing_changed.connect(func(_facing: Vector2i) -> void: _update_side_panel())
 	_tiles.grid.tile_changed.connect(func(_coord: Vector2i, _kind: TileKind) -> void: _update_side_panel())
 	_tiles.grid.tapped_changed.connect(func(_coord: Vector2i, _remaining: int) -> void: _update_side_panel())
+	_tiles.grid.known_changed.connect(func(_coord: Vector2i, _known: bool) -> void: _update_side_panel())
 	_update_side_panel()
+
+	# Detect mode: the wizard's outline takes in the area, and the actions it blocks dim.
+	_interaction.detecting_changed.connect(func(detecting: bool) -> void:
+		_marker.outline_radius = _interaction.detect_radius if detecting else 0
+		for blocked: Control in [%FocusBox, %PushHint, %ScryHint, %BuildHint]:
+			blocked.modulate.a = 0.35 if detecting else 1.0
+		_update_side_panel())
 
 	# Connected last, so a move that runs out of aether has updated everything else before leaving.
 	_wizard.mover.moved.connect(_pay_for_move)
@@ -132,10 +141,16 @@ func _update_side_panel() -> void:
 	var ley := _tiles.ley_lines
 	var resonant := ley != null and ley.is_resonant(_tiles.grid, coord)
 	var activated := ley != null and ley.is_active(coord)
-	_tile_info.show_tile(kind, _tiles.icon_texture(kind, _tiles.grid.is_tapped(coord)), _tiles.grid.cooldown(coord),
-		resonant, activated)
+	var known := _tiles.grid.is_known(coord)
+	_tile_info.show_tile(kind, _tiles.icon_texture(kind, _tiles.grid.is_tapped(coord), known),
+		_tiles.grid.cooldown(coord), resonant, activated, known)
 	for action in _focus_hints:
 		_focus_hints[action].text = _focus_hint_text(action)
+	# Detect is only listed where it works (an unknown tile in reach), or to leave detect mode.
+	var detect_hint := %DetectHint as Label
+	detect_hint.text = "%s / Esc – Stop Detecting" % _key_name(&"detect") if _interaction.detecting \
+		else "%s – Detect" % _key_name(&"detect")
+	detect_hint.visible = _interaction.detecting or _interaction.can_detect_here()
 	# Scry is only listed where it works: the middle of the explored area's edge.
 	var scry_hint := %ScryHint as Label
 	scry_hint.text = "%s – Scry" % _key_name(&"scry")

@@ -53,6 +53,36 @@ func corner_points(scale: float = 1.0) -> PackedVector2Array:
 	return points
 
 
+# Closed outline around a group of hexes, in local space around the origin hex's center: the cell
+# edges (at full cell size) no other hex in coords shares. coords must form one patch without holes.
+func region_outline(coords: Array[Vector2i]) -> PackedVector2Array:
+	var corners := corner_points()
+	# Corners keyed by rounded position, so neighbors' shared corners match exactly.
+	var key := func(p: Vector2) -> Vector2i: return Vector2i((p * 8.0).round())
+	var edges: Dictionary[Vector4i, bool] = {}
+	for c in coords:
+		var center := hex_to_local(c)
+		for i in corners.size() - 1:
+			var a: Vector2i = key.call(center + corners[i])
+			var b: Vector2i = key.call(center + corners[i + 1])
+			edges[Vector4i(a.x, a.y, b.x, b.y)] = true
+	# Every cell runs its edges the same way round, so neighbors run a shared edge in opposite
+	# directions. The rest are the boundary, each corner on it starting exactly one of them.
+	var next: Dictionary[Vector2i, Vector2i] = {}
+	for e: Vector4i in edges:
+		if not edges.has(Vector4i(e.z, e.w, e.x, e.y)):
+			next[Vector2i(e.x, e.y)] = Vector2i(e.z, e.w)
+	var points := PackedVector2Array()
+	if next.is_empty():
+		return points
+	var at: Vector2i = next.keys()[0]
+	for i in next.size():
+		points.append(Vector2(at) / 8.0)
+		at = next[at]
+	points.append(points[0])
+	return points
+
+
 func _draw() -> void:
 	if not draw_outlines:
 		return

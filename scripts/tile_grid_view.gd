@@ -5,7 +5,8 @@ extends Node2D
 # child of a HexBoard. Draws nothing until a grid is assigned. Every tile is a filled hex
 # (hex_color, or ley_color where it resonates with a ley line or is on an activated one); kinds
 # whose icon has an entry in ICONS draw that sprite-sheet icon over it. Icons with an entry in ICON_ANIMS step through it, all in sync off one clock. Tile size comes
-# from the board's tile_scale. Tiles that cost aether to step onto show the cost as a number and
+# from the board's tile_scale. Tiles whose elements are unknown draw their icon in unknown_icon_color
+# (still animated). Tiles that cost aether to step onto show the cost as a number and
 # a blue dot in their upper left; the landing tile is outlined. The occupied (player's) tile's icon
 # sits higher, clear of the player's sprite.
 
@@ -22,6 +23,8 @@ extends Node2D
 ## How far up the icon of the tile the player stands on (occupied) moves, in pixels, to make room
 ## for the player's sprite below it.
 @export var occupied_icon_shift: float = 8.0
+## Flat color of the icons of tiles whose elements are unknown (TileGrid.is_known).
+@export var unknown_icon_color: Color = Color(0.78, 0.78, 0.78)
 ## Play the ICON_ANIMS icon animations.
 @export var animate_icons: bool = true
 ## Tapped-tile cooldown number size and color (yellow, to stand out from the white wizard).
@@ -72,10 +75,12 @@ var grid: TileGrid:
 		if grid != null and grid.tile_changed.is_connected(_on_tile_changed):
 			grid.tile_changed.disconnect(_on_tile_changed)
 			grid.tapped_changed.disconnect(_on_tapped_changed)
+			grid.known_changed.disconnect(_on_known_changed)
 		grid = value
 		if grid != null:
 			grid.tile_changed.connect(_on_tile_changed)
 			grid.tapped_changed.connect(_on_tapped_changed)
+			grid.known_changed.connect(_on_known_changed)
 		queue_redraw()
 ## Where the view is looking from (the player's coord). On a wrapping grid each tile is drawn at
 ## its copy nearest here, so the map wraps around whoever is exploring it.
@@ -111,8 +116,10 @@ var swap_progress: float = 1.0:
 var _swapping := false
 var _swap_from: Vector2i
 var _swap_to: Vector2i
-# Greyscale copies of the icons, for tapped tiles; built on first use.
+# Greyscale copies of the icons, for tapped tiles, and flat unknown_icon_color ones, for unknown
+# tiles; built on first use.
 var _grey_icons: Dictionary[StringName, Texture2D] = {}
+var _unknown_icons: Dictionary[StringName, Texture2D] = {}
 # Cooldown numbers draw on this child, above the player's sprite; _draw collects them as
 # [remaining, center] so they follow their icons through swaps.
 var _overlay: Node2D
@@ -133,10 +140,13 @@ func has_icon(kind: TileKind) -> bool:
 	return icon_sheet != null and ICONS.has(kind.icon)
 
 
-# The kind's icon as a standalone texture (also for UI), greyscale if tapped; null if it has none.
-func icon_texture(kind: TileKind, tapped: bool = false) -> Texture2D:
+# The kind's icon as a standalone texture (also for UI), greyscale if tapped, flat
+# unknown_icon_color if not known; null if it has none.
+func icon_texture(kind: TileKind, tapped: bool = false, known: bool = true) -> Texture2D:
 	if not has_icon(kind):
 		return null
+	if not known:
+		return _unknown_icon(kind.icon)
 	if tapped:
 		return _grey_icon(kind.icon)
 	var atlas := AtlasTexture.new()
@@ -146,18 +156,28 @@ func icon_texture(kind: TileKind, tapped: bool = false) -> Texture2D:
 
 
 func _grey_icon(icon: StringName) -> Texture2D:
-	if not _grey_icons.has(icon):
+	return _recolored_icon(icon, _grey_icons, func(c: Color) -> Color:
+		var lum := c.get_luminance()
+		return Color(lum, lum, lum, c.a))
+
+
+func _unknown_icon(icon: StringName) -> Texture2D:
+	return _recolored_icon(icon, _unknown_icons, func(c: Color) -> Color:
+		return Color(unknown_icon_color, c.a * unknown_icon_color.a))
+
+
+# The icon with recolor (Color -> Color) applied to each pixel, cached in cache.
+func _recolored_icon(icon: StringName, cache: Dictionary[StringName, Texture2D], recolor: Callable) -> Texture2D:
+	if not cache.has(icon):
 		var image := icon_sheet.get_image()
 		if image.is_compressed():
 			image.decompress()
 		image = image.get_region(Rect2i(ICONS[icon]))
 		for y in image.get_height():
 			for x in image.get_width():
-				var c := image.get_pixel(x, y)
-				var lum := c.get_luminance()
-				image.set_pixel(x, y, Color(lum, lum, lum, c.a))
-		_grey_icons[icon] = ImageTexture.create_from_image(image)
-	return _grey_icons[icon]
+				image.set_pixel(x, y, recolor.call(image.get_pixel(x, y)))
+		cache[icon] = ImageTexture.create_from_image(image)
+	return cache[icon]
 
 
 # Current value of one animation channel for an icon, or the channel's default.
@@ -210,6 +230,10 @@ func _on_tile_changed(_coord: Vector2i, _kind: TileKind) -> void:
 
 
 func _on_tapped_changed(_coord: Vector2i, _remaining: int) -> void:
+	queue_redraw()
+
+
+func _on_known_changed(_coord: Vector2i, _known: bool) -> void:
 	queue_redraw()
 
 
@@ -269,15 +293,15 @@ func _draw_contents(coord: Vector2i, center: Vector2, icon_offset: Vector2) -> v
 	var kind := grid.get_tile(coord)
 	if has_icon(kind):
 		var tapped := grid.is_tapped(coord)
-		_draw_icon(kind.icon, center + icon_offset, tapped)
+		_draw_icon(kind.icon, center + icon_offset, tapped, grid.is_known(coord))
 		if tapped:
 			_cooldown_labels.append([grid.cooldown(coord), center])
 	if grid.move_cost(coord) > 0:
 		_draw_move_cost(grid.move_cost(coord), center)
 
 
-# Tapped icons are greyscale and hold still.
-func _draw_icon(icon: StringName, center: Vector2, tapped: bool) -> void:
+# Tapped icons are greyscale and hold still; unknown ones are flat unknown_icon_color.
+func _draw_icon(icon: StringName, center: Vector2, tapped: bool, known: bool = true) -> void:
 	var region := ICONS[icon]
 	var icon_size := region.size * icon_scale
 	var anim := func(channel: StringName) -> float:
@@ -287,7 +311,9 @@ func _draw_icon(icon: StringName, center: Vector2, tapped: bool) -> void:
 	draw_set_transform(pivot, deg_to_rad(anim.call(&"rotation")), Vector2(1.0, anim.call(&"scale_y")))
 	var rect := Rect2(Vector2(-icon_size.x / 2.0, -icon_size.y), icon_size)
 	var modulate_color := Color(1.0, 1.0, 1.0, anim.call(&"alpha"))
-	if tapped:
+	if not known:
+		draw_texture_rect(_unknown_icon(icon), rect, false, modulate_color)
+	elif tapped:
 		draw_texture_rect(_grey_icon(icon), rect, false, modulate_color)
 	else:
 		draw_texture_rect_region(icon_sheet, rect, region, modulate_color)

@@ -8,6 +8,10 @@ extends RefCounted
 #
 # Extracting along a line of tiles yields the elements they all share.
 #
+# A tile's elements start out unknown: revealed tiles are unknown until something makes them known
+# (set_known), and unknown tiles yield nothing. Knowing travels with the tile when it's swapped; a
+# replaced tile (set_tile) is known, since the player put it there.
+#
 # Extracting from a tile taps it rather than removing it. A tapped tile yields nothing until its
 # cooldown, counted in player actions, runs out: whoever runs the actions calls tick_cooldowns()
 # once per action.
@@ -19,6 +23,7 @@ extends RefCounted
 signal tile_changed(coord: Vector2i, kind: TileKind)
 ## remaining is 0 when the tile becomes untapped.
 signal tapped_changed(coord: Vector2i, remaining: int)
+signal known_changed(coord: Vector2i, known: bool)
 
 ## The surface's wrapping, or null for an unbounded plane.
 var torus: HexTorus
@@ -32,6 +37,8 @@ var tap_cooldown: int = 5
 var cooldowns: Dictionary[Vector2i, int] = {}
 ## Revealed tiles -> aether it costs to step onto them; tiles that cost nothing are left out.
 var move_costs: Dictionary[Vector2i, int] = {}
+## Revealed tiles whose elements are known; the rest are unknown.
+var known: Dictionary[Vector2i, bool] = {}
 
 
 func _init(p_torus: HexTorus = null, p_kinds: Array[TileKind] = []) -> void:
@@ -89,13 +96,36 @@ func set_move_cost(coord: Vector2i, cost: int) -> void:
 		move_costs.erase(canonical(coord))
 
 
-# Replacing a tile drops any tapped state, which belonged to the old tile.
+# Replacing a tile drops any tapped state, which belonged to the old tile, and makes it known.
 func set_tile(coord: Vector2i, kind: TileKind) -> void:
 	var key := canonical(coord)
 	assert(tiles.has(key), "Coord %s is not on the grid" % coord)
 	tiles[key] = kind
-	_set_cooldown(key, 0)  # before tile_changed, so listeners never see the old tile's state
+	# Before tile_changed, so listeners never see the old tile's state.
+	_set_cooldown(key, 0)
+	set_known(key)
 	tile_changed.emit(key, kind)
+
+
+# Whether the elements of the tile at coord are known; false off the grid.
+func is_known(coord: Vector2i) -> bool:
+	return known.has(canonical(coord))
+
+
+func set_known(coord: Vector2i, value: bool = true) -> void:
+	var key := canonical(coord)
+	if value == known.has(key) or not tiles.has(key):
+		return
+	if value:
+		known[key] = true
+	else:
+		known.erase(key)
+	known_changed.emit(key, value)
+
+
+# Whether any of coords is a revealed tile whose elements are unknown.
+func any_unknown(coords: Array[Vector2i]) -> bool:
+	return coords.any(func(c: Vector2i) -> bool: return has_tile(c) and not is_known(c))
 
 
 func is_tapped(coord: Vector2i) -> bool:
@@ -108,10 +138,11 @@ func cooldown(coord: Vector2i) -> int:
 
 
 # The elements every tile at coords yields, in the first tile's order: what extracting them
-# together would give. Empty if they share none, or any of them is off the grid or tapped.
+# together would give. Empty if they share none, or any of them is off the grid, unknown or tapped.
 func extractable_elements(coords: Array[Vector2i]) -> Array[StringName]:
 	var shared: Array[StringName] = []
-	if coords.is_empty() or not coords.all(func(c: Vector2i) -> bool: return has_tile(c) and not is_tapped(c)):
+	if coords.is_empty() or not coords.all(func(c: Vector2i) -> bool:
+			return has_tile(c) and is_known(c) and not is_tapped(c)):
 		return shared
 	for element in get_tile(coords[0]).elements:
 		if coords.all(func(c: Vector2i) -> bool: return element in get_tile(c).elements):
@@ -138,7 +169,7 @@ func can_swap(a: Vector2i, b: Vector2i) -> bool:
 		and (get_tile(a) != get_tile(b) or cooldown(a) != cooldown(b) or move_cost(a) != move_cost(b))
 
 
-# Swaps the tiles at a and b, tapped state and move cost included. Returns false (no change) if
+# Swaps the tiles at a and b, tapped state, move cost and known state included. Returns false (no change) if
 # either isn't part of the grid or isn't movable, or a swap would change nothing.
 func try_swap(a: Vector2i, b: Vector2i) -> bool:
 	if not can_swap(a, b):
@@ -147,12 +178,16 @@ func try_swap(a: Vector2i, b: Vector2i) -> bool:
 	var a_cooldown := cooldown(a)
 	var b_cooldown := cooldown(b)
 	var a_cost := move_cost(a)
+	var a_known := is_known(a)
+	var b_known := is_known(b)
 	set_move_cost(a, move_cost(b))
 	set_move_cost(b, a_cost)
 	set_tile(a, get_tile(b))
 	set_tile(b, a_kind)
 	_set_cooldown(canonical(a), b_cooldown)
 	_set_cooldown(canonical(b), a_cooldown)
+	set_known(a, b_known)
+	set_known(b, a_known)
 	return true
 
 

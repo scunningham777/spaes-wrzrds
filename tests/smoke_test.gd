@@ -221,6 +221,36 @@ func _test_core_logic() -> void:
 	eg.tick_cooldowns()
 	_check(not eg.is_tapped(Vector2i(1, 0)) and untapped == [Vector2i(1, 0)]
 		and eg.try_extract(at.call(Vector2i(1, 0))) == [&"wood"], "tapped: 5th tick untaps it, extractable again")
+	# Known: revealed tiles start unknown and yield nothing; knowing moves with the tile on a swap,
+	# and a replaced tile is known.
+	var kg := _hexagon_grid(1)
+	var stone_kind := TileKind.new(&"stone_outcrop", "Stone Outcrop", &"", [&"stone"] as Array[StringName])
+	kg.add_tile(Vector2i(5, 5), stone_kind)
+	var known_changes: Array[Vector2i] = []
+	kg.known_changed.connect(func(c: Vector2i, _known: bool) -> void: known_changes.append(c))
+	_check(not kg.is_known(Vector2i(5, 5)) and not kg.can_extract(at.call(Vector2i(5, 5)))
+		and kg.any_unknown(at.call(Vector2i(5, 5))), "known: a revealed tile is unknown and yields nothing")
+	kg.set_known(Vector2i(5, 5))
+	_check(kg.is_known(Vector2i(5, 5)) and kg.try_extract(at.call(Vector2i(5, 5))) == [&"stone"]
+		and known_changes == [Vector2i(5, 5)], "known: once known it yields its element")
+	kg.set_known(Vector2i(9, 9))
+	_check(not kg.is_known(Vector2i(9, 9)) and known_changes.size() == 1
+		and not kg.any_unknown(at.call(Vector2i(9, 9))), "known: off-grid coords are never known or unknown")
+	kg.set_tile(Vector2i.ZERO, timber)
+	_check(kg.is_known(Vector2i.ZERO) and not kg.is_known(Vector2i(1, 0)), "known: a replaced tile is known")
+	# (1, 0) is Empty and unknown; swap it with the known timber.
+	_check(kg.try_swap(Vector2i.ZERO, Vector2i(1, 0)) and kg.is_known(Vector2i(1, 0))
+		and not kg.is_known(Vector2i.ZERO), "known: state moves with the tile on a swap")
+	_check(not kg.any_unknown([Vector2i(1, 0), Vector2i(5, 5)] as Array[Vector2i])
+		and kg.any_unknown([Vector2i(1, 0), Vector2i.ZERO] as Array[Vector2i]), "known: any_unknown finds an unknown tile")
+	var frozen := HexMover.new(HexLayout.new(false))
+	frozen.frozen = true
+	var frozen_facing := frozen.facing
+	frozen.turn(1)
+	_check(not frozen.move(Hex.Compass.N) and frozen.coord == Vector2i.ZERO and frozen.facing != frozen_facing,
+		"core: a frozen mover can't move but can turn")
+	frozen.frozen = false
+	_check(frozen.move(Hex.Compass.N), "core: an unfrozen mover moves again")
 	var inv := Inventory.new()
 	var inv_changes := [0]
 	inv.changed.connect(func() -> void: inv_changes[0] += 1)
@@ -551,6 +581,20 @@ func _test_enter_planet() -> void:
 		"planet: %d tiles for radius %d" % [tiles.grid.tiles.size(), radius])
 	_check(tiles.grid.tiles.values().any(func(k: TileKind) -> bool: return k != TileKind.EMPTY),
 		"planet: tiles are generated, not all Empty")
+	_check(tiles.grid.known.is_empty() and (current_scene.get_node("%TileInfo") as TileInfo).shown_yield() == "Elements: unknown",
+		"known: every tile's elements are unknown on landing")
+	var detect_hint: Label = current_scene.get_node("%DetectHint")
+	_check(detect_hint.visible and detect_hint.text == "S – Detect", "detect: hint shows next to unknown tiles")
+	# Unknown icons are flat light gray, keeping the icon's shape (alpha).
+	var unknown_icon := tiles.icon_texture(tiles.grid.kinds[0], false, false).get_image()
+	var unknown_pixels: Array[Color] = []
+	for y in unknown_icon.get_height():
+		for x in unknown_icon.get_width():
+			if unknown_icon.get_pixel(x, y).a > 0.0:
+				unknown_pixels.append(unknown_icon.get_pixel(x, y))
+	_check(not unknown_pixels.is_empty() and unknown_pixels.all(func(c: Color) -> bool:
+		return absf(c.r - tiles.unknown_icon_color.r) < 0.01 and c.r == c.g and c.g == c.b),  # 8-bit channels
+		"known: unknown icons draw in light gray")
 	var aether_bar: ProgressBar = current_scene.get_node("%AetherBar")
 	var aether_label: Label = current_scene.get_node("%AetherLabel")
 	var aether := func() -> int: return _game().state.inventory.count(Aether.ITEM)
@@ -705,7 +749,7 @@ func _test_enter_planet() -> void:
 		"focus: box shows Staff with R – Extract (%s)" % [focus_hints])
 	var general_hints: Array = current_scene.get_node("%Actions").get_children().filter(
 		func(l: Label) -> bool: return l.visible).map(func(l: Label) -> String: return l.text)
-	_check(general_hints == ["F – Push"], "focus: Extract moved out of the general actions (%s)" % [general_hints])
+	_check(general_hints == ["S – Detect", "F – Push"], "focus: Extract moved out of the general actions (%s)" % [general_hints])
 	_check(focus_box.global_position.y > (current_scene.get_node("%Actions") as Control).global_position.y
 		and focus_box.get_global_rect().end.y < divider.global_position.y, "focus: box sits between Push and the divider")
 	_press(KEY_R)
@@ -819,6 +863,51 @@ func _test_enter_planet() -> void:
 	tri = marker.triangle_points()
 	_check(tri[2].x > 0.0 and tri[2].y < 0.0, "planet: facing triangle follows a turn to NE (%s)" % tri)
 
+	# Detect: next to an unknown tile S enters detect mode. The wizard's outline takes in the ring of
+	# tiles around them, and they can't move or take other actions (turning still works) until S or
+	# Esc leaves it.
+	var interaction: Node = current_scene.get_node("TileInteraction")  # untyped: its script uses the Game autoload
+	var single_outline := marker.outline_points()
+	_check(interaction.can_detect_here() and detect_hint.visible, "detect: available at the edge, next to unknown tiles")
+	_press(KEY_S)
+	var ring := marker.outline_points()
+	_check(interaction.detecting and planet_wizard.mover.frozen and marker.outline_radius == interaction.detect_radius,
+		"detect: S enters detect mode")
+	# The 18 outer edges of the wizard's tile and its ring, closed, all clear of the wizard's own tile.
+	_check(ring.size() == 19 and ring[0] == ring[18] and Array(ring).all(func(p: Vector2) -> bool:
+		return p.length() > planet_board.hex_size * 1.5), "detect: outline takes in the ring around the wizard (%d points)" % ring.size())
+	_check(detect_hint.text == "S / Esc – Stop Detecting" and focus_box.modulate.a < 1.0
+		and (current_scene.get_node("%PushHint") as Control).modulate.a < 1.0,
+		"detect: hint says how to stop, blocked actions dim (%s)" % detect_hint.text)
+	var detect_coord := planet_wizard.mover.coord
+	var detect_aether: int = aether.call()
+	var detect_tiles := tiles.grid.tiles.duplicate()
+	var detect_cooldowns := tiles.grid.cooldowns.duplicate()
+	for key: Key in [KEY_W, KEY_X, KEY_Q, KEY_E, KEY_Z, KEY_C, KEY_KP_8, KEY_R, KEY_F, KEY_V, KEY_B]:
+		_press(key)
+	_check(planet_wizard.mover.coord == detect_coord and aether.call() == detect_aether and not lock.busy
+		and tiles.grid.tiles == detect_tiles and tiles.grid.cooldowns == detect_cooldowns and interaction.detecting,
+		"detect: moves and other actions are blocked")
+	var detect_facing := planet_wizard.mover.facing
+	_press(KEY_D)
+	_check(planet_wizard.mover.facing != detect_facing and interaction.detecting, "detect: turning still works")
+	_press(KEY_A)
+	_press(KEY_S)
+	_check(not interaction.detecting and not planet_wizard.mover.frozen and marker.outline_points() == single_outline
+		and focus_box.modulate.a == 1.0 and detect_hint.text == "S – Detect", "detect: S again leaves detect mode")
+	_press(KEY_S)
+	_press(KEY_ESCAPE)
+	_check(not interaction.detecting and current_scene.scene_file_path == "res://scenes/planet.tscn",
+		"detect: Esc leaves detect mode without leaving the planet")
+	var known_before_detect := tiles.grid.known.duplicate()
+	for c in interaction.detect_area():
+		tiles.grid.set_known(c)
+	_press(KEY_S)
+	_check(not interaction.can_detect_here() and not detect_hint.visible and not interaction.detecting,
+		"detect: unavailable with nothing unknown around")
+	for c in interaction.detect_area():
+		tiles.grid.set_known(c, known_before_detect.has(tiles.grid.canonical(c)))
+
 	# Ley lines: hidden, but iron runs along one turn plum.
 	_check(tiles.ley_lines != null and tiles.ley_lines.lines.size() >= 3, "ley: the planet view has the planet's lines")
 	var planet_ley := tiles.ley_lines
@@ -913,7 +1002,9 @@ func _test_enter_planet() -> void:
 	var camera: Camera2D = current_scene.get_node("Camera2D")
 	_check(camera.position == planet_wizard.position and tiles.view_center == planet_wizard.mover.coord,
 		"planet: camera and view follow the wizard")
+	var known_before_scry := tiles.grid.known.size()
 	_press(KEY_V)
+	_check(tiles.grid.known.size() == known_before_scry, "known: scried tiles are unknown")
 	_check(tiles.grid.tiles.size() == 2 * Hex.hexagon(radius).size() - (radius + 1),
 		"scry: V reveals a second patch sharing an edge (%d tiles)" % tiles.grid.tiles.size())
 	_check(not scry_hint.visible, "scry: hint hides once the edge is explored")

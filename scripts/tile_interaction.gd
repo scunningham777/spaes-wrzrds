@@ -6,18 +6,36 @@ extends Node
 # one it faces, V scries (reveals the next patch of the planet), B builds a tower (on a detected
 # iron tile where ley lines cross). Animated actions hand their tween to the ActionLock, which
 # blocks input until they finish.
+#
+# S enters detect mode, where there's an unknown tile within detect_radius of the player: the
+# player can't move or take other actions (turning still works) until S or Esc leaves it.
+
+signal detecting_changed(detecting: bool)
 
 @export var player: HexPlayerController
 @export var tiles: TileGridView
 @export var lock: ActionLock
 @export var swap_seconds: float = 0.3
+## Detect mode covers the player's tile and every tile up to this many steps away.
+@export var detect_radius: int = 1
 
 ## The planet being explored, for scrying; assigned by the scene. tiles shows its grid.
 var surface: PlanetSurface
+var detecting := false
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("extract"):
+	if detecting:
+		if event.is_action_pressed("detect") or event.is_action_pressed("ui_cancel"):
+			_set_detecting(false)
+			get_viewport().set_input_as_handled()
+		elif [&"extract", &"push", &"scry", &"build_tower"].any(event.is_action_pressed):
+			get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("detect"):
+		_try_detect()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("extract"):
 		_try_extract()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("push"):
@@ -42,7 +60,20 @@ func can_build_tower_here() -> bool:
 	return Towers.can_build_at(tiles.grid, tiles.ley_lines, player.mover.coord)
 
 
-# The elements R would extract right now; empty if the line shares none (or a tile is tapped).
+# The tiles detect mode covers, around the player.
+func detect_area() -> Array[Vector2i]:
+	var coords: Array[Vector2i] = []
+	for offset in Hex.hexagon(detect_radius):
+		coords.append(player.mover.coord + offset)
+	return coords
+
+
+# Whether S would enter detect mode here: an unknown tile is in reach.
+func can_detect_here() -> bool:
+	return tiles.grid.any_unknown(detect_area())
+
+
+# The elements R would extract right now; empty if the line shares none (or a tile is unknown or tapped).
 func extract_preview() -> Array[StringName]:
 	return tiles.grid.extractable_elements(extract_line())
 
@@ -106,3 +137,18 @@ func _try_build_tower() -> void:
 	tiles.grid.tick_cooldowns()
 	Towers.try_build(Towers.BASIC, tiles.grid, tiles.ley_lines, Game.state.inventory, here)
 	print("Built a %s at %s" % [Towers.display_name(Towers.BASIC), here])
+
+
+func _try_detect() -> void:
+	if not can_detect_here():
+		print("Nothing unknown to detect around %s" % [player.mover.coord])
+		return
+	_set_detecting(true)
+
+
+# Detect mode holds the player in place.
+func _set_detecting(value: bool) -> void:
+	detecting = value
+	player.mover.frozen = value
+	print("Detect mode %s" % ["on" if value else "off"])
+	detecting_changed.emit(value)

@@ -10,7 +10,7 @@ extends Node2D
 # (NW/NE/SW/SE) in both orientations.
 # Flat-top hexes have no E/W neighbors, so W/X are the N/S movement keys and A/D turn.
 # Pointy-top hexes have no N/S neighbors, so A/D are the E/W movement keys and W/X turn.
-# S / Numpad5 is intentionally unbound, reserved for a future action.
+# S / Numpad5 is the detect action (TileInteraction), not movement.
 #
 # Input actions are named by key position (hex_up = W/Numpad8/Up, etc.) since their meaning
 # depends on orientation.
