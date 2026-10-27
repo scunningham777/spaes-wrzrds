@@ -193,7 +193,9 @@ func _update_detect_panel() -> void:
 	var detection := _interaction.detection
 	if detection == null:
 		return
-	var guessed := detection.guessed(detection.selected)
+	var guessed: Array[StringName] = []
+	if detection.selected != null:
+		guessed = detection.guessed(detection.selected)
 	var list := %DetectElements as Control
 	for i in list.get_child_count():
 		var label := list.get_child(i) as Label

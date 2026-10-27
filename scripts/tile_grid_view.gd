@@ -5,11 +5,11 @@ extends Node2D
 # child of a HexBoard. Draws nothing until a grid is assigned. Every tile is a filled hex
 # (hex_color, or ley_color where it resonates with a ley line or is on an activated one); kinds
 # whose icon has an entry in ICONS draw that sprite-sheet icon over it. Icons with an entry in ICON_ANIMS step through it, all in sync off one clock. Tile size comes
-# from the board's tile_scale. Tiles whose elements are unknown draw their icon in unknown_icon_color
-# (still animated). In detect mode (detection) tiles outside its area shrink and hold still, tiles
+# from the board's tile_scale. Tiles whose elements are unknown draw their icon in unknown_icon_color,
+# holding still. In detect mode (detection) tiles outside its area shrink and hold still, tiles
 # partly guessed right fill with partial_color, guesses show as their number keys in the lower
-# right, the selected tile is outlined, tiles just guessed right flash correct_color (flash_correct),
-# and the landing outline hides. Tiles that cost aether to step onto show the cost as a number and
+# right, the selected tile is outlined, and the landing outline, move costs and cooldowns hide.
+# After a submit, tiles flash (flash_tiles) correct_color or wrong_color. Tiles that cost aether to step onto show the cost as a number and
 # a blue dot in their upper left; the landing tile is outlined. The occupied (player's) tile's icon
 # sits higher, clear of the player's sprite.
 
@@ -46,9 +46,11 @@ extends Node2D
 @export var guess_color: Color = Color(0.55, 0.85, 1.0)
 @export var selection_color: Color = Color.WHITE
 @export var selection_line_width: float = 3.0
-## Fill tiles flash when guessed right, and how long the flash takes to fade back.
+## Fill tiles flash after a submit: guessed right, or guessed all wrong or not at all; and how long
+## the flash takes to fade back.
 @export var correct_color: Color = Color(0.2, 0.65, 0.25)
-@export var correct_flash_seconds: float = 0.6
+@export var wrong_color: Color = Color(0.7, 0.12, 0.12)
+@export var flash_seconds: float = 0.6
 ## Outline around the landing tile.
 @export var landing_color: Color = Color(1.0, 0.85, 0.1)
 @export var landing_line_width: float = 3.0
@@ -138,10 +140,10 @@ var detect_shrink: float = 0.0:
 	set(value):
 		detect_shrink = value
 		queue_redraw()
-## 0..1: how strongly the tiles being flashed (flash_correct) show correct_color.
-var correct_flash: float = 0.0:
+## 0..1: how strongly the tiles being flashed (flash_tiles) show their flash color.
+var flash_strength: float = 0.0:
 	set(value):
-		correct_flash = value
+		flash_strength = value
 		queue_redraw()
 ## 0..1 progress of the swap animation, if one is playing (see animate_swap).
 var swap_progress: float = 1.0:
@@ -166,8 +168,8 @@ var _guess_labels: Array[Array] = []
 # Stored copies of the detect area's coords; kept while outside tiles grow back after detect mode.
 var _detect_area: Dictionary[Vector2i, bool] = {}
 var _shrink: Tween
-# Stored copies of the tiles flash_correct is flashing.
-var _flashing: Dictionary[Vector2i, bool] = {}
+# Stored copies of the tiles flash_tiles is flashing -> their colors.
+var _flashing: Dictionary[Vector2i, Color] = {}
 var _flash: Tween
 
 @onready var board: HexBoard = get_parent() as HexBoard
@@ -293,18 +295,28 @@ func _shrink_tween(to: float) -> void:
 				_detect_area.clear())
 
 
-# Flashes the tiles at coords correct_color, then fades them back to their own fill. Replaces any
-# flash still playing.
-func flash_correct(coords: Array[Vector2i]) -> void:
+# Flashes each tile in colors (coord -> Color) its color, then fades them back to their own fill.
+# Replaces any flash still playing.
+func flash_tiles(colors: Dictionary[Vector2i, Color]) -> void:
 	if _flash != null:
 		_flash.kill()
 	_flashing.clear()
-	for c in coords:
-		_flashing[grid.canonical(c)] = true
-	correct_flash = 1.0
+	for c in colors:
+		_flashing[grid.canonical(c)] = colors[c]
+	flash_strength = 1.0
 	_flash = create_tween()
-	_flash.tween_interval(correct_flash_seconds * 0.25)
-	_flash.tween_property(self, "correct_flash", 0.0, correct_flash_seconds * 0.75)
+	_flash.tween_interval(flash_seconds * 0.25)
+	_flash.tween_property(self, "flash_strength", 0.0, flash_seconds * 0.75)
+
+
+# Whether the icon of the tile at coord holds still: it's unknown, or outside the detect area.
+func icon_still(coord: Vector2i) -> bool:
+	return not grid.is_known(coord) or is_outside_detect(coord)
+
+
+# Whether the tile at coord shows its move cost and cooldown: not in detect mode, nor shrunk.
+func shows_numbers(coord: Vector2i) -> bool:
+	return detection == null and not is_outside_detect(coord)
 
 
 # Whether coord is outside detect mode's area (shrunk, or shrinking back); false outside detect mode.
@@ -347,7 +359,7 @@ func _draw() -> void:
 		draw_set_transform(board.hex_to_local(grid.nearest(landing, view_center)))
 		draw_polyline(board.corner_points(landing_scale * tile_scale_at(landing)), landing_color, landing_line_width)
 		draw_set_transform(Vector2.ZERO)
-	if detection != null:
+	if detection != null and detection.selected != null:
 		draw_set_transform(board.hex_to_local(grid.nearest(detection.selected, view_center)))
 		draw_polyline(board.corner_points(board.tile_scale), selection_color, selection_line_width)
 		draw_set_transform(Vector2.ZERO)
@@ -369,8 +381,8 @@ func fill_color(coord: Vector2i) -> Color:
 		fill = partial_color
 	elif ley_lines != null and (ley_lines.is_active(coord) or ley_lines.is_resonant(grid, coord)):
 		fill = ley_color
-	if correct_flash > 0.0 and _flashing.has(grid.canonical(coord)):
-		fill = fill.lerp(correct_color, correct_flash)
+	if flash_strength > 0.0 and _flashing.has(grid.canonical(coord)):
+		fill = fill.lerp(_flashing[grid.canonical(coord)], flash_strength)
 	return fill
 
 
@@ -382,21 +394,20 @@ func icon_shift(coord: Vector2i) -> Vector2:
 
 
 # Draws the icon (offset by icon_offset, and tapped cooldown) and move cost of the tile at coord,
-# centered on center, plus its guesses in detect mode. Tiles outside the detect area only draw
-# their icon, shrunk and still.
+# centered on center, plus its guesses in detect mode (see shows_numbers and icon_still). Tiles
+# outside the detect area only draw their icon, shrunk.
 func _draw_contents(coord: Vector2i, center: Vector2, icon_offset: Vector2) -> void:
 	var kind := grid.get_tile(coord)
-	var outside := is_outside_detect(coord)
+	var numbers_shown := shows_numbers(coord)
 	if has_icon(kind):
 		var tapped := grid.is_tapped(coord)
-		_draw_icon(kind.icon, center + icon_offset, tapped, grid.is_known(coord), tile_scale_at(coord), outside)
-		if tapped and not outside:
+		_draw_icon(kind.icon, center + icon_offset, tapped, grid.is_known(coord), tile_scale_at(coord),
+			icon_still(coord))
+		if tapped and numbers_shown:
 			_cooldown_labels.append([grid.cooldown(coord), center])
-	if outside:
-		return
-	if grid.move_cost(coord) > 0:
+	if numbers_shown and grid.move_cost(coord) > 0:
 		_draw_move_cost(grid.move_cost(coord), center)
-	if detection != null and not detection.guessed(coord).is_empty():
+	if detection != null and not is_outside_detect(coord) and not detection.guessed(coord).is_empty():
 		var numbers: Array[String] = []
 		for element in detection.guessed(coord):
 			numbers.append(str(Detection.number(detection.elements.find(element))))

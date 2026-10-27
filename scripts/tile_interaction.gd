@@ -63,12 +63,11 @@ func can_build_tower_here() -> bool:
 	return Towers.can_build_at(tiles.grid, tiles.ley_lines, player.mover.coord)
 
 
-# The tiles detect mode covers, around the player: the player's own first.
+# The tiles detect mode covers, around the player.
 func detect_area() -> Array[Vector2i]:
-	var coords: Array[Vector2i] = [player.mover.coord]
+	var coords: Array[Vector2i] = []
 	for offset in Hex.hexagon(detect_radius):
-		if offset != Vector2i.ZERO:
-			coords.append(player.mover.coord + offset)
+		coords.append(player.mover.coord + offset)
 	return coords
 
 
@@ -172,11 +171,14 @@ func _detect_input(event: InputEvent) -> bool:
 	elif event.is_action_pressed("submit_guess"):
 		var learned := detection.submit()
 		print("Detected %s" % [learned.map(func(k: TileKind) -> String: return k.display_name)])
-		var correct: Array[Vector2i] = []
-		correct.assign(detection.area.filter(func(c: Vector2i) -> bool:
-			return tiles.grid.has_tile(c) and tiles.grid.get_tile(c) in learned))
-		if not correct.is_empty():
-			tiles.flash_correct(correct)
+		# Every tile flashes but the partly right ones (gold), so each submit shows.
+		var colors: Dictionary[Vector2i, Color] = {}
+		for c in detection.area:
+			if tiles.grid.has_tile(c) and tiles.grid.get_tile(c) in learned:
+				colors[c] = tiles.correct_color
+		for c in detection.missed():
+			colors[c] = tiles.wrong_color
+		tiles.flash_tiles(colors)
 		if detection.is_done():
 			_end_detect()
 	elif event.is_action_pressed("detect"):

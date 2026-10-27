@@ -266,12 +266,13 @@ func _test_core_logic() -> void:
 		if d != Vector2i.ZERO:
 			det_area.append(d)
 	var det := Detection.new(dg, det_area)
-	_check(det.elements == [&"gold", &"iron", &"stone", &"wood"] and det.selected == Vector2i.ZERO
-		and det.targets().size() == 4,
-		"detect: every element on the planet, alphabetical; starts on the first coord (%s)" % [det.elements])
+	_check(det.elements == [&"gold", &"iron", &"stone", &"wood"] and det.selected == null
+		and det.targets().size() == 4 and not det.toggle(0),
+		"detect: every element on the planet, alphabetical; nothing selected to start (%s)" % [det.elements])
 	_check(Detection.number(0) == 1 and Detection.number(9) == 0, "detect: elements are numbered 1-9, then 0")
-	_check(not det.select(Vector2i(1, -1)) and not det.select(Vector2i(5, 5)) and det.selected == Vector2i.ZERO,
+	_check(not det.select(Vector2i(1, -1)) and not det.select(Vector2i(5, 5)) and det.selected == null,
 		"detect: only unknown tiles in the area can be selected")
+	det.select(Vector2i.ZERO)
 	det.toggle(1)  # iron, for (0, 0)
 	_check(det.guessed(Vector2i(0, 1)) == [&"iron"], "detect: a guess counts for every tile of the kind")
 	det.select(Vector2i(1, 0))  # rusty gold: gold and iron
@@ -283,8 +284,8 @@ func _test_core_logic() -> void:
 	det.toggle(2)  # stone on timber: a decoy, all wrong
 	_check(det.submit() == [iron] and dg.is_kind_known(iron) and not dg.is_kind_known(rusty_gold)
 		and det.guessed(Vector2i.ZERO).is_empty(), "detect: an exact guess makes the kind known")
-	_check(det.is_partial(Vector2i(1, 0)) and not det.is_partial(Vector2i(-1, 0)) and not det.is_partial(Vector2i.ZERO),
-		"detect: some right is partial, all wrong isn't")
+	_check(det.is_partial(Vector2i(1, 0)) and not det.is_partial(Vector2i(-1, 0)) and not det.is_partial(Vector2i.ZERO)
+		and det.missed() == [Vector2i(-1, 0)], "detect: some right is partial, all wrong is missed")
 	_check(det.guessed(Vector2i(1, 0)) == [&"iron"] and det.guessed(Vector2i(-1, 0)) == [&"stone"],
 		"detect: wrong guesses stay to adjust")
 	det.select(Vector2i(1, 0))
@@ -650,9 +651,12 @@ func _test_enter_planet() -> void:
 	_check(not unknown_pixels.is_empty() and unknown_pixels.all(func(c: Color) -> bool:
 		return absf(c.r - tiles.unknown_icon_color.r) < 0.01 and c.r == c.g and c.g == c.b),  # 8-bit channels
 		"known: unknown icons draw in light gray")
+	_check(tiles.icon_still(Vector2i.ZERO) and tiles.shows_numbers(Vector2i.ZERO),
+		"known: unknown icons hold still while exploring; move costs show")
 	# The checks below extract, so learn every kind (detect mode gets its own unknown tiles later).
 	for kind in tiles.grid.kinds:
 		tiles.grid.set_kind_known(kind)
+	_check(not tiles.icon_still(Vector2i.ZERO), "known: known icons animate")
 	_check(not detect_hint.visible, "detect: no hint with nothing unknown around")
 	var aether_bar: ProgressBar = current_scene.get_node("%AetherBar")
 	var aether_label: Label = current_scene.get_node("%AetherLabel")
@@ -947,7 +951,7 @@ func _test_enter_planet() -> void:
 		and tiles.icon_shift(detect_center) == Vector2.ZERO,
 		"detect: the wizard flies off the board, input blocked, and their tile's icon recenters")
 	_check(interaction.detecting and planet_wizard.mover.frozen and tiles.detection == interaction.detection
-		and interaction.detection.selected == tiles.grid.canonical(detect_center), "detect: S enters detect mode, on the wizard's tile")
+		and interaction.detection.selected == null, "detect: S enters detect mode, nothing selected")
 	_check(detect_panel.visible and (current_scene.get_node("%DetectHints") as Control).visible and not aether_bar.visible
 		and not actions.visible and not focus_box.visible and not (current_scene.get_node("%TileInfo") as Control).visible
 		and not marker.visible, "detect: the side panel shows detecting instead, and the wizard's outline hides")
@@ -975,6 +979,15 @@ func _test_enter_planet() -> void:
 	await _until(func() -> bool: return not lock.busy)
 	var detection: Detection = interaction.detection
 	_check(detection.guesses.is_empty() and detection.partial.is_empty(), "detect: a new session starts fresh")
+	_check(not tiles.shows_numbers(Vector2i(0, 1)) and tiles.icon_still(Vector2i(0, 1)),
+		"detect: move costs and cooldowns hide; unknown icons hold still")
+	_press(KEY_3)
+	_check(detection.guesses.is_empty(), "detect: no guess without a selected tile")
+	_press(KEY_ENTER)  # nothing guessed: every tile in the ring is wrong
+	_check([detect_center, Vector2i(0, 1), Vector2i(1, 1), Vector2i(-1, 2)].all(func(c: Vector2i) -> bool:
+		return tiles.fill_color(c).is_equal_approx(tiles.wrong_color)), "detect: submitting no guesses flashes the ring red")
+	_press(KEY_S)  # the wizard's own tile
+	_check(detection.selected == tiles.grid.canonical(detect_center), "detect: S selects the wizard's tile")
 	_press(KEY_3)  # Iron, on the wizard's iron tile
 	_check(detection.guessed(Vector2i(1, 1)) == [&"iron"], "detect: a guess counts for every like icon")
 	_press(KEY_X)  # S: the gold at (0, 1)
@@ -1004,8 +1017,8 @@ func _test_enter_planet() -> void:
 		and not tiles.grid.is_known(Vector2i(-1, 2)) and interaction.detecting, "detect: Enter submits; exact guesses become known")
 	_check(tiles.fill_color(Vector2i(-1, 2)) == tiles.partial_color and tiles.fill_color(Vector2i(0, 1)) != tiles.partial_color,
 		"detect: a partly right tile turns gold")
-	await _until(func() -> bool: return tiles.correct_flash == 0.0)
-	_check(tiles.correct_flash == 0.0 and not tiles.fill_color(Vector2i(0, 1)).is_equal_approx(tiles.correct_color),
+	await _until(func() -> bool: return tiles.flash_strength == 0.0)
+	_check(tiles.flash_strength == 0.0 and not tiles.fill_color(Vector2i(0, 1)).is_equal_approx(tiles.correct_color),
 		"detect: the green flash fades")
 	_check(tiles.grid.tiles.keys().filter(func(c: Vector2i) -> bool: return tiles.grid.get_tile(c) == iron)
 		.all(tiles.grid.is_known), "detect: a detected icon is known across the planet")
@@ -1020,7 +1033,7 @@ func _test_enter_planet() -> void:
 	for kind in tiles.grid.kinds:
 		tiles.grid.set_kind_known(kind)
 	await _until(func() -> bool: return tiles.detect_shrink == 0.0)
-	await _until(func() -> bool: return not lock.busy and tiles.correct_flash == 0.0)
+	await _until(func() -> bool: return not lock.busy and tiles.flash_strength == 0.0)
 
 	# Ley lines: hidden, but iron runs along one turn plum.
 	_check(tiles.ley_lines != null and tiles.ley_lines.lines.size() >= 3, "ley: the planet view has the planet's lines")

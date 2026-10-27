@@ -22,20 +22,18 @@ var grid: TileGrid
 var area: Array[Vector2i] = []
 ## The elements to guess from, alphabetical by display name.
 var elements: Array[StringName] = []
-## The tile guesses go to (a stored copy); starts on the area's first coord (the player's).
-var selected: Vector2i
+## The tile guesses go to (a stored copy), or null until one is selected.
+var selected: Variant = null
 ## Kind id -> guessed elements, in list order.
 var guesses: Dictionary[StringName, Array] = {}
 ## Stored copies of the tiles the last submit found partly right.
 var partial: Dictionary[Vector2i, bool] = {}
 
 
-# p_area's first coord is selected to start with.
 func _init(p_grid: TileGrid, p_area: Array[Vector2i]) -> void:
 	grid = p_grid
 	for c in p_area:
 		area.append(grid.canonical(c))
-	selected = area[0]
 	for kind in grid.kinds:
 		for element in kind.elements:
 			if not element in elements:
@@ -58,6 +56,14 @@ func targets() -> Array[Vector2i]:
 
 func is_target(coord: Vector2i) -> bool:
 	return grid.canonical(coord) in targets()
+
+
+# The area's unknown tiles the last submit found no part of right (guessed all wrong, or not at
+# all); after a submit, every target that isn't partial.
+func missed() -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	result.assign(targets().filter(func(c: Vector2i) -> bool: return not partial.has(c)))
+	return result
 
 
 # Whether nothing's left to detect.
@@ -83,9 +89,9 @@ func guessed(coord: Vector2i) -> Array[StringName]:
 
 
 # Guesses the element at index in the list for the selected tile's kind, or takes that guess back.
-# False (no change) if the selected tile is known or index is past the guessable elements.
+# False (no change) if no unknown tile is selected or index is past the guessable elements.
 func toggle(index: int) -> bool:
-	if index < 0 or index >= mini(elements.size(), MAX_ELEMENTS) or not is_target(selected):
+	if index < 0 or index >= mini(elements.size(), MAX_ELEMENTS) or selected == null or not is_target(selected):
 		return false
 	var element := elements[index]
 	var kind := grid.get_tile(selected)
