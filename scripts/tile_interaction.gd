@@ -171,13 +171,10 @@ func _detect_input(event: InputEvent) -> bool:
 	elif event.is_action_pressed("submit_guess"):
 		var learned := detection.submit()
 		print("Detected %s" % [learned.map(func(k: TileKind) -> String: return k.display_name)])
-		# Every tile flashes but the partly right ones (gold), so each submit shows.
 		var colors: Dictionary[Vector2i, Color] = {}
 		for c in detection.area:
 			if tiles.grid.has_tile(c) and tiles.grid.get_tile(c) in learned:
 				colors[c] = tiles.correct_color
-		for c in detection.missed():
-			colors[c] = tiles.wrong_color
 		tiles.flash_tiles(colors)
 		if detection.is_done():
 			_end_detect()

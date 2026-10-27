@@ -22,7 +22,7 @@ know can be extracted. Next to an unknown tile, **S** enters detect mode, a gues
 Select a tile with the movement keys (**S** / numpad 5 for your own) and toggle element guesses with the number
 keys; a guess counts for every tile with that icon. **Enter** or **Space** submits: an icon guessed exactly
 becomes known everywhere on the planet (its tiles flash green), one partly right (some of its elements, extras or not) turns gold
-until the next submit, and the rest (all wrong, or not guessed) flash red. **Esc** leaves; detect mode also ends once the whole ring is known.
+and the rest (all wrong, or not guessed) turn red, both until the next submit. **Esc** leaves; detect mode also ends once the whole ring is known.
 
 A planet is a large hex map that wraps around both ways, but you only see what you've explored: you land in a
 small hexagon of tiles, and scrying reveals the next hexagon over, sharing the edge you stand on. Tiles are

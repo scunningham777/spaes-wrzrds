@@ -7,10 +7,10 @@ extends Node2D
 # whose icon has an entry in ICONS draw that sprite-sheet icon over it. Icons with an entry in ICON_ANIMS step through it, all in sync off one clock. Tile size comes
 # from the board's tile_scale. Tiles whose elements are unknown draw their icon in unknown_icon_color,
 # holding still. In detect mode (detection) tiles outside its area shrink and hold still, tiles
-# partly guessed right fill with partial_color, guesses show as their number keys in the lower
-# right, the selected tile is outlined, and the landing outline, move costs and cooldowns hide.
-# After a submit, tiles flash (flash_tiles) correct_color or wrong_color. Tiles that cost aether to step onto show the cost as a number and
-# a blue dot in their upper left; the landing tile is outlined. The occupied (player's) tile's icon
+# partly guessed right fill with partial_color and ones guessed wrong with wrong_color, guesses
+# show as their number keys in the lower right, the selected tile is outlined, and the landing
+# outline, move costs and cooldowns hide. Tiles just guessed right flash correct_color
+# (flash_tiles). Tiles that cost aether to step onto show the cost as a number and a blue dot in their upper left; the landing tile is outlined. The occupied (player's) tile's icon
 # sits higher, clear of the player's sprite.
 
 ## Sprite sheet that ICONS regions are cut from.
@@ -38,18 +38,18 @@ extends Node2D
 @export var move_cost_dot_color: Color = Color(0.3, 0.6, 1.0)
 @export var move_cost_dot_radius: float = 3.5
 ## Detect mode: drawn size of tiles outside its area, how long they take to shrink or grow back,
-## fill of tiles partly guessed right, guess numbers, and the selected tile's outline.
+## fills of tiles partly guessed right and guessed wrong, guess numbers, and the selected tile's
+## outline.
 @export var detect_outside_scale: float = 0.25
 @export var detect_shrink_seconds: float = 0.15
 @export var partial_color: Color = Color(0.72, 0.53, 0.04)
+@export var wrong_color: Color = Color(0.6, 0.1, 0.1)
 @export var guess_font_size: int = 14
 @export var guess_color: Color = Color(0.55, 0.85, 1.0)
 @export var selection_color: Color = Color.WHITE
 @export var selection_line_width: float = 3.0
-## Fill tiles flash after a submit: guessed right, or guessed all wrong or not at all; and how long
-## the flash takes to fade back.
+## Fill tiles guessed right flash, and how long the flash takes to fade back.
 @export var correct_color: Color = Color(0.2, 0.65, 0.25)
-@export var wrong_color: Color = Color(0.7, 0.12, 0.12)
 @export var flash_seconds: float = 0.6
 ## Outline around the landing tile.
 @export var landing_color: Color = Color(1.0, 0.85, 0.1)
@@ -372,13 +372,15 @@ func _draw_overlay() -> void:
 		_draw_guesses(label[0], label[1])
 
 
-# Hex fill for the tile at coord: partly guessed tiles in detect mode, then resonant tiles, stand
+# Hex fill for the tile at coord: partly right or wrong tiles in detect mode, then resonant tiles, stand
 # out; everything else is hex_color. A correct-guess flash blends over it. The ley lines themselves
 # are never drawn.
 func fill_color(coord: Vector2i) -> Color:
 	var fill := hex_color
 	if detection != null and detection.is_partial(coord):
 		fill = partial_color
+	elif detection != null and detection.is_wrong(coord):
+		fill = wrong_color
 	elif ley_lines != null and (ley_lines.is_active(coord) or ley_lines.is_resonant(grid, coord)):
 		fill = ley_color
 	if flash_strength > 0.0 and _flashing.has(grid.canonical(coord)):

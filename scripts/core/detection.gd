@@ -4,8 +4,8 @@ extends RefCounted
 # One detect mode session: the player guesses the elements of the unknown tiles in an area (the
 # ring around them), Wordle-style. Guesses belong to a kind, so guessing for one tile guesses for
 # every tile of its kind. Submitting scores each guessed kind: exactly its elements makes it known
-# (TileGrid.set_kind_known, planet-wide); some of them, extras or not, makes its tiles partial
-# until the next submit; none leaves them as they were.
+# (TileGrid.set_kind_known, planet-wide); some of them, extras or not, makes its tiles partial;
+# none (or no guess) makes them wrong. Partial and wrong last until the next submit.
 #
 # The elements to guess from are every element on the planet (its TileGrid.kinds), in
 # alphabetical order, whether or not the area has it: decoys keep the last unknown kind from being
@@ -28,6 +28,8 @@ var selected: Variant = null
 var guesses: Dictionary[StringName, Array] = {}
 ## Stored copies of the tiles the last submit found partly right.
 var partial: Dictionary[Vector2i, bool] = {}
+## Stored copies of the tiles the last submit found no part of right (guessed all wrong, or not at all).
+var wrong: Dictionary[Vector2i, bool] = {}
 
 
 func _init(p_grid: TileGrid, p_area: Array[Vector2i]) -> void:
@@ -56,14 +58,6 @@ func targets() -> Array[Vector2i]:
 
 func is_target(coord: Vector2i) -> bool:
 	return grid.canonical(coord) in targets()
-
-
-# The area's unknown tiles the last submit found no part of right (guessed all wrong, or not at
-# all); after a submit, every target that isn't partial.
-func missed() -> Array[Vector2i]:
-	var result: Array[Vector2i] = []
-	result.assign(targets().filter(func(c: Vector2i) -> bool: return not partial.has(c)))
-	return result
 
 
 # Whether nothing's left to detect.
@@ -114,9 +108,14 @@ func is_partial(coord: Vector2i) -> bool:
 	return partial.has(grid.canonical(coord))
 
 
+func is_wrong(coord: Vector2i) -> bool:
+	return wrong.has(grid.canonical(coord))
+
+
 # Scores every guessed kind in the area (see the top). Returns the kinds it made known.
 func submit() -> Array[TileKind]:
 	partial.clear()
+	wrong.clear()
 	var learned: Array[TileKind] = []
 	var kinds: Array[TileKind] = []
 	for c in targets():
@@ -127,10 +126,11 @@ func submit() -> Array[TileKind]:
 		var right := kind_guesses.filter(func(e: StringName) -> bool: return e in kind.elements)
 		if right.size() == kind.elements.size() and kind_guesses.size() == right.size():
 			learned.append(kind)
-		elif not right.is_empty():
+		else:
+			var results: Dictionary[Vector2i, bool] = partial if not right.is_empty() else wrong
 			for c in targets():
 				if grid.get_tile(c) == kind:
-					partial[c] = true
+					results[c] = true
 	for kind in learned:
 		guesses.erase(kind.id)
 		grid.set_kind_known(kind)

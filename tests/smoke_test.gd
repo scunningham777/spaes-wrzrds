@@ -285,7 +285,8 @@ func _test_core_logic() -> void:
 	_check(det.submit() == [iron] and dg.is_kind_known(iron) and not dg.is_kind_known(rusty_gold)
 		and det.guessed(Vector2i.ZERO).is_empty(), "detect: an exact guess makes the kind known")
 	_check(det.is_partial(Vector2i(1, 0)) and not det.is_partial(Vector2i(-1, 0)) and not det.is_partial(Vector2i.ZERO)
-		and det.missed() == [Vector2i(-1, 0)], "detect: some right is partial, all wrong is missed")
+		and det.is_wrong(Vector2i(-1, 0)) and not det.is_wrong(Vector2i(1, 0)) and det.wrong.size() == 1,
+		"detect: some right is partial, all wrong is wrong")
 	_check(det.guessed(Vector2i(1, 0)) == [&"iron"] and det.guessed(Vector2i(-1, 0)) == [&"stone"],
 		"detect: wrong guesses stay to adjust")
 	det.select(Vector2i(1, 0))
@@ -293,13 +294,14 @@ func _test_core_logic() -> void:
 	det.select(Vector2i(-1, 0))
 	det.toggle(3)  # stone and wood on timber: right, plus an extra
 	_check(det.guessed(Vector2i(1, 0)) == [&"gold", &"iron"] and det.submit() == [rusty_gold]
-		and det.is_partial(Vector2i(-1, 0)) and not det.is_partial(Vector2i(1, 0)),
+		and det.is_partial(Vector2i(-1, 0)) and not det.is_partial(Vector2i(1, 0)) and det.wrong.is_empty(),
 		"detect: a new submit replaces the results; right plus an extra is partial")
 	_check(det.elements == [&"gold", &"iron", &"stone", &"wood"] and det.toggle(0) and det.toggle(0)
 		and det.guessed(Vector2i(-1, 0)) == [&"stone", &"wood"],
 		"detect: the list never changes, and detected elements can still be guessed")
 	det.toggle(2)  # stone off: just wood
-	_check(det.submit() == [timber] and det.is_done() and det.partial.is_empty(), "detect: done once everything is known")
+	_check(det.submit() == [timber] and det.is_done() and det.partial.is_empty() and det.wrong.is_empty(),
+		"detect: done once everything is known")
 	var inv := Inventory.new()
 	var inv_changes := [0]
 	inv.changed.connect(func() -> void: inv_changes[0] += 1)
@@ -984,8 +986,12 @@ func _test_enter_planet() -> void:
 	_press(KEY_3)
 	_check(detection.guesses.is_empty(), "detect: no guess without a selected tile")
 	_press(KEY_ENTER)  # nothing guessed: every tile in the ring is wrong
-	_check([detect_center, Vector2i(0, 1), Vector2i(1, 1), Vector2i(-1, 2)].all(func(c: Vector2i) -> bool:
-		return tiles.fill_color(c).is_equal_approx(tiles.wrong_color)), "detect: submitting no guesses flashes the ring red")
+	var ring_tiles: Array[Vector2i] = [detect_center, Vector2i(0, 1), Vector2i(1, 1), Vector2i(-1, 2)]
+	_check(ring_tiles.all(func(c: Vector2i) -> bool: return tiles.fill_color(c) == tiles.wrong_color),
+		"detect: submitting no guesses turns the ring red")
+	await create_timer(0.3).timeout
+	_check(ring_tiles.all(func(c: Vector2i) -> bool: return tiles.fill_color(c) == tiles.wrong_color),
+		"detect: and it stays red until the next submit")
 	_press(KEY_S)  # the wizard's own tile
 	_check(detection.selected == tiles.grid.canonical(detect_center), "detect: S selects the wizard's tile")
 	_press(KEY_3)  # Iron, on the wizard's iron tile
@@ -1012,7 +1018,8 @@ func _test_enter_planet() -> void:
 	_press(KEY_ENTER)
 	_check(tiles.fill_color(Vector2i(0, 1)).is_equal_approx(tiles.correct_color)
 		and tiles.fill_color(detect_center).is_equal_approx(tiles.correct_color)
-		and tiles.fill_color(Vector2i(-1, 2)) == tiles.partial_color, "detect: tiles guessed right flash green")
+		and tiles.fill_color(Vector2i(-1, 2)) == tiles.partial_color and detection.wrong.is_empty(),
+		"detect: tiles guessed right flash green; the next submit clears the red")
 	_check(tiles.grid.is_known(detect_center) and tiles.grid.is_known(Vector2i(1, 1)) and tiles.grid.is_known(Vector2i(0, 1))
 		and not tiles.grid.is_known(Vector2i(-1, 2)) and interaction.detecting, "detect: Enter submits; exact guesses become known")
 	_check(tiles.fill_color(Vector2i(-1, 2)) == tiles.partial_color and tiles.fill_color(Vector2i(0, 1)) != tiles.partial_color,
