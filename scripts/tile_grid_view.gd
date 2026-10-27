@@ -10,8 +10,9 @@ extends Node2D
 # partly guessed right fill with partial_color and ones guessed wrong with wrong_color, guesses
 # show as their number keys in the lower right, the selected tile is outlined, and the landing
 # outline, move costs and cooldowns hide. Tiles just guessed right flash correct_color
-# (flash_tiles). Tiles that cost aether to step onto show the cost as a number and a blue dot in their upper left; the landing tile is outlined. The occupied (player's) tile's icon
-# sits higher, clear of the player's sprite.
+# (flash_tiles). Tiles that cost aether to step onto show the cost as a number and a blue dot in
+# their upper left; the landing tile is outlined. The occupied (player's) tile's icon sits higher,
+# clear of the player's sprite.
 
 ## Sprite sheet that ICONS regions are cut from.
 @export var icon_sheet: Texture2D
