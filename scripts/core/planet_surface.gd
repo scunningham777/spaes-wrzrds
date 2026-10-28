@@ -64,6 +64,20 @@ func reveal_patch(center: Vector2i) -> bool:
 	return true
 
 
+# Reveals (generating) every unrevealed tile within radius of center. Returns the stored copies of
+# the new tiles.
+func reveal_around(center: Vector2i, radius: int) -> Array[Vector2i]:
+	var region: Array[Vector2i] = []
+	for offset in Hex.hexagon(radius):
+		region.append(center + offset)
+	return generator.reveal(grid, region)
+
+
+# Whether a tile next to coord is still unrevealed.
+func next_to_unrevealed(coord: Vector2i) -> bool:
+	return Hex.hexagon(1).any(func(offset: Vector2i) -> bool: return not grid.has_tile(coord + offset))
+
+
 # Center of the unrevealed patch that scrying from coord would reveal (its copy nearest coord), or
 # null if coord isn't at the middle of an edge between a revealed patch and an unrevealed one.
 # With an odd patch radius an edge has an even number of tiles, so either middle tile counts.

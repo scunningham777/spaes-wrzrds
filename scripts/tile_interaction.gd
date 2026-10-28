@@ -3,8 +3,9 @@ extends Node
 
 # Ported from Unity TileExplore.TileInteractionManager: maps interaction keys to TileGrid
 # operations at the player's position/facing. R extracts, F swaps the player's tile with the
-# one it faces, V scries (reveals the next patch of the planet), B builds a tower (on a detected
-# iron tile where ley lines cross). Animated actions hand their tween to the ActionLock, which
+# one it faces, V scries (next to unrevealed tiles, reveals every tile within the orb's scry radius),
+# B builds a tower (on a detected iron tile where ley lines cross). Extract and scry come from the
+# equipped foci (Foci). Animated actions hand their tween to the ActionLock, which
 # blocks input until they finish.
 #
 # S enters detect mode, where there's an unknown tile within detect_radius of the player (see
@@ -54,7 +55,14 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # The tiles R would extract: the player's tile plus the equipped focus's distance straight ahead.
 func extract_line() -> Array[Vector2i]:
-	return Hex.line(player.mover.coord, player.mover.facing, Foci.distance(Game.state.equipped_focus))
+	var staff := Foci.granting(Game.state.equipped_foci, &"extract")
+	return Hex.line(player.mover.coord, player.mover.facing, Foci.distance(staff))
+
+
+# Whether V would scry here: a focus grants it, and a tile next to the player is unrevealed.
+func can_scry_here() -> bool:
+	return surface != null and not Foci.granting(Game.state.equipped_foci, &"scry").is_empty() \
+		and surface.next_to_unrevealed(player.mover.coord)
 
 
 # Whether the player's tile is a tower site (affordability aside). Uses the ley lines as the map
@@ -88,9 +96,9 @@ func extract_preview() -> Array[StringName]:
 # untapped and sharing at least one element. Success taps them all and yields the focus's extract
 # amount of each shared element, not one per tile.
 func _try_extract() -> void:
-	var focus := Game.state.equipped_focus
-	if not Foci.grants(focus, &"extract"):
-		print("The equipped focus can't extract")
+	var focus := Foci.granting(Game.state.equipped_foci, &"extract")
+	if focus.is_empty():
+		print("No equipped focus can extract")
 		return
 	var coords := extract_line()
 	if not tiles.grid.can_extract(coords):
@@ -115,17 +123,16 @@ func _try_swap() -> void:
 	lock.run(tiles.animate_swap(here, front, swap_seconds))
 
 
-# Scrying works from the middle of the explored area's edge (see PlanetSurface.scry_target) and
-# reveals the patch beyond it.
+# Scrying works next to an unrevealed tile and reveals every tile within the scrying focus's
+# scry_radius of the player.
 func _try_scry() -> void:
 	var here := player.mover.coord
-	if surface == null or not surface.can_scry(here):
-		print("Nothing to scry from %s" % [here])
+	if not can_scry_here():
+		print("Can't scry from %s" % [here])
 		return
 	tiles.grid.tick_cooldowns()
-	var target: Vector2i = surface.scry_target(here)
-	surface.try_scry(here)
-	print("Scried the patch around %s" % [target])
+	var revealed := surface.reveal_around(here, Foci.scry_radius(Foci.granting(Game.state.equipped_foci, &"scry")))
+	print("Scried %d tiles around %s" % [revealed.size(), here])
 
 
 # Replaces the detected iron tile under the player with a tower, spending its cost.

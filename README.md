@@ -8,7 +8,7 @@ Open `project.godot` in Godot 4.7.x (standard build, not .NET) and press **F5**.
 
 Controls (flat-top hexes): **Q/W/E/Z/X/C** or numpad move · **A/D** turn · **Enter** enter a planet ·
 **R** extract the tile you're on (needs the staff; taps the tile for a few actions) · **F** swap your tile with
-the one you face · **S** detect (see below) · **V** scry (from the middle of the explored area's edge) · **B** build a tower (see below) ·
+the one you face · **S** detect (see below) · **V** scry (needs the orb; see below) · **B** build a tower (see below) ·
 **I** inventory · **Esc** back.
 
 On a planet each move costs the aether (the blue bar) of the tile you step onto, shown as a number
@@ -25,8 +25,10 @@ becomes known everywhere on the planet (its tiles flash green), one partly right
 and the rest (all wrong, or not guessed) turn red, both until the next submit. **Esc** leaves; detect mode also ends once the whole ring is known.
 
 A planet is a large hex map that wraps around both ways, but you only see what you've explored: you land in a
-small hexagon of tiles, and scrying reveals the next hexagon over, sharing the edge you stand on. Tiles are
-generated as they're revealed.
+small hexagon of tiles, and next to unexplored ground **V** scries, revealing every tile around you. How far both
+reach comes from your orb. Tiles are generated as they're revealed.
+
+Your equipped foci (the staff and the orb) each get a box in the side panel listing the actions they grant.
 
 Each planet also has hidden ley lines, 1–2 along each hex axis. Two or more known iron tiles in a row along one get a plum
 background; the lines themselves are never shown.

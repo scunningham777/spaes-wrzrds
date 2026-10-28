@@ -24,22 +24,6 @@ corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_focus"]
-content_margin_left = 12.0
-content_margin_top = 8.0
-content_margin_right = 12.0
-content_margin_bottom = 12.0
-bg_color = Color(0.2, 0.21, 0.24, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.3, 0.31, 0.34, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-
 [sub_resource type="StyleBoxLine" id="StyleBoxLine_divider"]
 color = Color(0.5, 0.42, 0.28, 1)
 thickness = 2
@@ -278,13 +262,6 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "F – Push"
 
-[node name="ScryHint" type="Label" parent="UI/SidePanel/Margin/Layout/Top/Actions"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "V – Scry"
-
 [node name="BuildHint" type="Label" parent="UI/SidePanel/Margin/Layout/Top/Actions"]
 unique_name_in_owner = true
 visible = false
@@ -293,27 +270,11 @@ theme_override_font_sizes/font_size = 20
 text = "B – Build Tower"
 autowrap_mode = 3
 
-[node name="FocusBox" type="PanelContainer" parent="UI/SidePanel/Margin/Layout/Top"]
+[node name="Foci" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout/Top"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_focus")
-
-[node name="Content" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout/Top/FocusBox"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="FocusName" type="Label" parent="UI/SidePanel/Margin/Layout/Top/FocusBox/Content"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 24
-text = "Focus"
-horizontal_alignment = 1
-
-[node name="FocusActions" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout/Top/FocusBox/Content"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 12
 
 [node name="Bottom" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout"]
 layout_mode = 2

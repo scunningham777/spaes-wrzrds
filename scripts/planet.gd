@@ -2,6 +2,8 @@ extends Node2D
 
 # Planet surface (Unity's TileExploreScene layout). Esc fades out and returns to space.
 
+const FOCUS_BOX := preload("res://scenes/ui/focus_box.tscn")
+
 # Generation settings, from Unity's TileGridManager. They only apply on a planet's first visit.
 ## Radius of each patch of tiles: the one you land in, and each one scrying reveals.
 @export var grid_radius: int = 2
@@ -35,8 +37,8 @@ extends Node2D
 @onready var _lock: ActionLock = $ActionLock
 @onready var _fade: ScreenFade = $Fade
 
-# Focus action hint labels by action, so their status suffixes can be refreshed.
-var _focus_hints: Dictionary[StringName, Label] = {}
+# One box per equipped focus that grants actions, in GameState.equipped_foci order.
+var _focus_boxes: Array[FocusBox] = []
 var _surface: PlanetSurface
 
 
@@ -58,6 +60,7 @@ func _ready() -> void:
 		# Scene run directly from the editor (F6): nothing to remember it under.
 		_surface = PlanetSurface.new(grid_radius, patches_across, patches_down,
 			TileGridGenerator.new(empty_tile_probability))
+	_surface.reveal_around(TileGridGenerator.START_COORD, Foci.landing_radius(Game.state.equipped_foci))
 	_tiles.grid = _surface.grid
 	_tiles.ley_lines = _surface.ley_lines
 	_tiles.landing = TileGridGenerator.START_COORD
@@ -75,7 +78,7 @@ func _ready() -> void:
 
 	# Side panel describes the tile under the wizard and what its focus actions would do from here,
 	# so it refreshes on anything that changes those: moving, turning, and tile changes.
-	_show_focus(Game.state.equipped_focus)
+	_show_foci()
 	_wizard.mover.moved.connect(func(_coord: Vector2i) -> void: _update_side_panel())
 	_wizard.facing_changed.connect(func(_facing: Vector2i) -> void: _update_side_panel())
 	_tiles.grid.tile_changed.connect(func(_coord: Vector2i, _kind: TileKind) -> void: _update_side_panel())
@@ -89,27 +92,25 @@ func _ready() -> void:
 
 	# Dim the action lists while an action plays out and input is blocked.
 	_lock.busy_changed.connect(func(busy: bool) -> void:
-		for list: Control in [%Actions, %FocusBox]:
+		for list: Control in [%Actions, %Foci]:
 			list.modulate.a = 0.35 if busy else 1.0)
 
 	if Game.take_fade_in():
 		_fade.fade_in(fade_in_seconds)
 
 
-# Fills the outlined focus box with the focus's name and the actions it grants; hidden if none.
-func _show_focus(focus: StringName) -> void:
-	var box := %FocusBox as Control
-	box.visible = not focus.is_empty()
-	(%FocusName as Label).text = Foci.display_name(focus)
-	var list := %FocusActions as Control
-	for child in list.get_children():
-		child.queue_free()
-	_focus_hints.clear()
-	for action in Foci.actions(focus):
-		var hint := Label.new()
-		hint.add_theme_font_size_override(&"font_size", 20)
-		list.add_child(hint)
-		_focus_hints[action] = hint
+# An outlined box for each equipped focus that grants actions, with its name and those actions;
+# the list hides if there are none. Equipment can't change on a planet, so this runs once.
+func _show_foci() -> void:
+	var list := %Foci as Control
+	for focus in Game.state.equipped_foci:
+		if Foci.actions(focus).is_empty():
+			continue
+		var box := FOCUS_BOX.instantiate() as FocusBox
+		list.add_child(box)
+		box.show_focus(focus)
+		_focus_boxes.append(box)
+	list.visible = not _focus_boxes.is_empty()
 
 
 # "R – Extract", plus what the action would do from here where that's known ("R – Extract: Iron",
@@ -141,16 +142,14 @@ func _update_side_panel() -> void:
 	var known := _tiles.grid.is_known(coord)
 	_tile_info.show_tile(kind, _tiles.icon_texture(kind, _tiles.grid.is_tapped(coord), known),
 		_tiles.grid.cooldown(coord), resonant, activated, known)
-	for action in _focus_hints:
-		_focus_hints[action].text = _focus_hint_text(action)
+	# Scry dims where it won't work: with nothing unrevealed next to the wizard.
+	for box in _focus_boxes:
+		for action in box.actions():
+			box.set_hint(action, _focus_hint_text(action), action != &"scry" or _interaction.can_scry_here())
 	# Detect is only listed where it works: an unknown tile in reach.
 	var detect_hint := %DetectHint as Label
 	detect_hint.text = "%s – Detect" % _key_name(&"detect")
 	detect_hint.visible = _interaction.can_detect_here()
-	# Scry is only listed where it works: the middle of the explored area's edge.
-	var scry_hint := %ScryHint as Label
-	scry_hint.text = "%s – Scry" % _key_name(&"scry")
-	scry_hint.visible = _surface.can_scry(coord)
 	# Build is only listed where it works: a detected iron tile where ley lines cross.
 	var build_hint := %BuildHint as Label
 	build_hint.text = "%s – Build Tower (needs %s)" % [_key_name(&"build_tower"), Towers.cost_text(Towers.BASIC)]
@@ -167,7 +166,7 @@ func _on_detecting_changed(detecting: bool) -> void:
 	_marker.visible = not detecting
 	for normal: Control in [%AetherBar, %Actions, %TileInfo]:
 		normal.visible = not detecting
-	(%FocusBox as Control).visible = not detecting and not Game.state.equipped_focus.is_empty()
+	(%Foci as Control).visible = not detecting and not _focus_boxes.is_empty()
 	(%DetectPanel as Control).visible = detecting
 	(%DetectHints as Control).visible = detecting
 	var list := %DetectElements as Control
