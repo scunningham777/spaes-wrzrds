@@ -5,12 +5,11 @@ extends Node2D
 const FOCUS_BOX := preload("res://scenes/ui/focus_box.tscn")
 
 # Generation settings, from Unity's TileGridManager. They only apply on a planet's first visit.
-## Radius of each patch of tiles: the one you land in, and each one scrying reveals.
-@export var grid_radius: int = 2
-## Planet size in patches; the surface wraps around both ways (see PlanetSurface). Keep across a
-## multiple of 3 * down so ley lines run once around the planet rather than winding.
-@export var patches_across: int = 12
-@export var patches_down: int = 4
+## Planet size in tiles; the surface wraps around both ways (see HexTorus). Width must be even;
+## keep it a multiple of twice the height so ley lines run once around the planet rather than
+## winding. How much is revealed on landing comes from the equipped foci (Foci.landing_radius).
+@export var planet_width: int = 48
+@export var planet_height: int = 24
 @export_range(0.0, 1.0) var empty_tile_probability: float = 0.0
 ## Player actions (moves, extracts, scrying; not pushes) an extracted tile stays tapped.
 @export var tap_cooldown_actions: int = 5
@@ -54,11 +53,11 @@ func _ready() -> void:
 	var location := Game.state.current_location
 	(%PlanetName as Label).text = location.display_name if location != null else "Unknown planet"
 	if location != null:
-		_surface = Game.state.get_or_create_surface(location.id, grid_radius, patches_across, patches_down,
+		_surface = Game.state.get_or_create_surface(location.id, planet_width, planet_height,
 			empty_tile_probability)
 	else:
 		# Scene run directly from the editor (F6): nothing to remember it under.
-		_surface = PlanetSurface.new(grid_radius, patches_across, patches_down,
+		_surface = PlanetSurface.new(planet_width, planet_height,
 			TileGridGenerator.new(empty_tile_probability))
 	_surface.reveal_around(TileGridGenerator.START_COORD, Foci.landing_radius(Game.state.equipped_foci))
 	_tiles.grid = _surface.grid

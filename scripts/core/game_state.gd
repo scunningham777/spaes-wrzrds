@@ -15,10 +15,10 @@ var equipped_foci: Array[StringName] = [Foci.STAFF, Foci.ORB]
 
 
 # Arguments as in PlanetSurface.new; they only apply on the first visit.
-func get_or_create_surface(location_id: StringName, patch_radius: int, patches_across: int,
-		patches_down: int, empty_probability: float) -> PlanetSurface:
+func get_or_create_surface(location_id: StringName, width: int, height: int,
+		empty_probability: float) -> PlanetSurface:
 	assert(location_id != &"", "Location has no id; set Enterable.id")
 	if not location_surfaces.has(location_id):
-		location_surfaces[location_id] = PlanetSurface.new(patch_radius, patches_across, patches_down,
+		location_surfaces[location_id] = PlanetSurface.new(width, height,
 			TileGridGenerator.new(empty_probability))
 	return location_surfaces[location_id]

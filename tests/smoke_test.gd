@@ -333,53 +333,38 @@ func _test_core_logic() -> void:
 	_check(inv_changes[0] == 3, "inventory: changed fires on add/spend")
 
 	var state := GameState.new()
-	var first := state.get_or_create_surface(&"x", 2, 4, 3, 0.15)
-	_check(state.get_or_create_surface(&"x", 2, 4, 3, 0.15) == first, "state: same id returns the stored surface")
-	_check(state.get_or_create_surface(&"y", 2, 4, 3, 0.15) != first, "state: different id gets its own surface")
+	var first := state.get_or_create_surface(&"x", 16, 8, 0.15)
+	_check(state.get_or_create_surface(&"x", 16, 8, 0.15) == first, "state: same id returns the stored surface")
+	_check(state.get_or_create_surface(&"y", 16, 8, 0.15) != first, "state: different id gets its own surface")
 
 	_test_planet_surface()
 	_test_ley_lines()
 
 
-# PlanetSurface: patches revealed by scrying on a wrapping planet.
+# PlanetSurface: a wrapping planet revealed around spots (landing, scrying).
 func _test_planet_surface() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
-	var surface := PlanetSurface.new(2, 4, 3, TileGridGenerator.new(0.0, rng))  # 16 x 18 tiles, 24 patches
+	var surface := PlanetSurface.new(16, 18, TileGridGenerator.new(0.0, rng))
 	var g := surface.grid
-	_check(g.torus.width == 16 and g.torus.height == 18, "surface: torus sized in patches (%dx%d)" % [g.torus.width, g.torus.height])
-	_check(g.tiles.size() == 19 and surface.patches.keys() == [Vector2i.ZERO], "surface: lands with one radius-2 patch revealed")
-	# The middles of the landing patch's six edges, one step of each PATCH_STEPS direction out.
-	var spots := Hex.hexagon(2).filter(surface.can_scry)
-	_check(spots == [Vector2i(-2, 1), Vector2i(-1, -1), Vector2i(-1, 2), Vector2i(1, -2), Vector2i(1, 1), Vector2i(2, -1)],
-		"surface: scry only from the middle of an edge (%s)" % [spots])
-	_check(surface.scry_target(Vector2i(2, -1)) == Vector2i(4, -2), "scry: targets the patch mirrored across the edge")
-
+	_check(g.torus.width == 16 and g.torus.height == 18 and g.tiles.is_empty(), "surface: sized in tiles, nothing revealed yet")
+	var landed := surface.reveal_around(Vector2i.ZERO, 2)
+	_check(landed.size() == 19 and g.tiles.size() == 19, "surface: reveals a radius-2 hexagon around a spot")
+	_check(not surface.next_to_unrevealed(Vector2i.ZERO) and not surface.next_to_unrevealed(Vector2i(1, 0))
+		and surface.next_to_unrevealed(Vector2i(2, -1)) and surface.next_to_unrevealed(Vector2i(0, -2)),
+		"surface: the edge of the revealed area is next to unrevealed tiles, the middle isn't")
 	var before := g.tiles.duplicate()
-	_check(surface.try_scry(Vector2i(2, -1)) and g.tiles.size() == 19 + 16, "scry: reveals a patch sharing one 3-tile edge")
+	var scried := surface.reveal_around(Vector2i(2, -1), 2)
+	# The hexagons around (0, 0) and (2, -1) overlap in 10 tiles.
+	_check(scried.size() == 9 and g.tiles.size() == 19 + 9, "surface: revealing again only adds new tiles (%d)" % scried.size())
 	_check(before.keys().all(func(c: Vector2i) -> bool: return g.get_tile(c) == before[c]),
-		"scry: already revealed tiles keep their kinds")
-	_check(not surface.can_scry(Vector2i(2, -1)) and not surface.try_scry(Vector2i(2, -1)) and g.tiles.size() == 35,
-		"scry: the shared edge is no longer the explored edge")
-	_check(surface.can_scry(Vector2i(6, -3)) and surface.can_scry(Vector2i(3, 0)), "scry: works from the new patch's edges")
-	_check(not surface.can_scry(Vector2i(9, 9)), "scry: not from off the explored area")
-
-	# Scrying east around the planet: the fourth patch over is the landing one again.
-	_check(surface.try_scry(Vector2i(6, -3)) and surface.try_scry(Vector2i(10, -5)), "wrap: scry onward east")
-	_check(surface.patches.size() == 4 and g.tiles.size() == 4 * 19 - 4 * 3,
-		"wrap: a ring of 4 patches meets the landing one edge to edge (%d tiles)" % g.tiles.size())
-	_check(not surface.can_scry(Vector2i(14, -7)) and not surface.can_scry(Vector2i(-2, 1)),
-		"wrap: no scry across the seam where the ring closed")
-	# Reveal everything: the patches cover the planet exactly once over.
-	var frontier: Array[Vector2i] = [Vector2i.ZERO]
-	while not frontier.is_empty():
-		var center: Vector2i = frontier.pop_back()
-		for step in PlanetSurface.PATCH_STEPS:
-			if surface.reveal_patch(center + step * 2):
-				frontier.append(center + step * 2)
-	_check(surface.patches.size() == 24 and g.tiles.size() == 16 * 18,
-		"wrap: all %d patches cover all %d tiles" % [surface.patches.size(), g.tiles.size()])
-	_check(Hex.hexagon(2).all(func(c: Vector2i) -> bool: return not surface.can_scry(c)), "wrap: nothing left to scry")
+		"surface: already revealed tiles keep their kinds")
+	_check(surface.reveal_around(Vector2i(2, -1), 2).is_empty(), "surface: nothing new to reveal, no change")
+	# Across the wrap: a lap across the 16 x 18 torus shifts r back by 8.
+	_check(surface.reveal_around(Vector2i(16, -8), 2).is_empty(), "wrap: a copy of a revealed spot is already revealed")
+	surface.reveal_around(Vector2i.ZERO, 13)  # the smallest hexagon that covers this torus
+	_check(g.tiles.size() == 16 * 18 and not surface.next_to_unrevealed(Vector2i(8, 4)),
+		"wrap: a big enough reveal covers the whole planet once")
 	# Move costs: aether tiles cost 1 and the rest 1, or occasionally 2.
 	var revealed: Array[Vector2i] = g.tiles.keys()
 	_check(revealed.all(func(c: Vector2i) -> bool:
@@ -398,10 +383,6 @@ func _test_planet_surface() -> void:
 	same.add_tile(Vector2i(1, 0), TileKind.EMPTY)
 	_check(same.try_swap(Vector2i.ZERO, Vector2i(1, 0)) and same.move_cost(Vector2i(1, 0)) == 2
 		and same.move_cost(Vector2i.ZERO) == 0, "cost: tiles differing only in cost can swap")
-	# Odd radius: edges have 4 tiles, so either middle one scries.
-	var odd := PlanetSurface.new(3, 3, 2)
-	_check(Hex.hexagon(3).filter(odd.can_scry).size() == 12 and odd.scry_target(Vector2i(3, -1)) == Vector2i(6, -3)
-		and odd.scry_target(Vector2i(3, -2)) == Vector2i(6, -3), "surface: odd radius scries from both middle tiles")
 
 
 # LeyLines: hidden lines along each axis; iron runs along them resonate.
@@ -429,7 +410,7 @@ func _test_ley_lines() -> void:
 	_check(counts_ok, "ley: 1 or 2 lines along each axis, over 20 seeds")
 	_check(lengths_ok, "ley: lines run once around a planet sized for it")
 	_check(apart_ok, "ley: lines on the same axis never touch")
-	var surface := PlanetSurface.new(2, 12, 4)
+	var surface := PlanetSurface.new(48, 24)
 	_check(surface.ley_lines != null and surface.ley_lines.lines.size() >= 3, "ley: planets get their lines when made")
 
 	# Resonance, with one hand-placed NE line through the origin.
@@ -1169,7 +1150,7 @@ func _test_enter_planet() -> void:
 	_check(not interaction.can_scry_here() and scry_hint.modulate.a < 1.0, "scry: hint dims once everything around is revealed")
 	_press(KEY_E)  # NE onto (3, -1), only just revealed
 	_check_coord(planet_wizard, Vector2i(3, -1), "scry: can walk onto the revealed tiles")
-	tiles_snapshot = tiles.grid.tiles.duplicate()  # the revisit should keep the scried patch
+	tiles_snapshot = tiles.grid.tiles.duplicate()  # the revisit should keep the scried tiles
 
 	# Esc fades out too, with input blocked, and space fades in.
 	var esc_scene := current_scene
