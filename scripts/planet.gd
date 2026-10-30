@@ -156,7 +156,7 @@ func _update_side_panel() -> void:
 	mark_node_hint.visible = _interaction.can_mark_node_here()
 	# Build is only listed where it works: a marked ley node.
 	var build_hint := %BuildHint as Label
-	build_hint.text = "%s – Build Tower (needs %s)" % [_key_name(&"build_tower"), Towers.cost_text(Towers.BASIC)]
+	build_hint.text = "%s – Build Tower (needs %s)" % [_key_name(&"build_tower"), Towers.requirement_text(Towers.BASIC)]
 	build_hint.visible = _interaction.can_build_tower_here()
 
 

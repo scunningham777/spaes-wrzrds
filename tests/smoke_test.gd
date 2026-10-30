@@ -475,15 +475,30 @@ func _test_ley_lines() -> void:
 		"node: marking stores it (across the wrap), says so, and only once")
 	_check(Towers.can_build_at(g, ley, Vector2i.ZERO) and not Towers.can_build_at(g, ley, Vector2i(1, 0)),
 		"tower: a marked node is a site")
-	var stock := Inventory.new()
-	stock.add(&"wood", 10)
-	stock.add(&"stone", 9)
-	_check(Towers.cost_text(Towers.BASIC) == "10 Wood, 10 Stone" and not Towers.try_build(Towers.BASIC, g, ley, stock, Vector2i.ZERO)
-		and g.get_tile(Vector2i.ZERO) == iron and stock.count(&"wood") == 10, "tower: can't build short of stone, no change")
-	stock.add(&"stone", 1)
+	# Elements: 3 stone and 2 iron tiles on the node and the ring around it. Iron so far: the node,
+	# (1, 0) and (0, 1).
+	var stone := TileKind.new(&"stone_outcrop", "Stone Outcrop", &"stone_outcrop", [&"stone"])
+	g.set_kind_known(stone)
+	for c in [Vector2i(0, -1), Vector2i(1, -1), Vector2i(2, 0)]:  # (2, 0) is past the ring
+		g.add_tile(c, stone)
+	_check(Towers.requirement_text(Towers.BASIC) == "3 Stone, 2 Iron" and not Towers.has_elements(Towers.BASIC, g, Vector2i.ZERO)
+		and not Towers.try_build(Towers.BASIC, g, ley, Vector2i.ZERO) and g.get_tile(Vector2i.ZERO) == iron,
+		"tower: two stone in the ring aren't enough (one past it doesn't count), no change")
+	g.add_tile(Vector2i(-1, 1), stone)
+	g.set_kind_known(stone, false)
+	_check(not Towers.has_elements(Towers.BASIC, g, Vector2i.ZERO), "tower: unknown stone doesn't count")
+	g.set_kind_known(stone)
+	_check(Towers.has_elements(Towers.BASIC, g, Vector2i.ZERO), "tower: three stone and three iron are enough")
+	g.set_tile(Vector2i(0, 1), gold)
+	g.set_tile(Vector2i.ZERO, gold)
+	_check(not Towers.has_elements(Towers.BASIC, g, Vector2i.ZERO), "tower: one iron isn't enough")
+	g.set_tile(Vector2i(0, 1), iron)
+	_check(Towers.has_elements(Towers.BASIC, g, Vector2i.ZERO),
+		"tower: the node's own tile needn't be anything, two iron in the ring will do")
 	_check(not ley.is_active(Vector2i.ZERO), "ley: lines start inactive")
-	_check(Towers.try_build(Towers.BASIC, g, ley, stock, Vector2i.ZERO) and g.get_tile(Vector2i.ZERO) == Towers.kind(Towers.BASIC)
-		and stock.count(&"wood") == 0 and stock.count(&"stone") == 0, "tower: building spends 10 wood and 10 stone")
+	_check(Towers.try_build(Towers.BASIC, g, ley, Vector2i.ZERO) and g.get_tile(Vector2i.ZERO) == Towers.kind(Towers.BASIC)
+		and g.get_tile(Vector2i(0, -1)) == stone and g.get_tile(Vector2i(1, 0)) == iron,
+		"tower: building replaces the node's tile and leaves the ring as it was")
 	var tower := g.get_tile(Vector2i.ZERO)
 	_check(tower.display_name == "Basic Tower" and tower.elements.is_empty() and not tower.movable
 		and g.move_cost(Vector2i.ZERO) == 1, "tower: a Basic Tower yields nothing, can't move, and costs 1 to enter")
@@ -1105,24 +1120,21 @@ func _test_enter_planet() -> void:
 	tiles.grid.set_tile(Vector2i.ZERO, iron)  # refreshes the side panel (it follows the planet's own lines)
 
 	# Tower: on the marked node, B turns the tile into a Basic Tower.
-	_check(build_hint.visible and not mark_hint.visible and build_hint.text == "B – Build Tower (needs 10 Wood, 10 Stone)"
+	_check(build_hint.visible and not mark_hint.visible and build_hint.text == "B – Build Tower (needs 3 Stone, 2 Iron)"
 		and build_hint.get_index() == mark_hint.get_index() + 1,
-		"tower: hint shows on a marked node, with the cost, below Mark Ley Node (%s)" % build_hint.text)
-	var stock: Inventory = _game().state.inventory
-	for item: StringName in [&"wood", &"stone"]:
-		if stock.count(item) > 0:
-			stock.spend(item, stock.count(item))
-	stock.add(&"wood", 10)
-	stock.add(&"stone", 9)
+		"tower: hint shows on a marked node, with what it needs, below Mark Ley Node (%s)" % build_hint.text)
+	# Iron is already at (1, 0) and (0, -1), in the ring; stone goes in it too.
+	tiles.grid.set_tile(Vector2i(-1, 0), stone)
+	tiles.grid.set_tile(Vector2i(1, -1), stone)
 	_press(KEY_B)
-	_check(tiles.grid.get_tile(Vector2i.ZERO) == iron and stock.count(&"wood") == 10,
-		"tower: B does nothing without enough stone")
-	stock.add(&"stone", 1)
+	_check(tiles.grid.get_tile(Vector2i.ZERO) == iron, "tower: B does nothing with only two stone around the node")
+	tiles.grid.set_tile(Vector2i(-1, 1), stone)
+	tiles.grid.set_tile(Vector2i.ZERO, gold)  # the node's own tile needn't be iron
 	_press(KEY_B)
 	await process_frame
-	_check(tiles.grid.get_tile(Vector2i.ZERO).id == Towers.BASIC and stock.count(&"wood") == 0
-		and stock.count(&"stone") == 0 and tiles.grid.move_cost(Vector2i.ZERO) == 1,
-		"tower: B builds a Basic Tower, spending 10 wood and 10 stone")
+	_check(tiles.grid.get_tile(Vector2i.ZERO).id == Towers.BASIC and tiles.grid.get_tile(Vector2i(-1, 1)) == stone
+		and tiles.grid.move_cost(Vector2i.ZERO) == 1,
+		"tower: B builds a Basic Tower on a gold node with three stone and two iron around it")
 	_check(ley_info.shown_name() == "Basic Tower" and ley_info.shown_yield() == "Element: none" and not build_hint.visible,
 		"tower: standing on it shows Basic Tower with no elements, and the hint goes")
 	_check(tiles.has_icon(tiles.grid.get_tile(Vector2i.ZERO))

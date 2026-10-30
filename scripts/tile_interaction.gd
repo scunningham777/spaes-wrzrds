@@ -154,17 +154,18 @@ func _try_mark_node() -> void:
 	print("Marked a ley node at %s" % [here])
 
 
-# Replaces the tile on the marked node under the player with a tower, spending its cost.
+# Replaces the tile on the marked node under the player with a tower, if the tiles on and around
+# it have the elements it needs.
 func _try_build_tower() -> void:
 	var here := player.mover.coord
 	if not can_build_tower_here():
 		print("Can't build a tower at %s" % [here])
 		return
-	if not Towers.can_afford(Towers.BASIC, Game.state.inventory):
-		print("Building a tower needs %s" % Towers.cost_text(Towers.BASIC))
+	if not Towers.has_elements(Towers.BASIC, tiles.grid, here):
+		print("Building a tower needs tiles with %s on and around it" % Towers.requirement_text(Towers.BASIC))
 		return
 	tiles.grid.tick_cooldowns()
-	Towers.try_build(Towers.BASIC, tiles.grid, tiles.ley_lines, Game.state.inventory, here)
+	Towers.try_build(Towers.BASIC, tiles.grid, tiles.ley_lines, here)
 	print("Built a %s at %s" % [Towers.display_name(Towers.BASIC), here])
 
 

@@ -35,8 +35,9 @@ background; the lines themselves are never shown.
 
 Standing where two or more ley lines cross, **M** marks the crossing as a ley node (outlined in plum, over the
 yellow landing outline if they share a tile). At least two of the lines through it must be ones you've seen:
-two or more of their tiles plum, or already activated. A marked node can be turned into a tower with **B** (10
-wood and 10 stone). That activates every line through it, lighting up all their tiles. Towers can't be pushed, yield
+two or more of their tiles plum, or already activated. A marked node can be turned into a tower with **B**, if the
+node and the six tiles around it include at least 3 known stone tiles and 2 known iron tiles (the node's own
+tile can be anything; those tiles are left as they are). That activates every line through it, lighting up all their tiles. Towers can't be pushed, yield
 nothing yet, and cost 1 aether to step onto.
 
 ## Tests
