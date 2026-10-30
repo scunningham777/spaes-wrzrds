@@ -262,6 +262,13 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "F – Push"
 
+[node name="MarkNodeHint" type="Label" parent="UI/SidePanel/Margin/Layout/Top/Actions"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "M – Mark Ley Node"
+
 [node name="BuildHint" type="Label" parent="UI/SidePanel/Margin/Layout/Top/Actions"]
 unique_name_in_owner = true
 visible = false

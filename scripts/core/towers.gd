@@ -1,10 +1,9 @@
 class_name Towers
 extends RefCounted
 
-# Static tower definitions. A tower is built where two or more ley lines cross, on an iron tile
-# that's been detected there (resonating with a line), and replaces that tile, activating every
-# line through it (LeyLines.activate_at). Towers can't be pushed. Same structure as Items and
-# Foci: ids and data here.
+# Static tower definitions. A tower is built on a marked ley node (LeyLines.mark_node) and
+# replaces the tile there, activating every line through it (LeyLines.activate_at). Towers can't
+# be pushed. Same structure as Items and Foci: ids and data here.
 
 const BASIC := &"basic_tower"
 
@@ -56,9 +55,10 @@ static func can_afford(tower: StringName, inventory: Inventory) -> bool:
 	return items.keys().all(func(item: StringName) -> bool: return inventory.count(item) >= items[item])
 
 
-# Whether a tower can go at coord: a detected iron tile (LeyLines.is_resonant) where lines cross.
+# Whether a tower can go at coord: a marked ley node without a tower on it yet.
 static func can_build_at(grid: TileGrid, ley_lines: LeyLines, coord: Vector2i) -> bool:
-	return ley_lines != null and ley_lines.is_resonant(grid, coord) and ley_lines.is_intersection(coord)
+	return ley_lines != null and ley_lines.is_node(coord) and grid.has_tile(coord) \
+		and not NAMES.has(grid.get_tile(coord).id)
 
 
 # Spends the tower's cost from inventory and replaces the tile at coord with it. Returns false

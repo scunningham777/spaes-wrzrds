@@ -4,9 +4,9 @@ extends Node
 # Ported from Unity TileExplore.TileInteractionManager: maps interaction keys to TileGrid
 # operations at the player's position/facing. R extracts, F swaps the player's tile with the
 # one it faces, V scries (next to unrevealed tiles, reveals every tile within the orb's scry radius),
-# B builds a tower (on a detected iron tile where ley lines cross). Extract and scry come from the
-# equipped foci (Foci). Animated actions hand their tween to the ActionLock, which
-# blocks input until they finish.
+# M marks a ley node (where ley lines the player has seen cross), B builds a tower (on a marked
+# node). Extract and scry come from the equipped foci (Foci). Animated actions hand their tween to
+# the ActionLock, which blocks input until they finish.
 #
 # S enters detect mode, where there's an unknown tile within detect_radius of the player (see
 # Detection). The player can't move, turn, or take other actions there: the direction keys (and S,
@@ -48,6 +48,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("scry"):
 		_try_scry()
 		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("mark_node"):
+		_try_mark_node()
+		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("build_tower"):
 		_try_build_tower()
 		get_viewport().set_input_as_handled()
@@ -65,8 +68,14 @@ func can_scry_here() -> bool:
 		and surface.next_to_unrevealed(player.mover.coord)
 
 
-# Whether the player's tile is a tower site (affordability aside). Uses the ley lines as the map
-# shows them, so building agrees with the plum tiles.
+# Whether M would mark a ley node on the player's tile. Uses the ley lines as the map shows them,
+# so marking agrees with the plum tiles.
+func can_mark_node_here() -> bool:
+	return tiles.ley_lines != null and tiles.ley_lines.can_mark_node(tiles.grid, player.mover.coord)
+
+
+# Whether the player's tile is a tower site (affordability aside): a marked node, on the ley lines
+# the map shows.
 func can_build_tower_here() -> bool:
 	return Towers.can_build_at(tiles.grid, tiles.ley_lines, player.mover.coord)
 
@@ -135,7 +144,17 @@ func _try_scry() -> void:
 	print("Scried %d tiles around %s" % [revealed.size(), here])
 
 
-# Replaces the detected iron tile under the player with a tower, spending its cost.
+func _try_mark_node() -> void:
+	var here := player.mover.coord
+	if not can_mark_node_here():
+		print("Can't mark a ley node at %s" % [here])
+		return
+	tiles.grid.tick_cooldowns()
+	tiles.ley_lines.mark_node(tiles.grid, here)
+	print("Marked a ley node at %s" % [here])
+
+
+# Replaces the tile on the marked node under the player with a tower, spending its cost.
 func _try_build_tower() -> void:
 	var here := player.mover.coord
 	if not can_build_tower_here():
@@ -193,7 +212,7 @@ func _detect_input(event: InputEvent) -> bool:
 		detection.toggle(guess)
 	else:
 		return HexPlayerController.turn_step(event, pointy_top) != 0 \
-			or [&"extract", &"push", &"scry", &"build_tower"].any(event.is_action_pressed)
+			or [&"extract", &"push", &"scry", &"mark_node", &"build_tower"].any(event.is_action_pressed)
 	return true
 
 

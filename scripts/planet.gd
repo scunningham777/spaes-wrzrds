@@ -76,8 +76,9 @@ func _ready() -> void:
 	_wizard.mover.moved.connect(func(_coord: Vector2i) -> void: _tiles.grid.tick_cooldowns())
 
 	# Side panel describes the tile under the wizard and what its focus actions would do from here,
-	# so it refreshes on anything that changes those: moving, turning, and tile changes.
+	# so it refreshes on anything that changes those: moving, turning, tile changes, and marking nodes.
 	_show_foci()
+	_surface.ley_lines.node_marked.connect(func(_coord: Vector2i) -> void: _update_side_panel())
 	_wizard.mover.moved.connect(func(_coord: Vector2i) -> void: _update_side_panel())
 	_wizard.facing_changed.connect(func(_facing: Vector2i) -> void: _update_side_panel())
 	_tiles.grid.tile_changed.connect(func(_coord: Vector2i, _kind: TileKind) -> void: _update_side_panel())
@@ -149,7 +150,11 @@ func _update_side_panel() -> void:
 	var detect_hint := %DetectHint as Label
 	detect_hint.text = "%s – Detect" % _key_name(&"detect")
 	detect_hint.visible = _interaction.can_detect_here()
-	# Build is only listed where it works: a detected iron tile where ley lines cross.
+	# Mark Ley Node is only listed where it works: an unmarked tile where seen ley lines cross.
+	var mark_node_hint := %MarkNodeHint as Label
+	mark_node_hint.text = "%s – Mark Ley Node" % _key_name(&"mark_node")
+	mark_node_hint.visible = _interaction.can_mark_node_here()
+	# Build is only listed where it works: a marked ley node.
 	var build_hint := %BuildHint as Label
 	build_hint.text = "%s – Build Tower (needs %s)" % [_key_name(&"build_tower"), Towers.cost_text(Towers.BASIC)]
 	build_hint.visible = _interaction.can_build_tower_here()

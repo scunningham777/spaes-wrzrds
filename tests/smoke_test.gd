@@ -451,16 +451,30 @@ func _test_ley_lines() -> void:
 	_check(ley.is_resonant(seam, Vector2i.ZERO) and ley.is_resonant(seam, Vector2i(-1, 0)),
 		"ley: runs carry across the wrap")
 
-	# Towers: built on a detected iron tile where two or more lines cross.
+	# Ley nodes: marked where two or more seen lines cross.
 	_check(not ley.is_intersection(Vector2i.ZERO), "ley: one line through a tile is no intersection")
 	ley.add_line(Vector2i.ZERO, Vector2i(0, 1))
 	_check(ley.is_intersection(Vector2i.ZERO) and ley.is_intersection(Vector2i(48, -24))
 		and not ley.is_intersection(Vector2i(1, 0)), "ley: two lines crossing make an intersection, across the wrap too")
-	var lone := TileGrid.new(torus)
-	lone.add_tile(Vector2i.ZERO, iron)
-	_check(Towers.can_build_at(g, ley, Vector2i.ZERO) and not Towers.can_build_at(g, ley, Vector2i(1, 0))
-		and not Towers.can_build_at(lone, ley, Vector2i.ZERO) and not Towers.can_build_at(g, null, Vector2i.ZERO),
-		"tower: site needs detected iron where lines cross")
+	g.set_tile(Vector2i(0, 1), gold)  # the N-S line's only iron run
+	_check(ley.is_seen(g, ley.lines[0]) and not ley.is_seen(g, ley.lines[1]),
+		"node: a line is seen once two of its tiles resonate along it")
+	_check(not ley.can_mark_node(g, Vector2i.ZERO), "node: one seen line through a crossing isn't enough")
+	g.set_tile(Vector2i(0, 1), iron)
+	_check(ley.is_seen(g, ley.lines[1]) and ley.can_mark_node(g, Vector2i.ZERO)
+		and not ley.can_mark_node(g, Vector2i(1, 0)), "node: two seen lines crossing can be marked, nowhere else")
+	ley.add_line(Vector2i.ZERO, Vector2i(1, -1))
+	_check(not ley.is_seen(g, ley.lines[2]) and ley.can_mark_node(g, Vector2i.ZERO),
+		"node: an unseen third line through the crossing doesn't block it")
+	_check(not Towers.can_build_at(g, ley, Vector2i.ZERO) and not Towers.can_build_at(g, null, Vector2i.ZERO),
+		"tower: no site until the node is marked")
+	var marked: Array[Vector2i] = []
+	ley.node_marked.connect(func(c: Vector2i) -> void: marked.append(c))
+	_check(ley.mark_node(g, Vector2i(48, -24)) and ley.is_node(Vector2i.ZERO) and marked == [Vector2i.ZERO]
+		and not ley.mark_node(g, Vector2i.ZERO) and marked.size() == 1,
+		"node: marking stores it (across the wrap), says so, and only once")
+	_check(Towers.can_build_at(g, ley, Vector2i.ZERO) and not Towers.can_build_at(g, ley, Vector2i(1, 0)),
+		"tower: a marked node is a site")
 	var stock := Inventory.new()
 	stock.add(&"wood", 10)
 	stock.add(&"stone", 9)
@@ -479,6 +493,7 @@ func _test_ley_lines() -> void:
 	_check(ley.lines.all(func(l: LeyLines.Line) -> bool: return l.active) and ley.is_active(Vector2i(10, 0))
 		and ley.is_active(Vector2i(0, 7)) and ley.is_active(Vector2i(48, -24)) and not ley.is_active(Vector2i(1, 1)),
 		"tower: building activates every line through it, and only tiles on them")
+	_check(ley.is_seen(TileGrid.new(torus), ley.lines[2]), "node: an active line is seen, iron or not")
 
 
 # A plane grid with a radius-sized hexagon of Empty tiles.
@@ -1073,14 +1088,26 @@ func _test_enter_planet() -> void:
 	_check(ley_info.shown_ley_line() == "", "ley: badge goes when the run is broken")
 	tiles.grid.set_tile(Vector2i(0, -1), iron)
 
-	# Tower: where a second line crosses, B turns the detected iron tile into a Basic Tower.
+	# Node: where a second seen line crosses ((0, 0) and (1, 0) are iron along it), M marks a ley node.
+	var mark_hint: Label = current_scene.get_node("%MarkNodeHint")
 	var build_hint: Label = current_scene.get_node("%BuildHint")
-	_check(not build_hint.visible, "tower: no build hint where only one line runs")
+	_check(not mark_hint.visible and not build_hint.visible, "node: no mark or build hint where only one line runs")
+	_press(KEY_M)
+	_check(not tiles.is_node(Vector2i.ZERO), "node: M does nothing there")
 	test_ley.add_line(Vector2i.ZERO, Vector2i(1, 0))
 	tiles.grid.set_tile(Vector2i.ZERO, iron)  # refreshes the side panel
-	_check(build_hint.visible and build_hint.text == "B – Build Tower (needs 10 Wood, 10 Stone)"
-		and build_hint.get_index() == current_scene.get_node("%Actions/PushHint").get_index() + 1,
-		"tower: hint shows where lines cross, with the cost, below Push (%s)" % build_hint.text)
+	_check(mark_hint.visible and mark_hint.text == "M – Mark Ley Node" and not build_hint.visible
+		and mark_hint.get_index() == current_scene.get_node("%Actions/PushHint").get_index() + 1,
+		"node: hint shows where seen lines cross, below Push, and no build hint yet (%s)" % mark_hint.text)
+	_press(KEY_M)
+	await process_frame
+	_check(tiles.is_node(Vector2i.ZERO) and tiles.landing == Vector2i.ZERO, "node: M marks the landing tile as a node")
+	tiles.grid.set_tile(Vector2i.ZERO, iron)  # refreshes the side panel (it follows the planet's own lines)
+
+	# Tower: on the marked node, B turns the tile into a Basic Tower.
+	_check(build_hint.visible and not mark_hint.visible and build_hint.text == "B – Build Tower (needs 10 Wood, 10 Stone)"
+		and build_hint.get_index() == mark_hint.get_index() + 1,
+		"tower: hint shows on a marked node, with the cost, below Mark Ley Node (%s)" % build_hint.text)
 	var stock: Inventory = _game().state.inventory
 	for item: StringName in [&"wood", &"stone"]:
 		if stock.count(item) > 0:

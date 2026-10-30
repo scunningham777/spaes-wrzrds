@@ -8,7 +8,7 @@ Open `project.godot` in Godot 4.7.x (standard build, not .NET) and press **F5**.
 
 Controls (flat-top hexes): **Q/W/E/Z/X/C** or numpad move · **A/D** turn · **Enter** enter a planet ·
 **R** extract the tile you're on (needs the staff; taps the tile for a few actions) · **F** swap your tile with
-the one you face · **S** detect (see below) · **V** scry (needs the orb; see below) · **B** build a tower (see below) ·
+the one you face · **S** detect (see below) · **V** scry (needs the orb; see below) · **M** mark a ley node and **B** build a tower (see below) ·
 **I** inventory · **Esc** back.
 
 On a planet each move costs the aether (the blue bar) of the tile you step onto, shown as a number
@@ -33,8 +33,10 @@ Your equipped foci (the staff and the orb) each get a box in the side panel list
 Each planet also has hidden ley lines, 1–2 along each hex axis. Two or more known iron tiles in a row along one get a plum
 background; the lines themselves are never shown.
 
-Where two or more ley lines cross, a plum iron tile can be turned into a tower with **B** (10 wood and 10
-stone). That activates every line through it, lighting up all their tiles. Towers can't be pushed, yield
+Standing where two or more ley lines cross, **M** marks the crossing as a ley node (outlined in plum, over the
+yellow landing outline if they share a tile). At least two of the lines through it must be ones you've seen:
+two or more of their tiles plum, or already activated. A marked node can be turned into a tower with **B** (10
+wood and 10 stone). That activates every line through it, lighting up all their tiles. Towers can't be pushed, yield
 nothing yet, and cost 1 aether to step onto.
 
 ## Tests

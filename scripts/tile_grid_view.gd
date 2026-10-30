@@ -8,11 +8,12 @@ extends Node2D
 # from the board's tile_scale. Tiles whose elements are unknown draw their icon in unknown_icon_color,
 # holding still. In detect mode (detection) tiles outside its area shrink and hold still, tiles
 # partly guessed right fill with partial_color and ones guessed wrong with wrong_color, guesses
-# show as their number keys in the lower right, the selected tile is outlined, and the landing
-# outline, move costs and cooldowns hide. Tiles just guessed right flash correct_color
+# show as their number keys in the lower right, the selected tile is outlined, and the landing and
+# node outlines, move costs and cooldowns hide. Tiles just guessed right flash correct_color
 # (flash_tiles). Tiles that cost aether to step onto show the cost as a number and a blue dot in
-# their upper left; the landing tile is outlined. The occupied (player's) tile's icon sits higher,
-# clear of the player's sprite.
+# their upper left; the landing tile is outlined, and marked ley nodes are outlined in ley_color
+# (over the landing outline, where one is on the landing tile). The occupied (player's) tile's icon
+# sits higher, clear of the player's sprite.
 
 ## Sprite sheet that ICONS regions are cut from.
 @export var icon_sheet: Texture2D
@@ -56,7 +57,8 @@ extends Node2D
 @export var landing_color: Color = Color(1.0, 0.85, 0.1)
 @export var landing_line_width: float = 3.0
 ## Size of the landing outline relative to the hex cell. 1.0 puts it in the gap between tiles, just
-## outside the player's outline (which hugs the tile) while they stand on it.
+## outside the player's outline (which hugs the tile) while they stand on it. Ley node outlines
+## share its size and width.
 @export var landing_scale: float = 1.0
 
 # Tile pictures by TileKind.icon: regions in icon_sheet (12px cells, 1px gutters: cell (col, row)
@@ -109,7 +111,11 @@ var view_center: Vector2i = Vector2i.ZERO:
 ## The planet's ley lines, or null if it has none.
 var ley_lines: LeyLines:
 	set(value):
+		if ley_lines != null:
+			ley_lines.node_marked.disconnect(_on_node_marked)
 		ley_lines = value
+		if ley_lines != null:
+			ley_lines.node_marked.connect(_on_node_marked)
 		queue_redraw()
 ## The tile the player landed on (outlined in landing_color), or null for none.
 var landing: Variant = null:
@@ -285,6 +291,10 @@ func _on_known_changed(_kind: TileKind, _known: bool) -> void:
 	queue_redraw()
 
 
+func _on_node_marked(_coord: Vector2i) -> void:
+	queue_redraw()
+
+
 func _shrink_tween(to: float) -> void:
 	if _shrink != null:
 		_shrink.kill()
@@ -356,14 +366,27 @@ func _draw() -> void:
 		# Last drawn is on top.
 		_draw_contents(_swap_from, to_pos.lerp(from_pos, swap_progress), to_shift.lerp(from_shift, swap_progress))
 		_draw_contents(_swap_to, from_pos.lerp(to_pos, swap_progress), from_shift.lerp(to_shift, swap_progress))
-	if landing != null and grid.has_tile(landing) and detection == null:
-		draw_set_transform(board.hex_to_local(grid.nearest(landing, view_center)))
-		draw_polyline(board.corner_points(landing_scale * tile_scale_at(landing)), landing_color, landing_line_width)
-		draw_set_transform(Vector2.ZERO)
+	if landing != null and grid.has_tile(landing) and detection == null and not is_node(landing):
+		_draw_ring(landing, landing_color)
+	if ley_lines != null and detection == null:
+		for node in ley_lines.nodes:
+			_draw_ring(node, ley_color)
 	if detection != null and detection.selected != null:
 		draw_set_transform(board.hex_to_local(grid.nearest(detection.selected, view_center)))
 		draw_polyline(board.corner_points(board.tile_scale), selection_color, selection_line_width)
 		draw_set_transform(Vector2.ZERO)
+
+
+# Outlines the tile at coord in color, at the landing outline's size and width.
+func _draw_ring(coord: Vector2i, color: Color) -> void:
+	draw_set_transform(board.hex_to_local(grid.nearest(coord, view_center)))
+	draw_polyline(board.corner_points(landing_scale * tile_scale_at(coord)), color, landing_line_width)
+	draw_set_transform(Vector2.ZERO)
+
+
+# Whether coord is a marked ley node.
+func is_node(coord: Vector2i) -> bool:
+	return ley_lines != null and ley_lines.is_node(coord)
 
 
 func _draw_overlay() -> void:
