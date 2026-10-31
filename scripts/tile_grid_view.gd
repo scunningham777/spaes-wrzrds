@@ -11,7 +11,8 @@ extends Node2D
 # show as their number keys in the lower right, the selected tile is outlined, and the landing and
 # node outlines, move costs and cooldowns hide. Tiles just guessed right flash correct_color
 # (flash_tiles). Tiles that cost aether to step onto show the cost as a number and a blue dot in
-# their upper left; the landing tile is outlined, and marked ley nodes are outlined in ley_color
+# their upper left; on an activated ley line the number is the cost after the line's bonus, in
+# move_bonus_color, and shows even at 0. The landing tile is outlined, and marked ley nodes are outlined in ley_color
 # (over the landing outline, where one is on the landing tile). The occupied (player's) tile's icon
 # sits higher, clear of the player's sprite.
 
@@ -39,6 +40,8 @@ extends Node2D
 @export var move_cost_font_size: int = 14
 @export var move_cost_dot_color: Color = Color(0.3, 0.6, 1.0)
 @export var move_cost_dot_radius: float = 3.5
+## Move cost number on an activated ley line, where it's discounted (LeyLines.move_cost).
+@export var move_bonus_color: Color = Color(0.35, 0.9, 0.4)
 ## Detect mode: drawn size of tiles outside its area, how long they take to shrink or grow back,
 ## fills of tiles partly guessed right and guessed wrong, guess numbers, and the selected tile's
 ## outline.
@@ -389,6 +392,16 @@ func is_node(coord: Vector2i) -> bool:
 	return ley_lines != null and ley_lines.is_node(coord)
 
 
+# Aether it costs to step onto the tile at coord, with any ley line bonus.
+func move_cost(coord: Vector2i) -> int:
+	return ley_lines.move_cost(grid, coord) if ley_lines != null else grid.move_cost(coord)
+
+
+# Whether the tile at coord gets a ley line's move bonus: it's on an activated line.
+func has_move_bonus(coord: Vector2i) -> bool:
+	return ley_lines != null and ley_lines.is_active(coord)
+
+
 func _draw_overlay() -> void:
 	for label in _cooldown_labels:
 		_draw_cooldown(label[0], label[1])
@@ -431,8 +444,9 @@ func _draw_contents(coord: Vector2i, center: Vector2, icon_offset: Vector2) -> v
 			icon_still(coord))
 		if tapped and numbers_shown:
 			_cooldown_labels.append([grid.cooldown(coord), center])
-	if numbers_shown and grid.move_cost(coord) > 0:
-		_draw_move_cost(grid.move_cost(coord), center)
+	var bonus := has_move_bonus(coord)
+	if numbers_shown and (bonus or move_cost(coord) > 0):
+		_draw_move_cost(move_cost(coord), center, move_bonus_color if bonus else Color.WHITE)
 	if detection != null and not is_outside_detect(coord) and not detection.guessed(coord).is_empty():
 		var numbers: Array[String] = []
 		for element in detection.guessed(coord):
@@ -491,15 +505,15 @@ func _draw_guesses(text: String, center: Vector2) -> void:
 	_overlay.draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, guess_font_size, guess_color)
 
 
-# Cost number with a blue dot after it, in the tile's upper left.
-func _draw_move_cost(cost: int, center: Vector2) -> void:
+# Cost number, in color, with a blue dot after it, in the tile's upper left.
+func _draw_move_cost(cost: int, center: Vector2, color: Color) -> void:
 	var font := ThemeDB.fallback_font
 	var half := _tile_half()
 	var text := str(cost)
 	var text_width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, move_cost_font_size).x
 	var pos := center + Vector2(-0.52 * half.x, -0.51 * half.y)  # baseline start
 	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, move_cost_font_size, 4, Color.BLACK)
-	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, move_cost_font_size, Color.WHITE)
+	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, move_cost_font_size, color)
 	var dot := pos + Vector2(text_width + move_cost_dot_radius + 2.0, -font.get_ascent(move_cost_font_size) * 0.35)
 	draw_circle(dot, move_cost_dot_radius + 1.5, Color.BLACK)
 	draw_circle(dot, move_cost_dot_radius, move_cost_dot_color)

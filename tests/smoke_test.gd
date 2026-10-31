@@ -508,6 +508,16 @@ func _test_ley_lines() -> void:
 	_check(ley.lines.all(func(l: LeyLines.Line) -> bool: return l.active) and ley.is_active(Vector2i(10, 0))
 		and ley.is_active(Vector2i(0, 7)) and ley.is_active(Vector2i(48, -24)) and not ley.is_active(Vector2i(1, 1)),
 		"tower: building activates every line through it, and only tiles on them")
+	_check(ley.move_cost(g, Vector2i.ZERO) == 0 and g.move_cost(Vector2i.ZERO) == 1,
+		"ley: an activated line takes 1 off the tower's cost, leaving the tile's own cost alone")
+	g.add_tile(Vector2i(3, 3), stone, 2)  # off every line
+	_check(ley.move_cost(g, Vector2i(3, 3)) == 2 and ley.move_cost(g, Vector2i(2, 0)) == 0,
+		"ley: no bonus off the lines, and a free tile on one stays free")
+	g.try_swap(Vector2i(3, 3), Vector2i(2, 0))
+	_check(ley.move_cost(g, Vector2i(2, 0)) == 1 and ley.move_cost(g, Vector2i(3, 3)) == 0,
+		"ley: the bonus belongs to the place, so a tile pushed onto a line gets it and one pushed off loses it")
+	g.add_tile(Vector2i(0, 7), stone, 2)
+	_check(ley.move_cost(g, Vector2i(0, 7)) == 1, "ley: a tile revealed along an activated line gets the bonus")
 	_check(ley.is_seen(TileGrid.new(torus), ley.lines[2]), "node: an active line is seen, iron or not")
 
 
@@ -1149,8 +1159,14 @@ func _test_enter_planet() -> void:
 	_press(KEY_F)
 	_check(tiles.grid.get_tile(Vector2i.ZERO).id == Towers.BASIC, "tower: F can't push it")
 	tiles.grid.set_tile(Vector2i.ZERO, iron)  # back to iron for the tests below
+	# Every step here costs 1, which the activated lines take down to 0; off them it stays 1.
+	_check(tiles.move_cost(Vector2i(0, 1)) == 0 and tiles.has_move_bonus(Vector2i(0, 1))
+		and tiles.move_cost(Vector2i(-1, 2)) == 1 and not tiles.has_move_bonus(Vector2i(-1, 2))
+		and tiles.move_bonus_color != Color.WHITE, "tower: tiles on its lines show a 0 cost, in the bonus color")
+	var aether_on_tower_line: int = aether.call()
 	_press(KEY_W)
 	_press(KEY_W)  # back to (0, 2)
+	_check(aether.call() == aether_on_tower_line, "tower: walking along its line is free (%d)" % aether.call())
 	_check(tiles.grid.get_tile(Vector2i(0, 2)) == gold and ley_info.shown_ley_line() == "ley line activated",
 		"tower: a non-iron tile on an activated line shows ley line activated")
 	tiles.ley_lines = planet_ley

@@ -243,10 +243,10 @@ func _follow_wizard() -> void:
 	_tiles.occupied = _wizard.mover.coord
 
 
-# Successful moves cost the aether of the tile stepped onto; running out kicks the player back to
-# space.
+# Successful moves cost the aether of the tile stepped onto, less any ley line bonus (as the map
+# shows it); running out kicks the player back to space.
 func _pay_for_move(coord: Vector2i) -> void:
-	if not Aether.pay_move(Game.state.inventory, _tiles.grid.move_cost(coord)):
+	if not Aether.pay_move(Game.state.inventory, _tiles.move_cost(coord)):
 		print("Out of aether")
 		_leave_out_of_aether()
 

@@ -5,7 +5,10 @@ extends RefCounted
 # is made. They're hidden; the player can only spot one where known RESONANT_ELEMENT tiles
 # (TileGrid.is_known) run along it, which makes those tiles resonate (see is_resonant). Where lines
 # the player has seen cross, they can mark a ley node (see can_mark_node); building a tower on a node
-# activates every line through it, showing every tile along them (see is_active).
+# activates every line through it, showing every tile along them (see is_active). Stepping onto a
+# tile on an activated line costs ACTIVE_MOVE_BONUS less aether (see move_cost). The bonus belongs to
+# the place, not the tile: a tile pushed onto a line gets it and one pushed off loses it, and tiles
+# revealed later along the line get it too.
 #
 # A line runs all the way around the torus back to its start. It closes in one lap if the torus
 # width is a multiple of twice its height; otherwise the diagonal lines wind around several times
@@ -28,6 +31,8 @@ const PLACEMENT_TRIES := 50
 ## through a crossing never blocks marking it.
 const SEEN_LINE_TILES := 2
 const NODE_LINES := 2
+## Aether taken off the move cost of tiles on an activated line (never below 0).
+const ACTIVE_MOVE_BONUS := 1
 
 
 # One line: its axis, the stored copy of every tile on it, and whether it's been activated.
@@ -140,6 +145,13 @@ func activate_at(coord: Vector2i) -> void:
 # Whether coord is on an activated line.
 func is_active(coord: Vector2i) -> bool:
 	return lines_through(coord).any(func(line: Line) -> bool: return line.active)
+
+
+# Aether it costs to step onto the tile at coord: its own cost (TileGrid.move_cost), less
+# ACTIVE_MOVE_BONUS on an activated line, down to 0.
+func move_cost(grid: TileGrid, coord: Vector2i) -> int:
+	var cost := grid.move_cost(coord)
+	return maxi(cost - ACTIVE_MOVE_BONUS, 0) if is_active(coord) else cost
 
 
 # Length of the run of resonant-element tiles through key along direction, both ways; counts
