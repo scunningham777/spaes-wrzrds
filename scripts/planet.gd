@@ -309,9 +309,18 @@ func _follow_wizard() -> void:
 	_tiles.occupied = _wizard.mover.coord
 
 
-# Successful moves cost the aether of the tile stepped onto, less any ley line bonus (as the map
-# shows it); running out kicks the player back to space.
+# Successful moves first collect any aether on the tile stepped onto (Aether.collect; its tiles
+# flash), then cost that tile's aether, less any ley line bonus (as the map shows it); running out
+# kicks the player back to space. The move has already ticked cooldowns, so collected tiles stay
+# tapped for the full cooldown.
 func _pay_for_move(coord: Vector2i) -> void:
+	var collected := Aether.collect(_tiles.grid, Game.state.inventory, coord)
+	if not collected.is_empty():
+		var colors: Dictionary[Vector2i, Color] = {}
+		for c in collected:
+			colors[c] = _tiles.move_cost_dot_color
+		_tiles.flash_tiles(colors)
+		print("Collected %d aether from %s" % [Aether.COLLECT_AMOUNT, collected])
 	if not Aether.pay_move(Game.state.inventory, _tiles.move_cost(coord)):
 		print("Out of aether")
 		_leave_out_of_aether()

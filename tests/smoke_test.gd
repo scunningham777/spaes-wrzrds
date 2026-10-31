@@ -321,6 +321,31 @@ func _test_core_logic() -> void:
 	_check(Aether.pay_move(purse, 1) and purse.count(Aether.ITEM) == 1, "aether: a move spends 1")
 	_check(not Aether.pay_move(purse, 2) and purse.count(Aether.ITEM) == 0, "aether: a cost past what's left spends the rest")
 	_check(not Aether.pay_move(purse, 1) and purse.count(Aether.ITEM) == 0, "aether: paying with none stays at 0")
+	# Collecting: stepping onto a known, untapped aether tile next to another gains COLLECT_AMOUNT
+	# and taps them both.
+	var spring := TileKind.new(&"aether_spring", "Aether Spring", &"", [Aether.ITEM] as Array[StringName])
+	var ag := TileGrid.new(null, [spring] as Array[TileKind])
+	for c in [Vector2i.ZERO, Vector2i(1, 0), Vector2i(5, 5)]:
+		ag.add_tile(c, spring)
+	ag.add_tile(Vector2i(0, 1), TileKind.EMPTY)
+	var pool := Inventory.new()
+	_check(Aether.collect(ag, pool, Vector2i.ZERO).is_empty() and pool.count(Aether.ITEM) == 0 and ag.cooldowns.is_empty(),
+		"collect: nothing from aether tiles not known yet")
+	ag.set_kind_known(spring)
+	_check(Aether.collect(ag, pool, Vector2i(5, 5)).is_empty() and not ag.is_tapped(Vector2i(5, 5)),
+		"collect: nothing from an aether tile with no aether next to it")
+	_check(Aether.collect(ag, pool, Vector2i(0, 1)).is_empty() and pool.count(Aether.ITEM) == 0,
+		"collect: nothing from a tile without aether, even next to some")
+	_check(Aether.collect(ag, pool, Vector2i.ZERO) == [Vector2i.ZERO, Vector2i(1, 0)]
+		and pool.count(Aether.ITEM) == Aether.COLLECT_AMOUNT and ag.cooldown(Vector2i.ZERO) == ag.tap_cooldown
+		and ag.cooldown(Vector2i(1, 0)) == ag.tap_cooldown, "collect: gains COLLECT_AMOUNT and taps both tiles")
+	ag.add_tile(Vector2i(-1, 0), spring)
+	_check(Aether.collect(ag, pool, Vector2i.ZERO).is_empty() and Aether.collect(ag, pool, Vector2i(-1, 0)).is_empty()
+		and pool.count(Aether.ITEM) == Aether.COLLECT_AMOUNT, "collect: nothing from a tapped tile, or next to only tapped ones")
+	for i in ag.tap_cooldown:
+		ag.tick_cooldowns()
+	_check(Aether.collect(ag, pool, Vector2i.ZERO).size() == 3 and pool.count(Aether.ITEM) == 2 * Aether.COLLECT_AMOUNT
+		and ag.is_tapped(Vector2i(-1, 0)), "collect: once untapped, taps every aether neighbor, for the same amount")
 	_check(inv_changes[0] == 3, "inventory: changed fires on add/spend")
 
 	var state := GameState.new()
@@ -679,9 +704,12 @@ func _test_enter_planet() -> void:
 		and aether_label.text == "Aether: 10", "aether: land with 10, shown on the bar (%s)" % aether_label.text)
 	_check(tiles.grid.tiles.keys().all(func(c: Vector2i) -> bool: return tiles.grid.move_cost(c) > 0)
 		and tiles.landing == Vector2i.ZERO, "cost: every tile costs aether, and the landing tile is outlined")
-	# The checks below count aether spent per step, so make every step cost 1.
+	# The checks below count aether spent per step, so make every step cost 1, and keep steps from
+	# collecting aether (Aether.collect) unless a check sets that up.
 	for c in Hex.hexagon(radius):
 		tiles.grid.set_move_cost(c, 1)
+		if Aether.ITEM in tiles.grid.get_tile(c).elements:
+			tiles.grid.set_tile(c, TileKind.EMPTY)
 	var header: Control = current_scene.get_node("UI/SidePanel/Margin/Layout/Top/Header")
 	_check(aether_bar.global_position.y >= header.get_global_rect().end.y
 		and aether_bar.get_global_rect().end.y <= (current_scene.get_node("%ModePanel") as Control).global_position.y,
@@ -957,6 +985,30 @@ func _test_enter_planet() -> void:
 		"aether: extracting it refills the bar (%s)" % aether_label.text)
 	tiles.grid.set_tile(Vector2i(0, 1), iron)
 	tiles.grid.set_tile(Vector2i.ZERO, iron)
+	# Collecting: with 1 aether left, stepping onto a known aether tile next to another collects
+	# before the step is paid for, so it doesn't end the visit; both tiles are tapped and flash.
+	var spring := tiles.grid.find_kind(&"aether_spring")
+	var aether_before_collect: int = aether.call()
+	tiles.grid.set_tile(Vector2i(0, 1), spring)
+	tiles.grid.set_tile(Vector2i(1, 1), spring)
+	inv.spend(Aether.ITEM, aether.call() - 1)
+	_press(KEY_W)  # onto (0,1), which costs 1
+	await process_frame
+	_check(aether.call() == Aether.COLLECT_AMOUNT and swap_wizard.mover.coord == Vector2i(0, 1)
+		and not (current_scene.get_node("%OutOfAetherMessage") as Control).visible,
+		"collect: stepping onto aether with 1 left collects %d before paying, and the visit goes on (%d)"
+		% [Aether.COLLECT_AMOUNT, aether.call()])
+	_check(tiles.grid.cooldown(Vector2i(0, 1)) == 5 and tiles.grid.cooldown(Vector2i(1, 1)) == 5
+		and tile_info.shown_tapped() == "tapped: 5" and tiles.flash_strength > 0.0,
+		"collect: both tiles are tapped for the full cooldown, and flash")
+	inv.add(Aether.ITEM, 2)  # for two more steps
+	_press(KEY_X)  # back to (0,0), iron
+	_press(KEY_W)  # onto (0,1) again, tapped now
+	_check(aether.call() == Aether.COLLECT_AMOUNT, "collect: nothing from iron, or from tapped aether (%d)" % aether.call())
+	_press(KEY_X)
+	tiles.grid.set_tile(Vector2i(0, 1), iron)
+	tiles.grid.set_tile(Vector2i(1, 1), gold)
+	inv.add(Aether.ITEM, aether_before_collect - aether.call())
 
 	tiles_snapshot = tiles.grid.tiles.duplicate()  # pushed/extracted state should survive a revisit
 

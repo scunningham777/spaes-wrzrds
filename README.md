@@ -28,7 +28,9 @@ phase: **N** marks the node at once.
 On a planet each move costs the aether (the blue bar) of the tile you step onto, shown as a number
 and blue dot in its upper left. Most tiles cost 1, occasionally 2 (never for aether tiles); the
 landing tile is outlined in yellow. Pushing a tile takes its cost with it. You land with at least
-10; extracting aether refills it, and running out sends you back to space.
+10; extracting aether refills it, and running out sends you back to space. Stepping onto a tile you know yields
+aether, next to at least one other, collects 2 aether by itself before the step is paid for (so it can save you on
+your last aether); it taps those tiles like extracting does.
 
 When you land, every tile's elements are unknown: their icons are light gray and still, and only tiles you
 know can be extracted. Next to an unknown tile, **S** enters detect mode, a guessing game for the ring of tiles around you
