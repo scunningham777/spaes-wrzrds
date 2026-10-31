@@ -11,7 +11,7 @@ const FOCUS_BOX := preload("res://scenes/ui/focus_box.tscn")
 @export var planet_width: int = 48
 @export var planet_height: int = 24
 @export_range(0.0, 1.0) var empty_tile_probability: float = 0.0
-## Player actions (moves, extracts, scrying; not pushes) an extracted tile stays tapped.
+## Player actions (moves, extracts; not pushes) an extracted tile stays tapped.
 @export var tap_cooldown_actions: int = 5
 ## Running out of aether: how long the message shows, then how long the fade to black takes.
 @export var out_of_aether_message_seconds: float = 1.5
@@ -65,8 +65,11 @@ func _ready() -> void:
 	_tiles.landing = TileGridGenerator.START_COORD
 	_interaction.surface = _surface
 
-	# Keep the wizard on the revealed tiles, and the view (camera and wrap) on the wizard.
+	# Keep the wizard on the revealed tiles, and the view (camera and wrap) on the wizard. Each step
+	# reveals the tiles around where it lands, out to the equipped foci's reveal radius.
 	_wizard.mover.can_enter = _tiles.grid.has_tile
+	_wizard.mover.moved.connect(func(coord: Vector2i) -> void:
+		_surface.reveal_around(coord, Foci.reveal_radius(Game.state.equipped_foci)))
 	_follow_wizard()
 	_camera.reset_smoothing()
 	_wizard.mover.moved.connect(func(_coord: Vector2i) -> void: _follow_wizard())
@@ -142,10 +145,9 @@ func _update_side_panel() -> void:
 	var known := _tiles.grid.is_known(coord)
 	_tile_info.show_tile(kind, _tiles.icon_texture(kind, _tiles.grid.is_tapped(coord), known),
 		_tiles.grid.cooldown(coord), resonant, activated, known)
-	# Scry dims where it won't work: with nothing unrevealed next to the wizard.
 	for box in _focus_boxes:
 		for action in box.actions():
-			box.set_hint(action, _focus_hint_text(action), action != &"scry" or _interaction.can_scry_here())
+			box.set_hint(action, _focus_hint_text(action))
 	# Detect is only listed where it works: an unknown tile in reach.
 	var detect_hint := %DetectHint as Label
 	detect_hint.text = "%s – Detect" % _key_name(&"detect")

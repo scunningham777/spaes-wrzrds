@@ -16,13 +16,13 @@ const NAMES: Dictionary[StringName, String] = {
 ## Action ids (input action names) each focus grants.
 const ACTIONS: Dictionary[StringName, Array] = {
 	STAFF: [&"extract"],
-	ORB: [&"scry"],
+	ORB: [],
 }
 
 ## Per-focus stats. Staff: distance, tiles ahead of the player that extraction also needs (all
 ## sharing an element with the player's tile); extract_amount, items gained of each shared element.
-## Orb: scry_radius, how far around the player scrying reveals; landing_radius, how far around the
-## landing tile is revealed on landing.
+## Orb: scry_radius, how far around the player each step reveals (see reveal_radius); landing_radius,
+## how far around the landing tile is revealed on landing.
 const STATS: Dictionary[StringName, Dictionary] = {
 	STAFF: {"distance": 1, "extract_amount": 2},
 	ORB: {"scry_radius": 2, "landing_radius": 2},
@@ -30,6 +30,8 @@ const STATS: Dictionary[StringName, Dictionary] = {
 
 ## How far around the landing tile is revealed when no equipped focus says (see landing_radius).
 const DEFAULT_LANDING_RADIUS := 1
+## How far around the player each step reveals when no equipped focus scries (see reveal_radius).
+const DEFAULT_REVEAL_RADIUS := 1
 
 
 static func display_name(focus: StringName) -> String:
@@ -73,3 +75,12 @@ static func landing_radius(foci: Array[StringName]) -> int:
 	for focus in foci:
 		radius = maxi(radius, STATS.get(focus, {}).get("landing_radius", -1))
 	return radius if radius >= 0 else DEFAULT_LANDING_RADIUS
+
+
+# How far around the player each step reveals with foci equipped: the widest scry_radius any of
+# them gives, or DEFAULT_REVEAL_RADIUS if none scries.
+static func reveal_radius(foci: Array[StringName]) -> int:
+	var radius := -1
+	for focus in foci:
+		radius = maxi(radius, STATS.get(focus, {}).get("scry_radius", -1))
+	return radius if radius >= 0 else DEFAULT_REVEAL_RADIUS

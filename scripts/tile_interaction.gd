@@ -3,9 +3,8 @@ extends Node
 
 # Ported from Unity TileExplore.TileInteractionManager: maps interaction keys to TileGrid
 # operations at the player's position/facing. R extracts, F swaps the player's tile with the
-# one it faces, V scries (next to unrevealed tiles, reveals every tile within the orb's scry radius),
-# M marks a ley node (where ley lines the player has seen cross), B builds a tower (on a marked
-# node). Extract and scry come from the equipped foci (Foci). Animated actions hand their tween to
+# one it faces, M marks a ley node (where ley lines the player has seen cross), B builds a tower (on
+# a marked node). Extract comes from the equipped foci (Foci). Animated actions hand their tween to
 # the ActionLock, which blocks input until they finish.
 #
 # S enters detect mode, where there's an unknown tile within detect_radius of the player (see
@@ -22,7 +21,7 @@ signal detecting_changed(detecting: bool)
 ## Detect mode covers the player's tile and every tile up to this many steps away.
 @export var detect_radius: int = 1
 
-## The planet being explored, for scrying; assigned by the scene. tiles shows its grid.
+## The planet being explored; assigned by the scene. tiles shows its grid.
 var surface: PlanetSurface
 ## The detect mode session, or null outside detect mode.
 var detection: Detection
@@ -45,9 +44,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("push"):
 		_try_swap()
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("scry"):
-		_try_scry()
-		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("mark_node"):
 		_try_mark_node()
 		get_viewport().set_input_as_handled()
@@ -60,12 +56,6 @@ func _unhandled_input(event: InputEvent) -> void:
 func extract_line() -> Array[Vector2i]:
 	var staff := Foci.granting(Game.state.equipped_foci, &"extract")
 	return Hex.line(player.mover.coord, player.mover.facing, Foci.distance(staff))
-
-
-# Whether V would scry here: a focus grants it, and a tile next to the player is unrevealed.
-func can_scry_here() -> bool:
-	return surface != null and not Foci.granting(Game.state.equipped_foci, &"scry").is_empty() \
-		and surface.next_to_unrevealed(player.mover.coord)
 
 
 # Whether M would mark a ley node on the player's tile. Uses the ley lines as the map shows them,
@@ -130,18 +120,6 @@ func _try_swap() -> void:
 	tiles.grid.try_swap(here, front)
 	print("Swapped tiles %s and %s" % [here, front])
 	lock.run(tiles.animate_swap(here, front, swap_seconds))
-
-
-# Scrying works next to an unrevealed tile and reveals every tile within the scrying focus's
-# scry_radius of the player.
-func _try_scry() -> void:
-	var here := player.mover.coord
-	if not can_scry_here():
-		print("Can't scry from %s" % [here])
-		return
-	tiles.grid.tick_cooldowns()
-	var revealed := surface.reveal_around(here, Foci.scry_radius(Foci.granting(Game.state.equipped_foci, &"scry")))
-	print("Scried %d tiles around %s" % [revealed.size(), here])
 
 
 func _try_mark_node() -> void:
@@ -213,7 +191,7 @@ func _detect_input(event: InputEvent) -> bool:
 		detection.toggle(guess)
 	else:
 		return HexPlayerController.turn_step(event, pointy_top) != 0 \
-			or [&"extract", &"push", &"scry", &"mark_node", &"build_tower"].any(event.is_action_pressed)
+			or [&"extract", &"push", &"mark_node", &"build_tower"].any(event.is_action_pressed)
 	return true
 
 

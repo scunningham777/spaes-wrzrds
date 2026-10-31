@@ -2,7 +2,7 @@ class_name PlanetSurface
 extends RefCounted
 
 # A planet: a wrapping hex grid (HexTorus) the player uncovers bit by bit, around where they land
-# and wherever they scry (reveal_around). Tiles are generated as they're revealed
+# and wherever they step (reveal_around). Tiles are generated as they're revealed
 # (TileGridGenerator). Ley lines close in one lap around it when width is a multiple of twice the
 # height (see LeyLines).
 
@@ -27,8 +27,3 @@ func reveal_around(center: Vector2i, radius: int) -> Array[Vector2i]:
 	for offset in Hex.hexagon(radius):
 		region.append(center + offset)
 	return generator.reveal(grid, region)
-
-
-# Whether a tile next to coord is still unrevealed.
-func next_to_unrevealed(coord: Vector2i) -> bool:
-	return Hex.hexagon(1).any(func(offset: Vector2i) -> bool: return not grid.has_tile(coord + offset))

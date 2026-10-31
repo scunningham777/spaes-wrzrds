@@ -169,12 +169,15 @@ func _test_core_logic() -> void:
 	_check(Foci.display_name(Foci.STAFF) == "Staff" and Foci.grants(Foci.STAFF, &"extract")
 		and not Foci.grants(Foci.STAFF, &"push") and Foci.actions(&"").is_empty(), "foci: staff grants extract")
 	_check(GameState.new().equipped_foci == [Foci.STAFF, Foci.ORB], "foci: staff and orb equipped by default")
-	_check(Foci.display_name(Foci.ORB) == "Orb" and Foci.grants(Foci.ORB, &"scry") and not Foci.grants(Foci.ORB, &"extract")
-		and Foci.scry_radius(Foci.ORB) >= 1 and Foci.scry_radius(Foci.STAFF) == 0, "foci: the orb grants scry, with a radius")
+	_check(Foci.display_name(Foci.ORB) == "Orb" and Foci.actions(Foci.ORB).is_empty()
+		and Foci.scry_radius(Foci.ORB) >= 1 and Foci.scry_radius(Foci.STAFF) == 0, "foci: the orb grants no actions, just a scry radius")
 	var both: Array[StringName] = [Foci.STAFF, Foci.ORB]
 	var none: Array[StringName] = []
-	_check(Foci.granting(both, &"scry") == Foci.ORB and Foci.granting(both, &"extract") == Foci.STAFF
-		and Foci.granting(none, &"scry") == &"", "foci: granting finds the equipped focus for an action")
+	_check(Foci.granting(both, &"extract") == Foci.STAFF and Foci.granting(none, &"extract") == &"",
+		"foci: granting finds the equipped focus for an action")
+	var staff_only: Array[StringName] = [Foci.STAFF]
+	_check(Foci.reveal_radius(both) == Foci.scry_radius(Foci.ORB) and Foci.reveal_radius(staff_only) == Foci.DEFAULT_REVEAL_RADIUS
+		and Foci.DEFAULT_REVEAL_RADIUS == 1, "foci: steps reveal out to the orb's scry radius, or 1 without one")
 	_check(Foci.landing_radius(both) == Foci.STATS[Foci.ORB]["landing_radius"]
 		and Foci.landing_radius(none) == Foci.DEFAULT_LANDING_RADIUS, "foci: the orb sets the landing radius")
 	_check(Foci.distance(Foci.STAFF) == 1 and Foci.extract_amount(Foci.STAFF) >= 1
@@ -341,7 +344,7 @@ func _test_core_logic() -> void:
 	_test_ley_lines()
 
 
-# PlanetSurface: a wrapping planet revealed around spots (landing, scrying).
+# PlanetSurface: a wrapping planet revealed around spots (landing, stepping).
 func _test_planet_surface() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
@@ -350,9 +353,6 @@ func _test_planet_surface() -> void:
 	_check(g.torus.width == 16 and g.torus.height == 18 and g.tiles.is_empty(), "surface: sized in tiles, nothing revealed yet")
 	var landed := surface.reveal_around(Vector2i.ZERO, 2)
 	_check(landed.size() == 19 and g.tiles.size() == 19, "surface: reveals a radius-2 hexagon around a spot")
-	_check(not surface.next_to_unrevealed(Vector2i.ZERO) and not surface.next_to_unrevealed(Vector2i(1, 0))
-		and surface.next_to_unrevealed(Vector2i(2, -1)) and surface.next_to_unrevealed(Vector2i(0, -2)),
-		"surface: the edge of the revealed area is next to unrevealed tiles, the middle isn't")
 	var before := g.tiles.duplicate()
 	var scried := surface.reveal_around(Vector2i(2, -1), 2)
 	# The hexagons around (0, 0) and (2, -1) overlap in 10 tiles.
@@ -363,7 +363,7 @@ func _test_planet_surface() -> void:
 	# Across the wrap: a lap across the 16 x 18 torus shifts r back by 8.
 	_check(surface.reveal_around(Vector2i(16, -8), 2).is_empty(), "wrap: a copy of a revealed spot is already revealed")
 	surface.reveal_around(Vector2i.ZERO, 13)  # the smallest hexagon that covers this torus
-	_check(g.tiles.size() == 16 * 18 and not surface.next_to_unrevealed(Vector2i(8, 4)),
+	_check(g.tiles.size() == 16 * 18,
 		"wrap: a big enough reveal covers the whole planet once")
 	# Move costs: aether tiles cost 1 and the rest 1, or occasionally 2.
 	var revealed: Array[Vector2i] = g.tiles.keys()
@@ -839,13 +839,12 @@ func _test_enter_planet() -> void:
 	var focus_box: Control = current_scene.get_node("%Foci")
 	var boxes: Array = focus_box.get_children()
 	var box_names := boxes.map(func(b: FocusBox) -> String: return (b.get_node("%FocusName") as Label).text)
-	_check(focus_box.visible and box_names == ["Staff", "Orb"]
-		and (boxes[0] as FocusBox).actions() == [&"extract"] and (boxes[1] as FocusBox).actions() == [&"scry"]
-		and extract_hint.call().begins_with("R – Extract") and (boxes[1] as FocusBox).hint(&"scry").text == "V – Scry",
-		"focus: a box each for the Staff (R – Extract) and the Orb (V – Scry) (%s)" % [box_names])
+	_check(focus_box.visible and box_names == ["Staff"] and (boxes[0] as FocusBox).actions() == [&"extract"]
+		and extract_hint.call().begins_with("R – Extract"),
+		"focus: a box for the Staff (R – Extract), none for the Orb, which grants no actions (%s)" % [box_names])
 	var general_hints: Array = current_scene.get_node("%Actions").get_children().filter(
 		func(l: Label) -> bool: return l.visible).map(func(l: Label) -> String: return l.text)
-	_check(general_hints == ["F – Push"], "focus: Extract and Scry aren't general actions (%s)" % [general_hints])
+	_check(general_hints == ["F – Push"], "focus: Extract isn't a general action (%s)" % [general_hints])
 	_check(focus_box.global_position.y > (current_scene.get_node("%Actions") as Control).global_position.y
 		and focus_box.get_global_rect().end.y < divider.global_position.y, "focus: boxes sit between Push and the divider")
 	_press(KEY_R)
@@ -928,15 +927,21 @@ func _test_enter_planet() -> void:
 
 	tiles_snapshot = tiles.grid.tiles.duplicate()  # pushed/extracted state should survive a revisit
 
-	# Boundary: walking N from (0,0) stops at the grid's edge.
+	# Each step reveals every tile within the orb's scry radius of where it lands: walking N from
+	# (0,0) to the edge of the landing area, (0, 2), reveals out to (0, 4).
 	var planet_wizard: HexPlayerController = current_scene.get_node("HexBoard/Wizard")
+	var scry_radius := Foci.scry_radius(Foci.ORB)
 	var aether_before_walk: int = aether.call()
-	for i in radius + 3:
+	_check(not tiles.grid.has_tile(Vector2i(0, radius + scry_radius)), "reveal: (0, 4) is unrevealed before walking")
+	for i in radius:
 		_press(KEY_W)
-	_check(planet_wizard.mover.coord == Vector2i(0, radius), "planet: wizard stops at the grid edge (got %s)" % planet_wizard.mover.coord)
-	_check(aether.call() == aether_before_walk - radius, "aether: bumping the edge costs nothing (%d left)" % aether.call())
+	_check(planet_wizard.mover.coord == Vector2i(0, radius) and aether.call() == aether_before_walk - radius,
+		"planet: wizard walks to the edge of the landing area (got %s)" % planet_wizard.mover.coord)
+	_check(Hex.hexagon(scry_radius).all(func(c: Vector2i) -> bool: return tiles.grid.has_tile(Vector2i(0, radius) + c))
+		and not tiles.grid.has_tile(Vector2i(0, radius + scry_radius + 1)),
+		"reveal: each step reveals out to the orb's scry radius, no further")
 	_check(planet_wizard.position == (current_scene.get_node("HexBoard") as HexBoard).hex_to_local(Vector2i(0, radius)),
-		"planet: wizard drawn on the edge hex")
+		"planet: wizard drawn on its hex")
 	# Facing N on the flat-top planet: the marker's triangle sits on the top edge, tip pointing up.
 	var marker: HexFacingMarker = current_scene.get_node("HexBoard/Wizard/FacingMarker")
 	var tri := marker.triangle_points()
@@ -961,10 +966,11 @@ func _test_enter_planet() -> void:
 	_check(tri[2].x > 0.0 and tri[2].y < 0.0, "planet: facing triangle follows a turn to NE (%s)" % tri)
 
 	# Detect: next to an unknown tile S enters detect mode, a guessing game for the ring around the
-	# wizard (flat-top, at (0, 2) on the edge: N, NE and NW are off the grid).
+	# wizard (flat-top, at (0, 2); N, NE and NW are Empty, which has nothing to detect).
 	var interaction: Node = current_scene.get_node("TileInteraction")  # untyped: its script uses the Game autoload
 	var detect_center := Vector2i(0, 2)
-	var detect_kinds := {Vector2i(0, 2): iron, Vector2i(0, 1): gold, Vector2i(1, 1): iron, Vector2i(-1, 2): timber}
+	var detect_kinds := {Vector2i(0, 2): iron, Vector2i(0, 1): gold, Vector2i(1, 1): iron, Vector2i(-1, 2): timber,
+		Vector2i(0, 3): TileKind.EMPTY, Vector2i(1, 2): TileKind.EMPTY, Vector2i(-1, 3): TileKind.EMPTY}
 	for c: Vector2i in detect_kinds:
 		tiles.grid.set_tile(c, detect_kinds[c])
 	for kind in tiles.grid.kinds:
@@ -1028,7 +1034,7 @@ func _test_enter_planet() -> void:
 	_press(KEY_3)  # Iron, on the wizard's iron tile
 	_check(detection.guessed(Vector2i(1, 1)) == [&"iron"], "detect: a guess counts for every like icon")
 	_press(KEY_X)  # S: the gold at (0, 1)
-	_press(KEY_W)  # N: off the grid, selection stays
+	_press(KEY_W)  # N: Empty, nothing to detect, selection stays
 	_check(detection.selected == tiles.grid.canonical(Vector2i(0, 1)), "detect: direction keys select around the wizard")
 	_press(KEY_2)
 	_press(KEY_3)
@@ -1041,7 +1047,7 @@ func _test_enter_planet() -> void:
 	_press(KEY_5)  # Gold and Wood: right, plus an extra
 	var detect_facing := planet_wizard.mover.facing
 	var detect_aether: int = aether.call()
-	for key: Key in [KEY_D, KEY_A, KEY_R, KEY_F, KEY_V, KEY_B]:
+	for key: Key in [KEY_D, KEY_A, KEY_R, KEY_F, KEY_B]:
 		_press(key)
 	_check(planet_wizard.mover.coord == detect_center and planet_wizard.mover.facing == detect_facing
 		and aether.call() == detect_aether and not lock.busy and interaction.detecting,
@@ -1173,41 +1179,26 @@ func _test_enter_planet() -> void:
 		"tower: a non-iron tile on an activated line shows ley line activated")
 	tiles.ley_lines = planet_ley
 
-	# Scry: the orb's action. It works next to an unrevealed tile, and reveals every tile within the
-	# orb's scry radius of the wizard.
-	var scry_hint := (focus_box.get_child(1) as FocusBox).hint(&"scry")
-	var scry_radius := Foci.scry_radius(Foci.ORB)
+	# Reveal: walking E reveals new tiles around each step; without the orb, only the ring around it.
 	_game().state.inventory.add(Aether.ITEM, 10)  # plenty for the walk
 	_press(KEY_X)
 	_press(KEY_X)  # (0, 2) -> (0, 0), the middle of the landing area
-	_check(not interaction.can_scry_here() and scry_hint.modulate.a < 1.0 and scry_hint.text == "V – Scry",
-		"scry: hint dims with nothing unrevealed next to the wizard")
-	_press(KEY_V)
-	_check(tiles.grid.tiles.size() == Hex.hexagon(radius).size(), "scry: V does nothing there")
 	_press(KEY_C)
-	_press(KEY_E)  # SE (1, -1) -> NE (2, -1), on the edge
-	_check_coord(planet_wizard, Vector2i(2, -1), "scry: walked to the east edge")
-	_check(interaction.can_scry_here() and scry_hint.modulate.a == 1.0, "scry: hint lights up next to unrevealed tiles")
+	_press(KEY_E)  # SE (1, -1) -> NE (2, -1)
+	_check_coord(planet_wizard, Vector2i(2, -1), "reveal: walked east")
+	_check(Hex.hexagon(scry_radius).all(func(c: Vector2i) -> bool: return tiles.grid.has_tile(Vector2i(2, -1) + c)),
+		"reveal: every tile within the orb's radius of the wizard is revealed")
+	_check(tiles.grid.tiles.keys().all(tiles.grid.is_known), "known: revealed tiles of known kinds are known")
 	var camera: Camera2D = current_scene.get_node("Camera2D")
 	_check(camera.position == planet_wizard.position and tiles.view_center == planet_wizard.mover.coord,
 		"planet: camera and view follow the wizard")
 	_game().state.equipped_foci.assign([Foci.STAFF])
-	_press(KEY_V)
-	_check(tiles.grid.tiles.size() == Hex.hexagon(radius).size(), "scry: no orb, no scry")
+	_press(KEY_E)  # NE onto (3, -1)
+	_check_coord(planet_wizard, Vector2i(3, -1), "reveal: can walk onto the revealed tiles")
+	_check(tiles.grid.has_tile(Vector2i(4, -1)) and not tiles.grid.has_tile(Vector2i(5, -1)),
+		"reveal: without the orb a step reveals just the ring around it")
 	_game().state.equipped_foci.assign([Foci.STAFF, Foci.ORB])
-	_press(KEY_V)
-	var scried: Dictionary[Vector2i, bool] = {}
-	for c in Hex.hexagon(radius):
-		scried[tiles.grid.canonical(c)] = true
-	for c in Hex.hexagon(scry_radius):
-		scried[tiles.grid.canonical(Vector2i(2, -1) + c)] = true
-	_check(tiles.grid.tiles.size() == scried.size() and scried.keys().all(tiles.grid.has_tile),
-		"scry: V reveals every tile within the orb's radius (%d tiles)" % tiles.grid.tiles.size())
-	_check(tiles.grid.tiles.keys().all(tiles.grid.is_known), "known: scried tiles of known kinds are known")
-	_check(not interaction.can_scry_here() and scry_hint.modulate.a < 1.0, "scry: hint dims once everything around is revealed")
-	_press(KEY_E)  # NE onto (3, -1), only just revealed
-	_check_coord(planet_wizard, Vector2i(3, -1), "scry: can walk onto the revealed tiles")
-	tiles_snapshot = tiles.grid.tiles.duplicate()  # the revisit should keep the scried tiles
+	tiles_snapshot = tiles.grid.tiles.duplicate()  # the revisit should keep the revealed tiles
 
 	# Esc fades out too, with input blocked, and space fades in.
 	var esc_scene := current_scene
