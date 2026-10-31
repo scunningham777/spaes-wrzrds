@@ -1123,9 +1123,11 @@ func _test_enter_planet() -> void:
 	_check(build_hint.visible and not mark_hint.visible and build_hint.text == "B – Build Tower (needs 3 Stone, 2 Iron)"
 		and build_hint.get_index() == mark_hint.get_index() + 1,
 		"tower: hint shows on a marked node, with what it needs, below Mark Ley Node (%s)" % build_hint.text)
-	# Iron is already at (1, 0) and (0, -1), in the ring; stone goes in it too.
+	# Iron is already at (1, 0) and (0, -1), in the ring; stone goes in it too. (-1, 1) is still what
+	# the planet rolled, which may be stone, so it's set to gold.
 	tiles.grid.set_tile(Vector2i(-1, 0), stone)
 	tiles.grid.set_tile(Vector2i(1, -1), stone)
+	tiles.grid.set_tile(Vector2i(-1, 1), gold)
 	_press(KEY_B)
 	_check(tiles.grid.get_tile(Vector2i.ZERO) == iron, "tower: B does nothing with only two stone around the node")
 	tiles.grid.set_tile(Vector2i(-1, 1), stone)
