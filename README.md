@@ -30,7 +30,7 @@ and blue dot in its upper left. Most tiles cost 1, occasionally 2 (never for aet
 landing tile is outlined in yellow. Pushing a tile takes its cost with it. You land with at least
 10; extracting aether refills it, and running out sends you back to space. Stepping onto a tile you know yields
 aether, next to at least one other, collects 2 aether by itself before the step is paid for (so it can save you on
-your last aether); it taps those tiles like extracting does.
+your last aether); it taps that tile and one of its aether neighbors, like extracting does.
 
 When you land, every tile's elements are unknown: their icons are light gray and still, and only tiles you
 know can be extracted. Next to an unknown tile, **S** enters detect mode, a guessing game for the ring of tiles around you

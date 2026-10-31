@@ -29,9 +29,9 @@ static func pay_move(inventory: Inventory, cost: int) -> bool:
 
 
 # Collects aether on stepping onto coord: if its tile and at least one neighbor are known to yield
-# aether and untapped, taps them all (as extracting does, TileGrid.try_extract) and adds
-# COLLECT_AMOUNT to inventory. Returns the stored copies of the tapped tiles, or [] (and changes
-# nothing) if there was nothing to collect.
+# aether and untapped, taps the tile and one such neighbor (the first in Hex.hexagon order; as
+# extracting does, TileGrid.try_extract) and adds COLLECT_AMOUNT to inventory. Returns the stored
+# copies of the two tapped tiles, or [] (and changes nothing) if there was nothing to collect.
 static func collect(grid: TileGrid, inventory: Inventory, coord: Vector2i) -> Array[Vector2i]:
 	var coords: Array[Vector2i] = []
 	if not _collectable(grid, coord):
@@ -41,6 +41,7 @@ static func collect(grid: TileGrid, inventory: Inventory, coord: Vector2i) -> Ar
 		var c := grid.canonical(coord + offset)
 		if not c in coords and _collectable(grid, c):
 			coords.append(c)
+			break
 	if coords.size() < 2:
 		coords.clear()
 		return coords

@@ -344,8 +344,9 @@ func _test_core_logic() -> void:
 		and pool.count(Aether.ITEM) == Aether.COLLECT_AMOUNT, "collect: nothing from a tapped tile, or next to only tapped ones")
 	for i in ag.tap_cooldown:
 		ag.tick_cooldowns()
-	_check(Aether.collect(ag, pool, Vector2i.ZERO).size() == 3 and pool.count(Aether.ITEM) == 2 * Aether.COLLECT_AMOUNT
-		and ag.is_tapped(Vector2i(-1, 0)), "collect: once untapped, taps every aether neighbor, for the same amount")
+	_check(Aether.collect(ag, pool, Vector2i.ZERO).size() == 2 and pool.count(Aether.ITEM) == 2 * Aether.COLLECT_AMOUNT
+		and ag.is_tapped(Vector2i(-1, 0)) != ag.is_tapped(Vector2i(1, 0)),
+		"collect: with two aether neighbors, taps just one of them along with the tile")
 	_check(inv_changes[0] == 3, "inventory: changed fires on add/spend")
 
 	var state := GameState.new()
