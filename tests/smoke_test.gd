@@ -53,27 +53,18 @@ func _test_core_logic() -> void:
 	var pointy := HexMover.new(HexLayout.new(true), Vector2i(2, 3))
 	var moves: Array[Vector2i] = []
 	pointy.moved.connect(func(c: Vector2i) -> void: moves.append(c))
-	_check(pointy.facing == Vector2i(1, 0), "core: pointy default facing E")
 	_check(not pointy.move(Hex.Compass.N), "core: pointy has no N neighbor")
 	_check(pointy.move(Hex.Compass.NW) and pointy.coord == Vector2i(1, 4), "core: pointy NW step")
 	_check(moves == [Vector2i(1, 4)], "core: moved signal fires once per step")
-	pointy.turn(-1)
-	_check(pointy.facing_compass() == Hex.Compass.NE, "core: pointy turn CCW E -> NE")
-	pointy.turn(7)
-	_check(pointy.facing_compass() == Hex.Compass.E, "core: turn wraps around")
 
 	var flat := HexMover.new(HexLayout.new(false))
-	_check(flat.facing_compass() == Hex.Compass.N, "core: flat default facing N")
 	_check(not flat.move(Hex.Compass.E), "core: flat has no E neighbor")
 	var bounded := HexMover.new(HexLayout.new(false))
 	bounded.can_enter = func(c: Vector2i) -> bool: return c.y <= 1
 	_check(bounded.move(Hex.Compass.N) and not bounded.move(Hex.Compass.N) and bounded.coord == Vector2i(0, 1),
 		"core: can_enter blocks moves")
-	bounded.turn(1)
-	_check(bounded.facing_compass() == Hex.Compass.NE, "core: turning still works when blocked")
-	_check(is_equal_approx(flat.facing_angle_degrees(), 90.0), "core: flat N angle is 90")
-	flat.turn(1)
-	_check(is_equal_approx(flat.facing_angle_degrees(), 30.0), "core: flat NE angle is 30")
+	_check(is_equal_approx(Hex.direction_angle_degrees(Vector2i(0, 1), false), 90.0)
+		and is_equal_approx(Hex.direction_angle_degrees(Vector2i(1, 0), false), 30.0), "core: flat N angle is 90, NE 30")
 
 	# Opposite compass directions cancel out in both orientations.
 	for pt: bool in [true, false]:
@@ -256,10 +247,7 @@ func _test_core_logic() -> void:
 		and known_changes == [stone_kind], "known: knowing a kind knows all its tiles")
 	var frozen := HexMover.new(HexLayout.new(false))
 	frozen.frozen = true
-	var frozen_facing := frozen.facing
-	frozen.turn(1)
-	_check(not frozen.move(Hex.Compass.N) and frozen.coord == Vector2i.ZERO and frozen.facing != frozen_facing,
-		"core: a frozen mover can't move but can turn")
+	_check(not frozen.move(Hex.Compass.N) and frozen.coord == Vector2i.ZERO, "core: a frozen mover can't move")
 	frozen.frozen = false
 	_check(frozen.move(Hex.Compass.N), "core: an unfrozen mover moves again")
 	# Detection: Wordle-style guessing of the unknown kinds in an area, the player's tile first, from
@@ -559,46 +547,40 @@ func _test_play_scene(pointy_top: bool) -> void:
 	_game().state.inventory.spend(&"stone")
 	_check(panel.selected_item == &"gold", "%s: selection falls back to the first item" % tag)
 
+	# The ship faces the way it last stepped (the art faces up), starting at rest.
+	_check_rot(sprite, 0.0, "%s: initial sprite faces up" % tag)
 	if pointy_top:
-		# Default facing is E; art faces up, so rotated +90 (clockwise) on screen.
-		_check_rot(sprite, 90.0, "%s: initial sprite faces E" % tag)
-
 		_press(KEY_D)
 		_check_coord(wizard, Vector2i(1, 0), "%s: D moves E" % tag)
 		_check(wizard.position.x > 0.0 and is_zero_approx(wizard.position.y), "%s: E is screen-right" % tag)
+		_check_rot(sprite, 90.0, "%s: stepping E faces E" % tag)
 		_press(KEY_E)
 		_check_coord(wizard, Vector2i(1, 1), "%s: E moves NE" % tag)
 		_check(wizard.position.y < 0.0, "%s: NE is screen-up" % tag)
+		_check_rot(sprite, 30.0, "%s: stepping NE faces NE" % tag)
 		_press(KEY_KP_1)
 		_check_coord(wizard, Vector2i(1, 0), "%s: Numpad1 moves SW" % tag)
-
-		_press(KEY_W)  # turns counter-clockwise, E -> NE
-		_check(wizard.mover.facing == Vector2i(0, 1), "%s: W turns to NE" % tag)
-		_check_rot(sprite, 30.0, "%s: NE sprite rotation" % tag)
+		_check_rot(sprite, 210.0, "%s: stepping SW faces SW" % tag)
+		_press(KEY_W)
 		_press(KEY_DOWN)
-		_press(KEY_DOWN)  # NE -> E -> SE
-		_check(wizard.mover.facing == Vector2i(1, -1), "%s: Down x2 turns to SE" % tag)
-		_check_coord(wizard, Vector2i(1, 0), "%s: turning doesn't move" % tag)
+		_check_coord(wizard, Vector2i(1, 0), "%s: W and Down don't move (no N/S neighbors)" % tag)
+		_check_rot(sprite, 210.0, "%s: and don't turn the ship either" % tag)
 	else:
-		_check_rot(sprite, 0.0, "%s: initial sprite faces N" % tag)
-
 		_press(KEY_W)
 		_check_coord(wizard, Vector2i(0, 1), "%s: W moves N" % tag)
 		_check(is_zero_approx(wizard.position.x) and wizard.position.y < 0.0, "%s: N is screen-up" % tag)
+		_check_rot(sprite, 0.0, "%s: stepping N faces N" % tag)
 		_press(KEY_E)
 		_check_coord(wizard, Vector2i(1, 1), "%s: E moves NE" % tag)
 		_check(wizard.position.x > 0.0, "%s: NE is screen-right" % tag)
+		_check_rot(sprite, 60.0, "%s: stepping NE faces NE" % tag)
 		_press(KEY_Z)
 		_check_coord(wizard, Vector2i(0, 1), "%s: Z moves SW" % tag)
-
-		_press(KEY_A)  # turns counter-clockwise, N -> NW
-		_check(wizard.mover.facing == Vector2i(-1, 1), "%s: A turns to NW" % tag)
-		_check_rot(sprite, -60.0, "%s: NW sprite rotation" % tag)
+		_check_rot(sprite, 240.0, "%s: stepping SW faces SW" % tag)
+		_press(KEY_A)
 		_press(KEY_RIGHT)
-		_press(KEY_RIGHT)  # NW -> N -> NE
-		_check(wizard.mover.facing == Vector2i(1, 0), "%s: Right x2 turns to NE" % tag)
-		_check_rot(sprite, 60.0, "%s: NE sprite rotation" % tag)
-		_check_coord(wizard, Vector2i(0, 1), "%s: turning doesn't move" % tag)
+		_check_coord(wizard, Vector2i(0, 1), "%s: A and Right don't move (no E/W neighbors)" % tag)
+		_check_rot(sprite, 240.0, "%s: and don't turn the ship either" % tag)
 
 	play.queue_free()
 	await process_frame
@@ -670,8 +652,9 @@ func _test_enter_planet() -> void:
 	_check(tiles.grid.known_kinds.is_empty() and not tiles.grid.tiles.keys().any(tiles.grid.is_known)
 		and (current_scene.get_node("%TileInfo") as TileInfo).shown_yield() == "Elements: unknown",
 		"known: every tile's elements are unknown on landing")
-	var detect_hint: Label = current_scene.get_node("%DetectHint")
-	_check(detect_hint.visible and detect_hint.text == "S – Detect", "detect: hint shows next to unknown tiles")
+	var bar: ActionBar = current_scene.get_node("%ActionBar")
+	_check(&"detect" in bar.actions() and bar.tile_text(&"detect") == "S Detect",
+		"detect: the action bar offers Detect next to unknown tiles (%s)" % bar.tile_text(&"detect"))
 	# Unknown icons are flat light gray, keeping the icon's shape (alpha).
 	var unknown_icon := tiles.icon_texture(tiles.grid.kinds[0], false, false).get_image()
 	var unknown_pixels: Array[Color] = []
@@ -688,7 +671,7 @@ func _test_enter_planet() -> void:
 	for kind in tiles.grid.kinds:
 		tiles.grid.set_kind_known(kind)
 	_check(not tiles.icon_still(Vector2i.ZERO), "known: known icons animate")
-	_check(not detect_hint.visible, "detect: no hint with nothing unknown around")
+	_check(not &"detect" in bar.actions(), "detect: not offered with nothing unknown around")
 	var aether_bar: ProgressBar = current_scene.get_node("%AetherBar")
 	var aether_label: Label = current_scene.get_node("%AetherLabel")
 	var aether := func() -> int: return _game().state.inventory.count(Aether.ITEM)
@@ -701,7 +684,7 @@ func _test_enter_planet() -> void:
 		tiles.grid.set_move_cost(c, 1)
 	var header: Control = current_scene.get_node("UI/SidePanel/Margin/Layout/Top/Header")
 	_check(aether_bar.global_position.y >= header.get_global_rect().end.y
-		and aether_bar.get_global_rect().end.y <= (current_scene.get_node("%Actions") as Control).global_position.y,
+		and aether_bar.get_global_rect().end.y <= (current_scene.get_node("%ModePanel") as Control).global_position.y,
 		"aether: bar sits under the wizard icon and planet name")
 	var tiles_snapshot := tiles.grid.tiles.duplicate()
 	_check(bg.color.is_equal_approx(Color(0.19215687, 0.3019608, 0.4745098)), "planet: blue background")
@@ -733,10 +716,12 @@ func _test_enter_planet() -> void:
 		% [board_screen_x, side_panel.get_global_rect().position.x])
 	_check(ItemIcon.color_for(&"wood") == Color(0.4, 0.6, 0.3), "inventory: wood is still a green square")
 
-	# Swap with F: wizard at (0,0) faces N on the flat-top planet, so (0,0) <-> (0,1).
+	# Push: F opens the push phase, where the direction keys pick the neighbor to swap with and
+	# Enter swaps. Flat-top, so W picks N: (0,0) <-> (0,1).
 	var lock: ActionLock = current_scene.get_node("ActionLock")
-	var actions: Control = current_scene.get_node("%Actions")
 	var swap_wizard: HexPlayerController = current_scene.get_node("HexBoard/Wizard")
+	var interaction: Node = current_scene.get_node("TileInteraction")  # untyped: its script uses the Game autoload
+	var lines := func() -> Array[String]: return current_scene.mode_lines()
 	# The planet's own kinds (generated from the defaults).
 	var timber := tiles.grid.find_kind(&"timber")
 	var gold := tiles.grid.find_kind(&"gold_ore")
@@ -744,18 +729,32 @@ func _test_enter_planet() -> void:
 	var stone := tiles.grid.find_kind(&"stone_outcrop")
 	tiles.grid.set_tile(Vector2i.ZERO, timber)
 	tiles.grid.set_tile(Vector2i(0, 1), gold)
+	_check(interaction.mode == &"move" and bar.actions()[0] == &"move" and bar.is_active(&"move"),
+		"actions: Move comes first, and is the open phase")
 	_press(KEY_F)
+	_check(interaction.mode == &"push" and swap_wizard.mover.frozen and bar.is_active(&"push")
+		and interaction.direction == null and tiles.targets.is_empty() and lines.call().has("Pick a tile to push"),
+		"push: F opens the push phase, with nothing picked yet (%s)" % [lines.call()])
+	_press(KEY_ENTER)
+	_check(tiles.grid.get_tile(Vector2i.ZERO) == timber and interaction.mode == &"push",
+		"push: Enter does nothing with nothing picked")
+	_press(KEY_W)
+	_check(swap_wizard.mover.coord == Vector2i.ZERO and interaction.direction == Vector2i(0, 1)
+		and tiles.targets == [Vector2i(0, 1)] and tiles.target_color.a < tiles.selection_color.a
+		and lines.call().has("Enter / Space – Push Gold Ore") and (current_scene.get_node("%TileInfo") as TileInfo).shown_name() == "Gold Ore",
+		"push: W picks the tile N without moving: outlined faintly, named, and described below (%s)" % [lines.call()])
+	_press(KEY_ENTER)
 	_check(tiles.grid.get_tile(Vector2i.ZERO) == gold
-		and tiles.grid.get_tile(Vector2i(0, 1)) == timber, "planet: F swaps with the faced tile")
-	_check(lock.busy and actions.modulate.a < 1.0, "lock: busy and actions dimmed during the swap")
+		and tiles.grid.get_tile(Vector2i(0, 1)) == timber, "push: Enter swaps with the picked tile")
+	_check(lock.busy and bar.modulate.a < 1.0 and interaction.mode == &"move" and tiles.targets.is_empty(),
+		"lock: busy and actions dimmed during the swap, back in Move")
 	# Everything but the inventory is blocked until the tween ends.
-	var facing_before := swap_wizard.mover.facing
 	for key: Key in [KEY_W, KEY_D, KEY_F, KEY_R, KEY_ESCAPE]:
 		_press(key)
-	_check(swap_wizard.mover.coord == Vector2i.ZERO and swap_wizard.mover.facing == facing_before
+	_check(swap_wizard.mover.coord == Vector2i.ZERO and interaction.mode == &"move"
 		and tiles.grid.get_tile(Vector2i.ZERO) == gold
 		and current_scene.scene_file_path == "res://scenes/planet.tscn",
-		"lock: move, turn, swap, extract and Esc are blocked")
+		"lock: move, push, extract and Esc are blocked")
 	var swap_inv_panel: InventoryPanel = current_scene.get_node("UI/InventoryPanel")
 	_press(KEY_I)
 	_check(swap_inv_panel.visible, "lock: inventory still opens")
@@ -763,10 +762,27 @@ func _test_enter_planet() -> void:
 	_check(not swap_inv_panel.visible and current_scene.scene_file_path == "res://scenes/planet.tscn",
 		"lock: Esc closes the inventory, doesn't leave")
 	await create_timer(0.5).timeout
-	_check(not lock.busy and actions.modulate.a == 1.0, "lock: released and actions undimmed after the swap")
-	_press(KEY_F)  # Gold back to (0,1), Timber to (0,0)
+	_check(not lock.busy and bar.modulate.a == 1.0, "lock: released and actions undimmed after the swap")
+	_press(KEY_F)
+	_check(interaction.direction == Vector2i(0, 1), "push: the last direction picked is kept")
+	_press(KEY_ENTER)  # Gold back to (0,1), Timber to (0,0)
 	await create_timer(0.5).timeout
-	_check(tiles.grid.get_tile(Vector2i(0, 1)) == gold, "lock: F works again afterwards")
+	_check(tiles.grid.get_tile(Vector2i(0, 1)) == gold, "lock: pushing works again afterwards")
+	# Esc and M go back to Move from a phase; another action's key, or a click on its tile, switches.
+	_press(KEY_F)
+	_press(KEY_ESCAPE)
+	_check(interaction.mode == &"move" and not swap_wizard.mover.frozen
+		and current_scene.scene_file_path == "res://scenes/planet.tscn", "actions: Esc goes back to Move, not off the planet")
+	_press(KEY_F)
+	_press(KEY_M)
+	_check(interaction.mode == &"move", "actions: so does M")
+	_press(KEY_F)
+	_press(KEY_R)
+	_check(interaction.mode == &"extract" and bar.is_active(&"extract") and not bar.is_active(&"push"),
+		"actions: another action's key switches straight to it")
+	(bar.tile(&"push") as Button).pressed.emit()
+	_check(interaction.mode == &"push", "actions: clicking an action's tile picks it")
+	_press(KEY_M)
 	tiles.grid.set_tile(Vector2i(0, 1), TileKind.EMPTY)
 	# Extract with R: the staff (distance 1) needs the wizard's tile and the faced one, (0,1), to
 	# match. Both get tapped; the inventory gains the staff's extract amount (1).
@@ -777,26 +793,29 @@ func _test_enter_planet() -> void:
 	_check(tile_info.shown_name() == "Iron Deposit" and tile_info.shown_yield() == "Element: Iron"
 		and tile_icon.texture != null, "tile info: shows the tile under the wizard (%s / %s)"
 		% [tile_info.shown_name(), tile_info.shown_yield()])
-	var extract_hint := func() -> String:
-		return (current_scene.get_node("%Foci").get_child(0) as FocusBox).hint(&"extract").text
-	_check(extract_hint.call() == "R – Extract: no match", "focus: extract hint says no match (%s)" % extract_hint.call())
-	_press(KEY_R)  # (0,1) is Empty: no match
-	_check(inv.count(&"iron") == 0 and tiles.grid.cooldowns.is_empty(), "planet: R without a matching line does nothing")
+	# R opens the extract phase aiming the way last picked, N: the wizard's tile plus the staff's
+	# distance (1) that way, (0,1), outlined. Empty there: no match.
+	_press(KEY_R)
+	_check(interaction.mode == &"extract" and tiles.targets == [Vector2i.ZERO, Vector2i(0, 1)]
+		and lines.call().has("Extract: no match"),
+		"extract: R opens the extract phase; the line is outlined, and there's no match (%s)" % [lines.call()])
+	_press(KEY_ENTER)
+	_check(inv.count(&"iron") == 0 and tiles.grid.cooldowns.is_empty() and interaction.mode == &"extract",
+		"extract: Enter without a matching line does nothing")
 	tiles.grid.set_tile(Vector2i(0, 1), iron)
 	tiles.grid.set_tile(Vector2i(1, 0), gold)
-	_check(extract_hint.call() == "R – Extract: Iron", "focus: extract hint names the matching element (%s)"
-		% extract_hint.call())
-	_press(KEY_D)  # face NE, toward the Gold at (1,0)
-	var turned_hint: String = extract_hint.call()
-	_press(KEY_A)  # back to N
-	_check(turned_hint == "R – Extract: no match" and extract_hint.call() == "R – Extract: Iron",
-		"focus: extract hint follows turning (%s)" % turned_hint)
-	_press(KEY_R)
+	_check(lines.call().has("Enter / Space – Extract: Iron"), "extract: names the matching element (%s)" % [lines.call()])
+	_press(KEY_E)  # NE, toward the Gold at (1,0)
+	var turned_lines: Array[String] = lines.call()
+	_press(KEY_W)  # back to N
+	_check(turned_lines.has("Extract: no match") and lines.call().has("Enter / Space – Extract: Iron"),
+		"extract: follows the picked direction (%s)" % [turned_lines])
+	_press(KEY_ENTER)
 	var amount := Foci.extract_amount(Foci.STAFF)
 	_check(tiles.grid.get_tile(Vector2i.ZERO) == iron and inv.count(&"iron") == amount
-		and tiles.grid.cooldown(Vector2i.ZERO) == 5 and tiles.grid.cooldown(Vector2i(0, 1)) == 5,
-		"planet: R extracts the staff's amount of Iron and taps both tiles in the line for 5 actions")
-	_check(extract_hint.call() == "R – Extract: no match", "focus: tapped tiles make the hint no match")
+		and tiles.grid.cooldown(Vector2i.ZERO) == 5 and tiles.grid.cooldown(Vector2i(0, 1)) == 5
+		and interaction.mode == &"move",
+		"extract: Enter extracts the staff's amount of Iron, taps both tiles in the line for 5 actions, and goes back to Move")
 	_check(tile_info.shown_name() == "Iron Deposit" and tile_info.shown_tapped() == "tapped: 5"
 		and tile_info.shown_yield() == "Element: Iron" and tile_icon.texture is ImageTexture,
 		"tile info: tapped beside the name, element unchanged, greyscale icon (%s / %s)"
@@ -835,52 +854,63 @@ func _test_enter_planet() -> void:
 	var split := (divider.global_position.y - 16.0) / (side_panel.size.y - 32.0)  # within the margins
 	_check(absf(split - 0.6) < 0.02 and divider.global_position.y < tile_info.global_position.y,
 		"tile info: below a divider 60%% of the way down (%.2f)" % split)
-	# Focus boxes: one per equipped focus, with its name and the actions it grants.
-	var focus_box: Control = current_scene.get_node("%Foci")
-	var boxes: Array = focus_box.get_children()
-	var box_names := boxes.map(func(b: FocusBox) -> String: return (b.get_node("%FocusName") as Label).text)
-	_check(focus_box.visible and box_names == ["Staff"] and (boxes[0] as FocusBox).actions() == [&"extract"]
-		and extract_hint.call().begins_with("R – Extract"),
-		"focus: a box for the Staff (R – Extract), none for the Orb, which grants no actions (%s)" % [box_names])
-	var general_hints: Array = current_scene.get_node("%Actions").get_children().filter(
-		func(l: Label) -> bool: return l.visible).map(func(l: Label) -> String: return l.text)
-	_check(general_hints == ["F – Push"], "focus: Extract isn't a general action (%s)" % [general_hints])
-	_check(focus_box.global_position.y > (current_scene.get_node("%Actions") as Control).global_position.y
-		and focus_box.get_global_rect().end.y < divider.global_position.y, "focus: boxes sit between Push and the divider")
+	# Action bar: along the bottom of the board, left of the side panel; Move first, then what can
+	# be done here. Nothing's extractable with the wizard's tile tapped, so Extract dims.
+	var keys_view: DirectionKeys = current_scene.get_node("%DirectionKeys")
+	_check(bar.actions() == [&"move", &"push", &"extract"] and bar.tile_text(&"move") == "M Move"
+		and bar.tile_text(&"push") == "F Push" and bar.tile_text(&"extract") == "R Extract",
+		"actions: Move, Push and Extract, with their keys (%s)" % [bar.actions()])
+	var bar_rect := bar.get_global_rect()
+	var screen := current_scene.get_viewport().get_visible_rect().size
+	_check(bar_rect.end.x <= side_panel.get_global_rect().position.x and bar_rect.end.y <= screen.y
+		and bar_rect.position.y > screen.y * 0.8 and bar_rect.size.y >= 64.0,
+		"actions: the bar runs along the bottom of the board (%s)" % bar_rect)
+	_check(bar.is_available(&"push") and not bar.is_available(&"extract"), "actions: Extract dims with nothing to extract")
+	# The side panel shows the direction keys, laid out like the hexes they move to (flat-top).
+	var expected_keys := {Vector2i(0, 1): "W", Vector2i(1, 0): "E", Vector2i(1, -1): "C", Vector2i(0, -1): "X",
+		Vector2i(-1, 0): "Z", Vector2i(-1, 1): "Q"}
+	_check((current_scene.get_node("%ModeTitle") as Label).text == "Move" and keys_view.visible
+		and keys_view.keys.size() == 6 and expected_keys.keys().all(func(d: Vector2i) -> bool:
+			return keys_view.keys.get(d) == expected_keys[d]) and keys_view.selected == null
+		and lines.call() == ["Numpad moves too"], "move: the side panel shows the direction keys around the wizard's hex")
+	_check((current_scene.get_node("%ModePanel") as Control).get_global_rect().end.y < divider.global_position.y,
+		"move: the panel fits above the divider")
 	_press(KEY_R)
-	_check(inv.count(&"iron") == amount and tiles.grid.cooldown(Vector2i.ZERO) == 5,
-		"planet: R on a tapped tile adds nothing and isn't an action")
-	# Turning doesn't count down; moving does (W to (0,1), X back to (0,0)).
-	_press(KEY_D)
-	_press(KEY_A)
-	_check(tiles.grid.cooldown(Vector2i.ZERO) == 5, "tapped: turning doesn't count down")
-	# Pushing doesn't either, or pushing a tapped tile back and forth would untap it for free.
-	_press(KEY_D)  # face NE, toward the Gold at (1,0)
+	_press(KEY_ENTER)
+	_check(inv.count(&"iron") == amount and tiles.grid.cooldown(Vector2i.ZERO) == 5 and interaction.mode == &"extract"
+		and lines.call().has("Extract: no match"), "extract: tapped tiles are no match, and Enter adds nothing and isn't an action")
+	_press(KEY_M)
+	# Pushing doesn't count down, or pushing a tapped tile back and forth would untap it for free.
 	_press(KEY_F)
+	_press(KEY_E)  # NE, toward the Gold at (1,0)
+	_check(keys_view.selected == Vector2i(1, 0), "push: the picked direction lights up in the side panel")
+	_press(KEY_ENTER)
 	await create_timer(0.5).timeout
 	_check(tiles.grid.get_tile(Vector2i(1, 0)) == iron and tiles.grid.cooldown(Vector2i(1, 0)) == 5,
 		"tapped: pushing a tapped tile doesn't count down")
-	_press(KEY_F)  # and back
+	_press(KEY_F)
+	_press(KEY_ENTER)  # and back
 	await create_timer(0.5).timeout
-	_press(KEY_A)
 	_check(tiles.grid.get_tile(Vector2i.ZERO) == iron and tiles.grid.cooldown(Vector2i.ZERO) == 5
 		and tiles.grid.cooldown(Vector2i(0, 1)) == 5, "tapped: pushing back and forth doesn't count down")
+	# Moving does (W to (0,1), X back to (0,0)).
 	_press(KEY_W)
 	_press(KEY_X)
 	_check(tiles.grid.cooldown(Vector2i.ZERO) == 3, "tapped: each move counts down (%d)" % tiles.grid.cooldown(Vector2i.ZERO))
 	_check(aether.call() == 8 and aether_bar.value == 8 and aether_label.text == "Aether: 8",
-		"aether: each move spends 1, turning is free (%d)" % aether.call())
+		"aether: each move spends 1 (%d)" % aether.call())
 	tiles.grid.set_move_cost(Vector2i(0, 1), 2)
 	_press(KEY_W)
 	_check(aether.call() == 6, "aether: a move spends the cost of the tile stepped onto (%d)" % aether.call())
 	tiles.grid.set_move_cost(Vector2i(0, 1), 1)
 	_press(KEY_X)
-	# Extract comes from the focus: with none equipped, R does nothing.
+	# Extract comes from the focus: with none equipped it isn't offered, and R does nothing.
 	tiles.grid.set_tile(Vector2i(0, -1), timber)
 	_game().state.equipped_foci.assign([Foci.ORB])
 	_press(KEY_X)  # to (0,-1)
 	_press(KEY_R)
-	_check(not tiles.grid.is_tapped(Vector2i(0, -1)) and inv.count(&"wood") == 0, "focus: no staff, no extract")
+	_check(not tiles.grid.is_tapped(Vector2i(0, -1)) and inv.count(&"wood") == 0 and interaction.mode == &"move"
+		and not &"extract" in bar.actions(), "focus: no staff, no Extract")
 	_game().state.equipped_foci.assign([Foci.STAFF, Foci.ORB])
 	_press(KEY_W)  # back to (0,0)
 
@@ -910,9 +940,11 @@ func _test_enter_planet() -> void:
 	tiles.grid.set_kind_known(rusty_gold)
 	tiles.grid.set_tile(Vector2i.ZERO, rusty_gold)  # setting also clears the tapped state
 	tiles.grid.set_tile(Vector2i(0, 1), rusty_gold)
-	_check(tile_info.shown_yield() == "Elements: Gold, Iron" and extract_hint.call() == "R – Extract: Gold, Iron",
-		"focus: multi-element tile and hint list every element (%s / %s)" % [tile_info.shown_yield(), extract_hint.call()])
 	_press(KEY_R)
+	_press(KEY_W)  # N again (pushing picked NE)
+	_check(tile_info.shown_yield() == "Elements: Gold, Iron" and lines.call().has("Enter / Space – Extract: Gold, Iron"),
+		"extract: multi-element tile and hint list every element (%s / %s)" % [tile_info.shown_yield(), lines.call()])
+	_press(KEY_ENTER)
 	_check(inv.count(&"gold") == amount and inv.count(&"iron") == 2 * amount,
 		"planet: R extracts the staff's amount of each shared element")
 	# Extracted aether goes into the same pool moving spends.
@@ -920,6 +952,7 @@ func _test_enter_planet() -> void:
 	tiles.grid.set_tile(Vector2i.ZERO, tiles.grid.find_kind(&"aether_spring"))
 	tiles.grid.set_tile(Vector2i(0, 1), tiles.grid.find_kind(&"aether_spring"))
 	_press(KEY_R)
+	_press(KEY_ENTER)
 	_check(aether.call() == aether_before + amount and aether_label.text == "Aether: %d" % (aether_before + amount),
 		"aether: extracting it refills the bar (%s)" % aether_label.text)
 	tiles.grid.set_tile(Vector2i(0, 1), iron)
@@ -942,10 +975,9 @@ func _test_enter_planet() -> void:
 		"reveal: each step reveals out to the orb's scry radius, no further")
 	_check(planet_wizard.position == (current_scene.get_node("HexBoard") as HexBoard).hex_to_local(Vector2i(0, radius)),
 		"planet: wizard drawn on its hex")
-	# Facing N on the flat-top planet: the marker's triangle sits on the top edge, tip pointing up.
-	var marker: HexFacingMarker = current_scene.get_node("HexBoard/Wizard/FacingMarker")
-	var tri := marker.triangle_points()
-	# The wizard sprite stands upright over the tile's icon; the marker shows the facing.
+	# The wizard's tile is outlined; there's no facing to show.
+	var marker: HexPlayerOutline = current_scene.get_node("HexBoard/Wizard/Outline")
+	# The wizard sprite stands upright over the tile's icon.
 	var planet_sprite := planet_wizard.get_node_or_null("Sprite2D") as Sprite2D
 	_check(planet_sprite != null and is_zero_approx(planet_sprite.rotation), "planet: upright wizard sprite on the wizard's tile")
 	_check(planet_wizard.get_index() > tiles.get_index(), "planet: wizard sprite drawn over the tile icons")
@@ -959,15 +991,10 @@ func _test_enter_planet() -> void:
 		"planet: cooldown numbers draw over the wizard")
 	var planet_board := current_scene.get_node("HexBoard") as HexBoard
 	_check(tiles.landing_scale > planet_board.tile_scale, "planet: landing outline sits outside the wizard's outline")
-	_check(is_zero_approx(tri[2].x) and tri[2].y < tri[0].y and tri[0].y < 0.0,
-		"planet: facing triangle points N from the top edge (%s)" % tri)
-	_press(KEY_D)  # turn clockwise to NE
-	tri = marker.triangle_points()
-	_check(tri[2].x > 0.0 and tri[2].y < 0.0, "planet: facing triangle follows a turn to NE (%s)" % tri)
+	_check(marker.visible, "planet: the wizard's tile is outlined")
 
 	# Detect: next to an unknown tile S enters detect mode, a guessing game for the ring around the
 	# wizard (flat-top, at (0, 2); N, NE and NW are Empty, which has nothing to detect).
-	var interaction: Node = current_scene.get_node("TileInteraction")  # untyped: its script uses the Game autoload
 	var detect_center := Vector2i(0, 2)
 	var detect_kinds := {Vector2i(0, 2): iron, Vector2i(0, 1): gold, Vector2i(1, 1): iron, Vector2i(-1, 2): timber,
 		Vector2i(0, 3): TileKind.EMPTY, Vector2i(1, 2): TileKind.EMPTY, Vector2i(-1, 3): TileKind.EMPTY}
@@ -976,8 +1003,7 @@ func _test_enter_planet() -> void:
 	for kind in tiles.grid.kinds:
 		tiles.grid.set_kind_known(kind, false)
 	_check_coord(planet_wizard, detect_center, "detect: wizard at the edge")
-	_check(interaction.can_detect_here() and detect_hint.visible and detect_hint.text == "S – Detect",
-		"detect: hint shows next to unknown tiles")
+	_check(interaction.can_detect_here() and &"detect" in bar.actions(), "detect: offered next to unknown tiles")
 	var detect_panel: Control = current_scene.get_node("%DetectPanel")
 	var detect_list: Control = current_scene.get_node("%DetectElements")
 	var detect_labels := func() -> Array: return detect_list.get_children().map(func(l: Label) -> String: return l.text)
@@ -990,9 +1016,9 @@ func _test_enter_planet() -> void:
 		and tiles.icon_shift(detect_center) == Vector2.ZERO,
 		"detect: the wizard flies off the board, input blocked, and their tile's icon recenters")
 	_check(interaction.detecting and planet_wizard.mover.frozen and tiles.detection == interaction.detection
-		and interaction.detection.selected == null, "detect: S enters detect mode, nothing selected")
+		and interaction.detection.selected == null and bar.is_active(&"detect"), "detect: S enters detect mode, nothing selected")
 	_check(detect_panel.visible and (current_scene.get_node("%DetectHints") as Control).visible and not aether_bar.visible
-		and not actions.visible and not focus_box.visible and not (current_scene.get_node("%TileInfo") as Control).visible
+		and not (current_scene.get_node("%ModePanel") as Control).visible and not (current_scene.get_node("%TileInfo") as Control).visible
 		and not marker.visible, "detect: the side panel shows detecting instead, and the wizard's outline hides")
 	var all_elements := ["1 – Aether", "2 – Gold", "3 – Iron", "4 – Stone", "5 – Wood"]
 	_check(detect_labels.call() == all_elements, "detect: every element on the planet listed with number keys (%s)"
@@ -1013,6 +1039,12 @@ func _test_enter_planet() -> void:
 	_check(wizard_sprite.visible and not wizard_icon.visible and tiles.occupied == planet_wizard.mover.coord,
 		"detect: the wizard flies back to the board")
 	_check(tiles.tile_scale_at(outside) == 1.0 and not tiles.is_outside_detect(outside), "detect: outside tiles grow back")
+	_press(KEY_S)
+	await _until(func() -> bool: return not lock.busy)
+	_press(KEY_M)
+	_check(not interaction.detecting and interaction.mode == &"move", "detect: M leaves detect mode too")
+	await _until(func() -> bool: return tiles.detect_shrink == 0.0)
+	await _until(func() -> bool: return not lock.busy)
 
 	_press(KEY_S)
 	await _until(func() -> bool: return not lock.busy)
@@ -1045,13 +1077,11 @@ func _test_enter_planet() -> void:
 	_press(KEY_Z)  # SW: the timber at (-1, 2)
 	_press(KEY_2)
 	_press(KEY_5)  # Gold and Wood: right, plus an extra
-	var detect_facing := planet_wizard.mover.facing
 	var detect_aether: int = aether.call()
-	for key: Key in [KEY_D, KEY_A, KEY_R, KEY_F, KEY_B]:
+	for key: Key in [KEY_D, KEY_A, KEY_R, KEY_F, KEY_B, KEY_N]:
 		_press(key)
-	_check(planet_wizard.mover.coord == detect_center and planet_wizard.mover.facing == detect_facing
-		and aether.call() == detect_aether and not lock.busy and interaction.detecting,
-		"detect: no moving, turning, or other actions")
+	_check(planet_wizard.mover.coord == detect_center and aether.call() == detect_aether and not lock.busy
+		and interaction.detecting and interaction.mode == &"detect", "detect: no moving or other actions")
 	_press(KEY_ENTER)
 	_check(tiles.fill_color(Vector2i(0, 1)).is_equal_approx(tiles.correct_color)
 		and tiles.fill_color(detect_center).is_equal_approx(tiles.correct_color)
@@ -1072,7 +1102,7 @@ func _test_enter_planet() -> void:
 	_check(detection.guessed(Vector2i(-1, 2)) == [&"wood"], "detect: detected elements can still be toggled")
 	_press(KEY_SPACE)
 	_check(tiles.grid.is_known(Vector2i(-1, 2)) and not interaction.detecting and not planet_wizard.mover.frozen
-		and tiles.fill_color(Vector2i(-1, 2)) != tiles.partial_color and not detect_hint.visible,
+		and tiles.fill_color(Vector2i(-1, 2)) != tiles.partial_color and not &"detect" in bar.actions(),
 		"detect: Space submits too, and detect mode ends once the ring is known")
 	for kind in tiles.grid.kinds:
 		tiles.grid.set_kind_known(kind)
@@ -1119,42 +1149,52 @@ func _test_enter_planet() -> void:
 	_check(ley_info.shown_ley_line() == "", "ley: badge goes when the run is broken")
 	tiles.grid.set_tile(Vector2i(0, -1), iron)
 
-	# Node: where a second seen line crosses ((0, 0) and (1, 0) are iron along it), M marks a ley node.
-	var mark_hint: Label = current_scene.get_node("%MarkNodeHint")
-	var build_hint: Label = current_scene.get_node("%BuildHint")
-	_check(not mark_hint.visible and not build_hint.visible, "node: no mark or build hint where only one line runs")
-	_press(KEY_M)
-	_check(not tiles.is_node(Vector2i.ZERO), "node: M does nothing there")
+	# Node: where a second seen line crosses ((0, 0) and (1, 0) are iron along it), N marks a ley node.
+	_check(not &"mark_node" in bar.actions() and not &"build_tower" in bar.actions(),
+		"node: no Mark Node or Build where only one line runs")
+	_press(KEY_N)
+	_check(not tiles.is_node(Vector2i.ZERO), "node: N does nothing there")
 	test_ley.add_line(Vector2i.ZERO, Vector2i(1, 0))
 	tiles.grid.set_tile(Vector2i.ZERO, iron)  # refreshes the side panel
-	_check(mark_hint.visible and mark_hint.text == "M – Mark Ley Node" and not build_hint.visible
-		and mark_hint.get_index() == current_scene.get_node("%Actions/PushHint").get_index() + 1,
-		"node: hint shows where seen lines cross, below Push, and no build hint yet (%s)" % mark_hint.text)
-	_press(KEY_M)
+	_check(bar.actions() == [&"move", &"push", &"extract", &"mark_node"] and bar.tile_text(&"mark_node") == "N Mark Node",
+		"node: Mark Node shows where seen lines cross, after Extract, and no Build yet (%s)" % [bar.actions()])
+	_press(KEY_N)
 	await process_frame
-	_check(tiles.is_node(Vector2i.ZERO) and tiles.landing == Vector2i.ZERO, "node: M marks the landing tile as a node")
+	_check(tiles.is_node(Vector2i.ZERO) and tiles.landing == Vector2i.ZERO and interaction.mode == &"move"
+		and lines.call() == ["Numpad moves too"], "node: N marks the landing tile as a node at once, staying in Move")
 	tiles.grid.set_tile(Vector2i.ZERO, iron)  # refreshes the side panel (it follows the planet's own lines)
 
 	# Tower: on the marked node, B turns the tile into a Basic Tower.
-	_check(build_hint.visible and not mark_hint.visible and build_hint.text == "B – Build Tower (needs 3 Stone, 2 Iron)"
-		and build_hint.get_index() == mark_hint.get_index() + 1,
-		"tower: hint shows on a marked node, with what it needs, below Mark Ley Node (%s)" % build_hint.text)
+	_check(bar.actions().back() == &"build_tower" and bar.tile_text(&"build_tower") == "B Build"
+		and not &"mark_node" in bar.actions(), "tower: Build shows on a marked node, last (%s)" % [bar.actions()])
 	# Iron is already at (1, 0) and (0, -1), in the ring; stone goes in it too. (-1, 1) is still what
 	# the planet rolled, which may be stone, so it's set to gold.
 	tiles.grid.set_tile(Vector2i(-1, 0), stone)
 	tiles.grid.set_tile(Vector2i(1, -1), stone)
 	tiles.grid.set_tile(Vector2i(-1, 1), gold)
 	_press(KEY_B)
-	_check(tiles.grid.get_tile(Vector2i.ZERO) == iron, "tower: B does nothing with only two stone around the node")
+	var build_options: Control = current_scene.get_node("%BuildOptions")
+	var basic_option: Button = build_options.get_child(0) as Button if build_options.get_child_count() > 0 else null
+	_check(interaction.mode == &"build_tower" and build_options.visible and basic_option != null
+		and basic_option.text == "1 – Basic Tower" and basic_option.button_pressed and not keys_view.visible
+		and lines.call() == ["Needs 3 Stone, 2 Iron", "Requirements not met", "Enter / Space – Build Basic Tower",
+			"M / Esc – Back to Move"],
+		"tower: B opens the build phase: Basic Tower, what it needs, and that it isn't met (%s)" % [lines.call()])
+	_press(KEY_ENTER)
+	_check(tiles.grid.get_tile(Vector2i.ZERO) == iron and interaction.mode == &"build_tower",
+		"tower: Enter does nothing with only two stone around the node")
 	tiles.grid.set_tile(Vector2i(-1, 1), stone)
 	tiles.grid.set_tile(Vector2i.ZERO, gold)  # the node's own tile needn't be iron
-	_press(KEY_B)
+	_check(lines.call().has("Requirements met"), "tower: says so once they're met")
+	basic_option.pressed.emit()
+	_check(interaction.tower == Towers.BASIC and basic_option.button_pressed, "tower: clicking the option keeps it chosen")
+	_press(KEY_ENTER)
 	await process_frame
 	_check(tiles.grid.get_tile(Vector2i.ZERO).id == Towers.BASIC and tiles.grid.get_tile(Vector2i(-1, 1)) == stone
-		and tiles.grid.move_cost(Vector2i.ZERO) == 1,
-		"tower: B builds a Basic Tower on a gold node with three stone and two iron around it")
-	_check(ley_info.shown_name() == "Basic Tower" and ley_info.shown_yield() == "Element: none" and not build_hint.visible,
-		"tower: standing on it shows Basic Tower with no elements, and the hint goes")
+		and tiles.grid.move_cost(Vector2i.ZERO) == 1 and interaction.mode == &"move",
+		"tower: Enter builds a Basic Tower on a gold node with three stone and two iron around it, back in Move")
+	_check(ley_info.shown_name() == "Basic Tower" and ley_info.shown_yield() == "Element: none"
+		and not &"build_tower" in bar.actions(), "tower: standing on it shows Basic Tower with no elements, and Build goes")
 	_check(tiles.has_icon(tiles.grid.get_tile(Vector2i.ZERO))
 		and (tiles.icon_texture(tiles.grid.get_tile(Vector2i.ZERO)) as AtlasTexture).region == Rect2(443, 508, 12, 12),
 		"tower: drawn with sprite cell (34, 39)")
@@ -1165,7 +1205,11 @@ func _test_enter_planet() -> void:
 		and tiles.fill_color(Vector2i(-2, 0)) == tiles.ley_color and tiles.fill_color(Vector2i(-1, 2)) == tiles.hex_color,
 		"tower: every tile on both lines turns plum, not just iron runs")
 	_press(KEY_F)
-	_check(tiles.grid.get_tile(Vector2i.ZERO).id == Towers.BASIC, "tower: F can't push it")
+	_press(KEY_W)
+	_press(KEY_ENTER)
+	_check(tiles.grid.get_tile(Vector2i.ZERO).id == Towers.BASIC and lines.call().has("Can't push that way"),
+		"tower: it can't be pushed")
+	_press(KEY_M)
 	tiles.grid.set_tile(Vector2i.ZERO, iron)  # back to iron for the tests below
 	# Every step here costs 1, which the activated lines take down to 0; off them it stays 1.
 	_check(tiles.move_cost(Vector2i(0, 1)) == 0 and tiles.has_move_bonus(Vector2i(0, 1))
@@ -1304,8 +1348,9 @@ func _check_coord(wizard: HexPlayerController, expected: Vector2i, label: String
 	_check(wizard.mover.coord == expected, "%s (got %s)" % [label, wizard.mover.coord])
 
 
+# Equal up to whole turns.
 func _check_rot(sprite: Sprite2D, expected: float, label: String) -> void:
-	_check(is_equal_approx(sprite.rotation_degrees, expected),
+	_check(is_zero_approx(snappedf(wrapf(sprite.rotation_degrees - expected, -180.0, 180.0), 0.001)),
 		"%s %s (got %s)" % [label, expected, sprite.rotation_degrees])
 
 

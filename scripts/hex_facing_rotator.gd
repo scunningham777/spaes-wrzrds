@@ -1,8 +1,8 @@
 extends Node2D
 
 # Ported from Unity TileExplore.HexFacingRotator.
-# Rotates a sprite to visually reflect HexPlayerController's facing direction. Attach to the
-# sprite node; the controller defaults to this node's parent.
+# Rotates a sprite to face the way a HexPlayerController last stepped; until its first step it
+# keeps its rest rotation. Attach to the sprite node; the controller defaults to this node's parent.
 
 @export var controller: HexPlayerController
 
@@ -13,12 +13,10 @@ extends Node2D
 func _ready() -> void:
 	if controller == null:
 		controller = get_parent() as HexPlayerController
-	# Children are ready before their parent, so this connects before the controller's
-	# initial facing_changed emit.
-	controller.facing_changed.connect(_on_facing_changed)
+	controller.stepped.connect(_on_stepped)
 
 
-func _on_facing_changed(_facing: Vector2i) -> void:
-	var angle := controller.mover.facing_angle_degrees()
+func _on_stepped(direction: Vector2i) -> void:
+	var angle := Hex.direction_angle_degrees(direction, controller.board.pointy_top)
 	# Godot rotation is clockwise-positive (y-down), so the CCW difference is negated.
 	rotation_degrees = sprite_rest_angle_degrees - angle

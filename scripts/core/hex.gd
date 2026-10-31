@@ -8,7 +8,7 @@ extends RefCounted
 
 enum Compass { N, NE, SE, S, SW, NW, E, W }
 
-# Clockwise direction order, used for turning. Index 0 is the default facing.
+# Clockwise direction order, starting from the top (or the right, pointy-top).
 const FLAT_TOP_CLOCKWISE: Array[Compass] = [
 	Compass.N, Compass.NE, Compass.SE, Compass.S, Compass.SW, Compass.NW
 ]

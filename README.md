@@ -6,10 +6,24 @@ A small top-down hex-grid game for **Godot 4.7** (GDScript), ported from a Unity
 
 Open `project.godot` in Godot 4.7.x (standard build, not .NET) and press **F5**.
 
-Controls (flat-top hexes): **Q/W/E/Z/X/C** or numpad move · **A/D** turn · **Enter** enter a planet ·
-**R** extract the tile you're on (needs the staff; taps the tile for a few actions) · **F** swap your tile with
-the one you face · **S** detect (see below) · **V** scry (needs the orb; see below) · **M** mark a ley node and **B** build a tower (see below) ·
-**I** inventory · **Esc** back.
+Controls (flat-top hexes): **Q/W/E/Z/X/C** or numpad move · **Enter** enter a planet · **I** inventory ·
+**Esc** back. In space the ship faces the way it last moved.
+
+On a planet, the action bar along the bottom of the map shows what you can do where you stand, each tile
+with its key (or click it): **M** Move, **F** Push, **R** Extract (needs the staff), **S** Detect (next to
+unknown tiles), **N** Mark Node and **B** Build (see below). Move comes first and is where you start: the
+side panel shows the direction keys laid out like the hexes they move to. Picking another action opens its
+phase in the side panel, where you stay put and the direction keys pick what it aims at instead:
+
+- **Push**: pick a neighbor (outlined faintly, and described under the divider); **Enter** or **Space** swaps it with your tile.
+- **Extract**: pick a direction; the line it takes from, your tile plus the staff's reach that way, is outlined, and
+  the side panel says what **Enter** / **Space** would extract, or "no match". Extracting taps the tiles for a few actions.
+- **Build**: pick a tower (number keys, or click); the side panel says what it needs and whether you have it, and
+  **Enter** / **Space** builds it.
+
+A push, extract or build goes back to Move when it's done; **M** or **Esc** go back from any phase, and another
+action's key switches straight to it. Push and Extract remember the last direction you picked. Mark Node has no
+phase: **N** marks the node at once.
 
 On a planet each move costs the aether (the blue bar) of the tile you step onto, shown as a number
 and blue dot in its upper left. Most tiles cost 1, occasionally 2 (never for aether tiles); the
@@ -22,20 +36,18 @@ know can be extracted. Next to an unknown tile, **S** enters detect mode, a gues
 Select a tile with the movement keys (**S** / numpad 5 for your own) and toggle element guesses with the number
 keys; a guess counts for every tile with that icon. **Enter** or **Space** submits: an icon guessed exactly
 becomes known everywhere on the planet (its tiles flash green), one partly right (some of its elements, extras or not) turns gold
-and the rest (all wrong, or not guessed) turn red, both until the next submit. **Esc** leaves; detect mode also ends once the whole ring is known.
+and the rest (all wrong, or not guessed) turn red, both until the next submit. **M** or **Esc** leaves; detect mode also ends once the whole ring is known.
 
 A planet is a large hex map that wraps around both ways, but you only see what you've explored: you land in a
-small hexagon of tiles, and next to unexplored ground **V** scries, revealing every tile around you. How far both
-reach comes from your orb. Tiles are generated as they're revealed.
-
-Your equipped foci (the staff and the orb) each get a box in the side panel listing the actions they grant.
+small hexagon of tiles, and every step reveals the tiles around where you land. How far both reach comes from your
+orb (without one, a step reveals just the ring around you). Tiles are generated as they're revealed.
 
 Each planet also has hidden ley lines, 1–2 along each hex axis. Two or more known iron tiles in a row along one get a plum
 background; the lines themselves are never shown.
 
-Standing where two or more ley lines cross, **M** marks the crossing as a ley node (outlined in plum, over the
+Standing where two or more ley lines cross, **N** marks the crossing as a ley node (outlined in plum, over the
 yellow landing outline if they share a tile). At least two of the lines through it must be ones you've seen:
-two or more of their tiles plum, or already activated. A marked node can be turned into a tower with **B**, if the
+two or more of their tiles plum, or already activated. A marked node can be turned into a tower with **B** (Build), if the
 node and the six tiles around it include at least 3 known stone tiles and 2 known iron tiles (the node's own
 tile can be anything; those tiles are left as they are). That activates every line through it, lighting up all their tiles. Towers can't be pushed, yield
 nothing yet, and cost 1 aether to step onto.

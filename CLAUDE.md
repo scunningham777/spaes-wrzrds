@@ -11,10 +11,10 @@ Godot **4.7** project, **GDScript only** (no C#). Binary: `C:\Tools\Godot_v4.7.2
   - Rules, state, and grid math go in plain classes (`extends RefCounted`/`Resource`) that know nothing about nodes, scenes, rendering, or input devices.
   - Nodes are thin adapters: they read input, call into the logic, and present the results (position, rotation, animation). They don't own game rules.
   - Logic talks outward through signals or return values, never by reaching into the scene tree.
-  - Logic works in grid/game units (axial hex coords, facings), never pixels; converting to screen space is the view layer's job.
+  - Logic works in grid/game units (axial hex coords, directions), never pixels; converting to screen space is the view layer's job.
   - Keep tunable data (stats, levels, balance numbers) in data files/resources, not hard-coded in scripts.
   - Logic should be testable headless without instantiating a scene.
-  - Portable logic lives in `scripts/core/` (`Hex`, `HexLayout`, `HexMover`); node adapters live in `scripts/`. Example split: `HexMover` holds coord/facing, `HexPlayerController` maps keys to mover calls and mirrors its state into a position.
+  - Portable logic lives in `scripts/core/` (`Hex`, `HexLayout`, `HexMover`); node adapters live in `scripts/`. Example split: `HexMover` holds the coord, `HexPlayerController` maps keys to mover calls and mirrors its state into a position.
 - `Game` autoload (`scripts/game.gd`) holds the cross-scene `GameState` and switches scenes by destination id (`Game.go_to("planet")`); core data uses those ids, never scene paths. Scripts run with `-s` (tests) can't reference autoloads by name – use `root.get_node("Game")`. For the same reason, reusable `class_name` nodes (UI panels, views) should have what they need assigned by their scene (e.g. `panel.inventory = Game.state.inventory`) rather than reading `Game` themselves.
 - Async scene tests append to `_finished` at their end: a script error silently aborts the function, and the completion check catches it.
 - Exports: see README "Builds". Output goes to `builds/` (has a `.gdignore`; never remove it, or exports get imported into the next export).

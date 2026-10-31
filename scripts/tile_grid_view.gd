@@ -9,7 +9,8 @@ extends Node2D
 # holding still. In detect mode (detection) tiles outside its area shrink and hold still, tiles
 # partly guessed right fill with partial_color and ones guessed wrong with wrong_color, guesses
 # show as their number keys in the lower right, the selected tile is outlined, and the landing and
-# node outlines, move costs and cooldowns hide. Tiles just guessed right flash correct_color
+# node outlines, move costs and cooldowns hide. Outside it, the tiles an action would act on
+# (targets) get a fainter outline. Tiles just guessed right flash correct_color
 # (flash_tiles). Tiles that cost aether to step onto show the cost as a number and a blue dot in
 # their upper left; on an activated ley line the number is the cost after the line's bonus, in
 # move_bonus_color, and shows even at 0. The landing tile is outlined, and marked ley nodes are outlined in ley_color
@@ -53,6 +54,9 @@ extends Node2D
 @export var guess_color: Color = Color(0.55, 0.85, 1.0)
 @export var selection_color: Color = Color.WHITE
 @export var selection_line_width: float = 3.0
+## Outline of the tiles a push or extract would act on (targets): fainter than detect's selection.
+@export var target_color: Color = Color(1, 1, 1, 0.45)
+@export var target_line_width: float = 2.0
 ## Fill tiles guessed right flash, and how long the flash takes to fade back.
 @export var correct_color: Color = Color(0.2, 0.65, 0.25)
 @export var flash_seconds: float = 0.6
@@ -132,6 +136,11 @@ var occupied: Variant = null:
 		queue_redraw()
 ## Seconds since the animations started.
 var anim_time: float = 0.0
+## Tiles the open action would act on (e.g. push's target), outlined in target_color.
+var targets: Array[Vector2i] = []:
+	set(value):
+		targets = value
+		queue_redraw()
 ## The detect mode session to show, or null outside detect mode.
 var detection: Detection:
 	set(value):
@@ -377,6 +386,10 @@ func _draw() -> void:
 	if detection != null and detection.selected != null:
 		draw_set_transform(board.hex_to_local(grid.nearest(detection.selected, view_center)))
 		draw_polyline(board.corner_points(board.tile_scale), selection_color, selection_line_width)
+		draw_set_transform(Vector2.ZERO)
+	for target in targets:
+		draw_set_transform(board.hex_to_local(grid.nearest(target, view_center)))
+		draw_polyline(board.corner_points(board.tile_scale), target_color, target_line_width)
 		draw_set_transform(Vector2.ZERO)
 
 

@@ -7,10 +7,12 @@
 [ext_resource type="Script" uid="uid://byp11b1kcnhb6" path="res://scripts/tile_interaction.gd" id="5_interaction"]
 [ext_resource type="PackedScene" path="res://scenes/ui/inventory_panel.tscn" id="6_inventory"]
 [ext_resource type="Texture2D" uid="uid://c5vjocj1uk3l1" path="res://art/urizen_onebit_tileset__v1d1_trans.png" id="7_icons"]
-[ext_resource type="Script" path="res://scripts/hex_facing_marker.gd" id="8_marker"]
+[ext_resource type="Script" path="res://scripts/hex_player_outline.gd" id="8_marker"]
 [ext_resource type="Script" path="res://scripts/ui/tile_info.gd" id="9_tile_info"]
 [ext_resource type="Script" path="res://scripts/action_lock.gd" id="10_lock"]
 [ext_resource type="Script" path="res://scripts/ui/screen_fade.gd" id="11_fade"]
+[ext_resource type="Script" path="res://scripts/ui/direction_keys.gd" id="12_direction_keys"]
+[ext_resource type="Script" path="res://scripts/ui/action_bar.gd" id="13_action_bar"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_side"]
 bg_color = Color(0.1, 0.105, 0.12, 0.97)
@@ -124,7 +126,7 @@ texture = ExtResource("7_icons")
 region_enabled = true
 region_rect = Rect2(378, 1, 12, 12)
 
-[node name="FacingMarker" type="Node2D" parent="HexBoard/Wizard" unique_id=1879602032]
+[node name="Outline" type="Node2D" parent="HexBoard/Wizard" unique_id=1879602032]
 script = ExtResource("8_marker")
 
 [node name="ActionLock" type="Node" parent="."]
@@ -245,43 +247,37 @@ text = "Aether: 10"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Actions" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout/Top"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="DetectHint" type="Label" parent="UI/SidePanel/Margin/Layout/Top/Actions"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "S – Detect"
-
-[node name="PushHint" type="Label" parent="UI/SidePanel/Margin/Layout/Top/Actions"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "F – Push"
-
-[node name="MarkNodeHint" type="Label" parent="UI/SidePanel/Margin/Layout/Top/Actions"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "M – Mark Ley Node"
-
-[node name="BuildHint" type="Label" parent="UI/SidePanel/Margin/Layout/Top/Actions"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "B – Build Tower"
-autowrap_mode = 3
-
-[node name="Foci" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout/Top"]
+[node name="ModePanel" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout/Top"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
+
+[node name="ModeTitle" type="Label" parent="UI/SidePanel/Margin/Layout/Top/ModePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Move"
+horizontal_alignment = 1
+
+[node name="DirectionKeys" type="Control" parent="UI/SidePanel/Margin/Layout/Top/ModePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+script = ExtResource("12_direction_keys")
+
+[node name="BuildOptions" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout/Top/ModePanel"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ModeLines" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout/Top/ModePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
 
 [node name="Bottom" type="VBoxContainer" parent="UI/SidePanel/Margin/Layout"]
 layout_mode = 2
@@ -389,7 +385,23 @@ text = "Enter / Space – Submit"
 [node name="LeaveHint" type="Label" parent="UI/SidePanel/Margin/Layout/Bottom/DetectHints"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
-text = "Esc – Leave"
+text = "M / Esc – Leave"
+
+[node name="ActionBar" type="HBoxContainer" parent="UI"]
+unique_name_in_owner = true
+anchors_preset = -1
+anchor_top = 1.0
+anchor_right = 0.6666667
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = -92.0
+offset_right = -8.0
+offset_bottom = -16.0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 8
+alignment = 1
+script = ExtResource("13_action_bar")
 
 [node name="InventoryPanel" parent="UI" unique_id=189433725 instance=ExtResource("6_inventory")]
 
