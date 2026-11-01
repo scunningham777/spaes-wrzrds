@@ -384,19 +384,20 @@ func _draw() -> void:
 		for node in ley_lines.nodes:
 			_draw_ring(node, ley_color)
 	if detection != null and detection.selected != null:
-		draw_set_transform(board.hex_to_local(grid.nearest(detection.selected, view_center)))
-		draw_polyline(board.corner_points(board.tile_scale), selection_color, selection_line_width)
-		draw_set_transform(Vector2.ZERO)
+		_draw_outline(detection.selected, board.tile_scale, selection_color, selection_line_width)
 	for target in targets:
-		draw_set_transform(board.hex_to_local(grid.nearest(target, view_center)))
-		draw_polyline(board.corner_points(board.tile_scale), target_color, target_line_width)
-		draw_set_transform(Vector2.ZERO)
+		_draw_outline(target, board.tile_scale, target_color, target_line_width)
 
 
 # Outlines the tile at coord in color, at the landing outline's size and width.
 func _draw_ring(coord: Vector2i, color: Color) -> void:
+	_draw_outline(coord, landing_scale * tile_scale_at(coord), color, landing_line_width)
+
+
+# Outlines the tile at coord (its copy nearest view_center), outline_scale times the cell's size.
+func _draw_outline(coord: Vector2i, outline_scale: float, color: Color, width: float) -> void:
 	draw_set_transform(board.hex_to_local(grid.nearest(coord, view_center)))
-	draw_polyline(board.corner_points(landing_scale * tile_scale_at(coord)), color, landing_line_width)
+	draw_polyline(board.corner_points(outline_scale), color, width)
 	draw_set_transform(Vector2.ZERO)
 
 

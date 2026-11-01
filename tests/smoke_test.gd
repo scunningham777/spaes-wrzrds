@@ -249,9 +249,12 @@ func _test_core_logic() -> void:
 		and kg.is_kind_known(Towers.kind(Towers.BASIC)), "known: Empty tiles and towers are always known")
 	_check(not kg.is_known(Vector2i(9, 9)) and not kg.any_unknown(at.call(Vector2i(9, 9))),
 		"known: off-grid coords are never known or unknown")
+	_check(not kg.yields(Vector2i.ZERO, &"stone") and not kg.yields(Vector2i(9, 9), &"stone"),
+		"known: an unknown tile, or none, yields nothing")
 	kg.set_kind_known(stone_kind)
 	_check(kg.is_known(Vector2i.ZERO) and kg.is_known(Vector2i(1, 0)) and kg.try_extract(at.call(Vector2i.ZERO)) == [&"stone"]
-		and known_changes == [stone_kind], "known: knowing a kind knows all its tiles")
+		and known_changes == [stone_kind] and kg.yields(Vector2i(1, 0), &"stone") and not kg.yields(Vector2i(1, 0), &"iron"),
+		"known: knowing a kind knows all its tiles, and what they yield")
 	var frozen := HexMover.new(HexLayout.new(false))
 	frozen.frozen = true
 	_check(not frozen.move(Hex.Compass.N) and frozen.coord == Vector2i.ZERO, "core: a frozen mover can't move")
@@ -494,10 +497,10 @@ func _test_ley_lines() -> void:
 		"ley: runs carry across the wrap")
 
 	# Ley nodes: marked where two or more seen lines cross.
-	_check(not ley.is_intersection(Vector2i.ZERO), "ley: one line through a tile is no intersection")
+	_check(ley.lines_through(Vector2i.ZERO).size() == 1, "ley: one line through a tile")
 	ley.add_line(Vector2i.ZERO, Vector2i(0, 1))
-	_check(ley.is_intersection(Vector2i.ZERO) and ley.is_intersection(Vector2i(48, -24))
-		and not ley.is_intersection(Vector2i(1, 0)), "ley: two lines crossing make an intersection, across the wrap too")
+	_check(ley.lines_through(Vector2i.ZERO).size() == 2 and ley.lines_through(Vector2i(48, -24)).size() == 2
+		and ley.lines_through(Vector2i(1, 0)).size() == 1, "ley: two lines cross at a tile, across the wrap too")
 	g.set_tile(Vector2i(0, 1), gold)  # the N-S line's only iron run
 	_check(ley.is_seen(g, ley.lines[0]) and not ley.is_seen(g, ley.lines[1]),
 		"node: a line is seen once two of its tiles resonate along it")

@@ -60,4 +60,4 @@ static func collect(grid: TileGrid, inventory: Inventory, coord: Vector2i,
 
 
 static func _collectable(grid: TileGrid, coord: Vector2i) -> bool:
-	return grid.is_known(coord) and ITEM in grid.get_tile(coord).elements and not grid.is_tapped(coord)
+	return grid.yields(coord, ITEM) and not grid.is_tapped(coord)

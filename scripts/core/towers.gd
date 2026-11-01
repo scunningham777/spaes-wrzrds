@@ -63,7 +63,7 @@ static func has_elements(tower: StringName, grid: TileGrid, coord: Vector2i) -> 
 	for element: StringName in elements:
 		var count := 0
 		for offset in Hex.hexagon(REACH):
-			if grid.is_known(coord + offset) and element in grid.get_tile(coord + offset).elements:
+			if grid.yields(coord + offset, element):
 				count += 1
 		if count < elements[element]:
 			return false

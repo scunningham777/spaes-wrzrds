@@ -40,6 +40,10 @@ const DETECT := &"detect"
 const MARK_NODE := &"mark_node"
 const BUILD := &"build_tower"
 const ACTIONS: Array[StringName] = [MOVE, PUSH, EXTRACT, DETECT, MARK_NODE, BUILD]
+## Axial deltas to a tile's six neighbors (the same in both orientations).
+const NEIGHBORS: Array[Vector2i] = [
+	Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, -1),
+]
 const NAMES: Dictionary[StringName, String] = {
 	MOVE: "Move", PUSH: "Push", EXTRACT: "Extract", DETECT: "Detect", MARK_NODE: "Mark Node", BUILD: "Build",
 }
@@ -51,8 +55,6 @@ const NAMES: Dictionary[StringName, String] = {
 ## Detect mode covers the player's tile and every tile up to this many steps away.
 @export var detect_radius: int = 1
 
-## The planet being explored; assigned by the scene. tiles shows its grid.
-var surface: PlanetSurface
 ## The open phase: one of ACTIONS other than MARK_NODE.
 var mode: StringName = MOVE
 ## The direction push and extract aim (an axial delta), or null until one is picked.
@@ -118,11 +120,9 @@ func can_act(action: StringName) -> bool:
 	var here := player.mover.coord
 	match action:
 		PUSH:
-			return Hex.clockwise_order(player.board.pointy_top).any(func(d: Hex.Compass) -> bool:
-				return tiles.grid.can_swap(here, here + Hex.delta(d, player.board.pointy_top)))
+			return NEIGHBORS.any(func(d: Vector2i) -> bool: return tiles.grid.can_swap(here, here + d))
 		EXTRACT:
-			return Hex.clockwise_order(player.board.pointy_top).any(func(d: Hex.Compass) -> bool:
-				return tiles.grid.can_extract(extract_line(Hex.delta(d, player.board.pointy_top))))
+			return NEIGHBORS.any(func(d: Vector2i) -> bool: return tiles.grid.can_extract(extract_line(d)))
 	return true
 
 

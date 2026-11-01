@@ -81,17 +81,12 @@ func add_line(start: Vector2i, direction: Vector2i) -> void:
 # in a row along a line through it.
 func is_resonant(grid: TileGrid, coord: Vector2i) -> bool:
 	var key := torus.canonical(coord)
-	if not _yields(grid, key):
+	if not grid.yields(key, RESONANT_ELEMENT):
 		return false
 	for line in lines:
 		if line.tiles.has(key) and _run_length(grid, key, line.direction) >= MIN_RUN:
 			return true
 	return false
-
-
-# Whether two or more lines cross at coord.
-func is_intersection(coord: Vector2i) -> bool:
-	return lines_through(coord).size() >= 2
 
 
 func lines_through(coord: Vector2i) -> Array[Line]:
@@ -107,7 +102,7 @@ func is_seen(grid: TileGrid, line: Line) -> bool:
 		return true
 	var resonating := 0
 	for c in line.tiles:
-		if _yields(grid, c) and _run_length(grid, c, line.direction) >= MIN_RUN:
+		if grid.yields(c, RESONANT_ELEMENT) and _run_length(grid, c, line.direction) >= MIN_RUN:
 			resonating += 1
 			if resonating >= SEEN_LINE_TILES:
 				return true
@@ -160,14 +155,11 @@ func _run_length(grid: TileGrid, key: Vector2i, direction: Vector2i) -> int:
 	var length := 1
 	for way in [direction, -direction]:
 		var c: Vector2i = key + way
-		while length < MIN_RUN and _yields(grid, c):
+		while length < MIN_RUN and grid.yields(c, RESONANT_ELEMENT):
 			length += 1
 			c += way
 	return length
 
-
-func _yields(grid: TileGrid, coord: Vector2i) -> bool:
-	return grid.is_known(coord) and RESONANT_ELEMENT in grid.get_tile(coord).elements
 
 
 # Whether coord is on, or next to, a line along axis.

@@ -66,7 +66,6 @@ func _ready() -> void:
 	_tiles.grid = _surface.grid
 	_tiles.ley_lines = _surface.ley_lines
 	_tiles.landing = TileGridGenerator.START_COORD
-	_interaction.surface = _surface
 
 	# Keep the wizard on the revealed tiles, and the view (camera and wrap) on the wizard. Each step
 	# reveals the tiles around where it lands, out to the equipped foci's reveal radius.
@@ -247,8 +246,7 @@ func _on_detecting_changed(detecting: bool) -> void:
 		child.queue_free()
 	if not detecting:
 		return
-	var letters := "QEADZCS" if _wizard.board.pointy_top else "QWEZXCS"
-	(%SelectHint as Label).text = "Numpad / %s – Select" % letters
+	(%SelectHint as Label).text = "Direction keys / %s – Select" % ActionBar.key_name(TileInteraction.DETECT)
 	var detection := _interaction.detection
 	for i in mini(detection.elements.size(), Detection.MAX_ELEMENTS):
 		var label := Label.new()

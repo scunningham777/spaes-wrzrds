@@ -124,6 +124,11 @@ func is_known(coord: Vector2i) -> bool:
 	return has_tile(coord) and is_kind_known(get_tile(coord))
 
 
+# Whether the tile at coord is known to yield element; false off the grid, or while it's unknown.
+func yields(coord: Vector2i, element: StringName) -> bool:
+	return is_known(coord) and element in get_tile(coord).elements
+
+
 # Whether any of coords is a revealed tile whose elements are unknown.
 func any_unknown(coords: Array[Vector2i]) -> bool:
 	return coords.any(func(c: Vector2i) -> bool: return has_tile(c) and not is_known(c))
