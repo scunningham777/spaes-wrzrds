@@ -159,7 +159,14 @@ func _test_core_logic() -> void:
 	# Foci: the staff grants extract, unknown foci grant nothing.
 	_check(Foci.display_name(Foci.STAFF) == "Staff" and Foci.grants(Foci.STAFF, &"extract")
 		and not Foci.grants(Foci.STAFF, &"push") and Foci.actions(&"").is_empty(), "foci: staff grants extract")
-	_check(GameState.new().equipped_foci == [Foci.STAFF, Foci.ORB], "foci: staff and orb equipped by default")
+	_check(GameState.new().equipped_foci == [Foci.STAFF, Foci.ORB, Foci.SYMBIOTE],
+		"foci: staff, orb and neural gill symbiote equipped by default")
+	var gills: Array[StringName] = [Foci.SYMBIOTE]
+	var no_foci: Array[StringName] = []
+	_check(Foci.display_name(Foci.SYMBIOTE) == "Neural Gill Symbiote" and Foci.actions(Foci.SYMBIOTE).is_empty()
+		and Foci.collect_distance(gills) == 1 and Foci.collect_per_tile(gills) == 1
+		and Foci.collect_distance(no_foci) == 0 and Foci.collect_per_tile(no_foci) == 1,
+		"foci: the symbiote collects aether 1 tile further, 1 a tile; without it, no further, still 1 a tile")
 	_check(Foci.display_name(Foci.ORB) == "Orb" and Foci.actions(Foci.ORB).is_empty()
 		and Foci.scry_radius(Foci.ORB) >= 1 and Foci.scry_radius(Foci.STAFF) == 0, "foci: the orb grants no actions, just a scry radius")
 	var both: Array[StringName] = [Foci.STAFF, Foci.ORB]
@@ -321,8 +328,8 @@ func _test_core_logic() -> void:
 	_check(Aether.pay_move(purse, 1) and purse.count(Aether.ITEM) == 1, "aether: a move spends 1")
 	_check(not Aether.pay_move(purse, 2) and purse.count(Aether.ITEM) == 0, "aether: a cost past what's left spends the rest")
 	_check(not Aether.pay_move(purse, 1) and purse.count(Aether.ITEM) == 0, "aether: paying with none stays at 0")
-	# Collecting: stepping onto a known, untapped aether tile next to another gains COLLECT_AMOUNT
-	# and taps them both.
+	# Collecting: stepping onto a known, untapped aether tile next to another gains 1 aether a tile
+	# (by default) and taps them both.
 	var spring := TileKind.new(&"aether_spring", "Aether Spring", &"", [Aether.ITEM] as Array[StringName])
 	var ag := TileGrid.new(null, [spring] as Array[TileKind])
 	for c in [Vector2i.ZERO, Vector2i(1, 0), Vector2i(5, 5)]:
@@ -337,16 +344,31 @@ func _test_core_logic() -> void:
 	_check(Aether.collect(ag, pool, Vector2i(0, 1)).is_empty() and pool.count(Aether.ITEM) == 0,
 		"collect: nothing from a tile without aether, even next to some")
 	_check(Aether.collect(ag, pool, Vector2i.ZERO) == [Vector2i.ZERO, Vector2i(1, 0)]
-		and pool.count(Aether.ITEM) == Aether.COLLECT_AMOUNT and ag.cooldown(Vector2i.ZERO) == ag.tap_cooldown
-		and ag.cooldown(Vector2i(1, 0)) == ag.tap_cooldown, "collect: gains COLLECT_AMOUNT and taps both tiles")
+		and pool.count(Aether.ITEM) == 2 and ag.cooldown(Vector2i.ZERO) == ag.tap_cooldown
+		and ag.cooldown(Vector2i(1, 0)) == ag.tap_cooldown, "collect: gains 1 a tile, 2, and taps both tiles")
 	ag.add_tile(Vector2i(-1, 0), spring)
 	_check(Aether.collect(ag, pool, Vector2i.ZERO).is_empty() and Aether.collect(ag, pool, Vector2i(-1, 0)).is_empty()
-		and pool.count(Aether.ITEM) == Aether.COLLECT_AMOUNT, "collect: nothing from a tapped tile, or next to only tapped ones")
+		and pool.count(Aether.ITEM) == 2, "collect: nothing from a tapped tile, or next to only tapped ones")
 	for i in ag.tap_cooldown:
 		ag.tick_cooldowns()
-	_check(Aether.collect(ag, pool, Vector2i.ZERO).size() == 2 and pool.count(Aether.ITEM) == 2 * Aether.COLLECT_AMOUNT
+	_check(Aether.collect(ag, pool, Vector2i.ZERO).size() == 2 and pool.count(Aether.ITEM) == 4
 		and ag.is_tapped(Vector2i(-1, 0)) != ag.is_tapped(Vector2i(1, 0)),
-		"collect: with two aether neighbors, taps just one of them along with the tile")
+		"collect: with no reach past the first neighbor, a second one isn't taken")
+	# Reach: with distance 1, every aether tile next to the tile or its first neighbor counts too, 1
+	# more each; one 2 away from both doesn't. Here the first neighbor is (-1, 0) (Hex.hexagon order).
+	var reach := TileGrid.new(null, [spring] as Array[TileKind])
+	reach.set_kind_known(spring)
+	for c in [Vector2i.ZERO, Vector2i(-1, 0), Vector2i(1, 0), Vector2i(-2, 1), Vector2i(3, 0)]:
+		reach.add_tile(c, spring)
+	var haul := Inventory.new()
+	var taken := Aether.collect(reach, haul, Vector2i.ZERO, 1, 1)
+	_check(taken.size() == 4 and Vector2i(1, 0) in taken and Vector2i(-2, 1) in taken and not Vector2i(3, 0) in taken
+		and haul.count(Aether.ITEM) == 4 and not reach.is_tapped(Vector2i(3, 0)),
+		"collect: reaching 1 further takes aether next to the tile or its first neighbor, 1 each (%s)" % [taken])
+	for i in reach.tap_cooldown:
+		reach.tick_cooldowns()
+	_check(Aether.collect(reach, haul, Vector2i.ZERO, 1, 3).size() == 4 and haul.count(Aether.ITEM) == 4 + 12,
+		"collect: per_tile sets the aether each tile gives")
 	_check(inv_changes[0] == 3, "inventory: changed fires on add/spend")
 
 	var state := GameState.new()
@@ -990,26 +1012,28 @@ func _test_enter_planet() -> void:
 	# before the step is paid for, so it doesn't end the visit; both tiles are tapped and flash.
 	var spring := tiles.grid.find_kind(&"aether_spring")
 	var aether_before_collect: int = aether.call()
+	# Without the symbiote, so tiles revealed around (0, 1) don't add to the count.
+	_game().state.equipped_foci.assign([Foci.STAFF, Foci.ORB])
 	tiles.grid.set_tile(Vector2i(0, 1), spring)
 	tiles.grid.set_tile(Vector2i(1, 1), spring)
 	inv.spend(Aether.ITEM, aether.call() - 1)
 	_press(KEY_W)  # onto (0,1), which costs 1
 	await process_frame
-	_check(aether.call() == Aether.COLLECT_AMOUNT and swap_wizard.mover.coord == Vector2i(0, 1)
+	_check(aether.call() == 2 and swap_wizard.mover.coord == Vector2i(0, 1)
 		and not (current_scene.get_node("%OutOfAetherMessage") as Control).visible,
-		"collect: stepping onto aether with 1 left collects %d before paying, and the visit goes on (%d)"
-		% [Aether.COLLECT_AMOUNT, aether.call()])
+		"collect: stepping onto aether with 1 left collects 2 before paying, and the visit goes on (%d)" % aether.call())
 	_check(tiles.grid.cooldown(Vector2i(0, 1)) == 5 and tiles.grid.cooldown(Vector2i(1, 1)) == 5
 		and tile_info.shown_tapped() == "tapped: 5" and tiles.flash_strength > 0.0,
 		"collect: both tiles are tapped for the full cooldown, and flash")
 	inv.add(Aether.ITEM, 2)  # for two more steps
 	_press(KEY_X)  # back to (0,0), iron
 	_press(KEY_W)  # onto (0,1) again, tapped now
-	_check(aether.call() == Aether.COLLECT_AMOUNT, "collect: nothing from iron, or from tapped aether (%d)" % aether.call())
+	_check(aether.call() == 2, "collect: nothing from iron, or from tapped aether (%d)" % aether.call())
 	_press(KEY_X)
 	tiles.grid.set_tile(Vector2i(0, 1), iron)
 	tiles.grid.set_tile(Vector2i(1, 1), gold)
 	inv.add(Aether.ITEM, aether_before_collect - aether.call())
+	_game().state.equipped_foci.assign([Foci.STAFF, Foci.ORB, Foci.SYMBIOTE])
 
 	tiles_snapshot = tiles.grid.tiles.duplicate()  # pushed/extracted state should survive a revisit
 
