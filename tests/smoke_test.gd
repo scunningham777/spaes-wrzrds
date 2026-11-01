@@ -1038,7 +1038,31 @@ func _test_enter_planet() -> void:
 	_press(KEY_X)
 	tiles.grid.set_tile(Vector2i(0, 1), iron)
 	tiles.grid.set_tile(Vector2i(1, 1), gold)
-	inv.add(Aether.ITEM, aether_before_collect - aether.call())
+	# A push puts a new tile under the wizard: pushing an aether tile onto (0,0), next to the aether
+	# at (1,0), collects there too. Pushing costs nothing.
+	var gold_east := tiles.grid.get_tile(Vector2i(1, 0))
+	tiles.grid.set_tile(Vector2i(0, 1), spring)
+	tiles.grid.set_tile(Vector2i(1, 0), spring)
+	var aether_before_push: int = aether.call()
+	_press(KEY_F)
+	_press(KEY_W)
+	_press(KEY_ENTER)
+	_check(tiles.grid.get_tile(Vector2i.ZERO) == spring and aether.call() == aether_before_push + 2
+		and tiles.grid.cooldown(Vector2i.ZERO) == 5 and tiles.grid.cooldown(Vector2i(1, 0)) == 5
+		and tiles.flash_strength > 0.0 and tile_info.shown_tapped() == "tapped: 5",
+		"collect: pushing aether under the wizard, next to more, collects it (%d)" % aether.call())
+	await create_timer(0.5).timeout
+	_press(KEY_F)
+	_press(KEY_ENTER)  # the tapped aether back to (0,1), iron to (0,0)
+	await create_timer(0.5).timeout
+	_check(tiles.grid.get_tile(Vector2i.ZERO) == iron and aether.call() == aether_before_push + 2,
+		"collect: nothing when the push leaves no aether under the wizard")
+	tiles.grid.set_tile(Vector2i(0, 1), iron)
+	tiles.grid.set_tile(Vector2i(1, 0), gold_east)
+	if aether.call() > aether_before_collect:
+		inv.spend(Aether.ITEM, aether.call() - aether_before_collect)
+	else:
+		inv.add(Aether.ITEM, aether_before_collect - aether.call())
 
 	tiles_snapshot = tiles.grid.tiles.duplicate()  # pushed/extracted state should survive a revisit
 

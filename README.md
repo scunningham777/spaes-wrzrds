@@ -29,7 +29,7 @@ On a planet each move costs the aether (the blue bar) of the tile you step onto,
 and blue dot in its upper left. Most tiles cost 1, occasionally 2 (never for aether tiles); the
 landing tile is outlined in yellow. Pushing a tile takes its cost with it. You land with at least
 10; extracting aether refills it, and running out sends you back to space. Stepping onto a tile you know yields
-aether, next to at least one other, collects aether by itself before the step is paid for (so it can save you on
+aether, next to at least one other (or pushing such a tile under you), collects aether by itself before the step is paid for (so it can save you on
 your last aether): 1 for that tile and 1 for one of its aether neighbors, tapping both like extracting does. Your
 neural gill symbiote caps how many tiles a step can collect from; it starts at those 2, and raising it will add aether
 tiles next to either of them, 1 aether each (tapped too).

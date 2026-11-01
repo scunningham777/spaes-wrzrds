@@ -96,6 +96,8 @@ func _ready() -> void:
 	_update_side_panel()
 	_interaction.detecting_changed.connect(_on_detecting_changed)
 	# Clicking an action's tile works like pressing its key, unless an action is playing out.
+	# A push puts a new tile under the wizard, which may have aether to collect.
+	_interaction.pushed.connect(_collect_aether)
 	_action_bar.action_pressed.connect(func(action: StringName) -> void:
 		if not _lock.busy:
 			_interaction.select_action(action))
@@ -309,23 +311,30 @@ func _follow_wizard() -> void:
 	_tiles.occupied = _wizard.mover.coord
 
 
-# Successful moves first collect any aether on the tile stepped onto (Aether.collect, from as many
-# tiles and as much as the equipped foci allow; its tiles flash), then cost that tile's aether, less any ley line bonus (as the map shows it); running out
-# kicks the player back to space. The move has already ticked cooldowns, so collected tiles stay
-# tapped for the full cooldown.
+# Successful moves first collect any aether on the tile stepped onto (see _collect_aether), then
+# cost that tile's aether, less any ley line bonus (as the map shows it); running out kicks the
+# player back to space. The move has already ticked cooldowns, so collected tiles stay tapped for
+# the full cooldown.
 func _pay_for_move(coord: Vector2i) -> void:
-	var foci := Game.state.equipped_foci
-	var per_tile := Foci.collect_per_tile(foci)
-	var collected := Aether.collect(_tiles.grid, Game.state.inventory, coord, Foci.max_collect_tiles(foci), per_tile)
-	if not collected.is_empty():
-		var colors: Dictionary[Vector2i, Color] = {}
-		for c in collected:
-			colors[c] = _tiles.move_cost_dot_color
-		_tiles.flash_tiles(colors)
-		print("Collected %d aether from %s" % [per_tile * collected.size(), collected])
+	_collect_aether(coord)
 	if not Aether.pay_move(Game.state.inventory, _tiles.move_cost(coord)):
 		print("Out of aether")
 		_leave_out_of_aether()
+
+
+# Collects any aether at coord, the wizard's tile after a step or a push (Aether.collect, from as
+# many tiles and as much as the equipped foci allow); the tiles it taps flash.
+func _collect_aether(coord: Vector2i) -> void:
+	var foci := Game.state.equipped_foci
+	var per_tile := Foci.collect_per_tile(foci)
+	var collected := Aether.collect(_tiles.grid, Game.state.inventory, coord, Foci.max_collect_tiles(foci), per_tile)
+	if collected.is_empty():
+		return
+	var colors: Dictionary[Vector2i, Color] = {}
+	for c in collected:
+		colors[c] = _tiles.move_cost_dot_color
+	_tiles.flash_tiles(colors)
+	print("Collected %d aether from %s" % [per_tile * collected.size(), collected])
 
 
 # Shows the out-of-aether message, then fades to black and returns to space.

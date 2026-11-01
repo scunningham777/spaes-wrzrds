@@ -29,6 +29,8 @@ signal mode_changed(mode: StringName)
 ## The picked direction or tower changed.
 signal selection_changed
 signal detecting_changed(detecting: bool)
+## A push swapped the player's tile, at here, for another: the player now stands on a new tile.
+signal pushed(here: Vector2i)
 
 ## Action ids, which are also their input action names, in action bar order.
 const MOVE := &"move"
@@ -281,6 +283,7 @@ func _try_swap() -> bool:
 	tiles.grid.try_swap(here, target)
 	print("Swapped tiles %s and %s" % [here, target])
 	lock.run(tiles.animate_swap(here, target, swap_seconds))
+	pushed.emit(here)
 	return true
 
 
