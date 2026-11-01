@@ -1,21 +1,21 @@
 class_name InventoryPanel
 extends PanelContainer
 
-# Grid inventory (I). Pauses the game while open. Clicking a slot selects it and shows the
-# item's description. Ported from the Viking demo's InventoryPanel, minus crafting mode.
+# Grid inventory (I) of the wizard's equipped foci. Pauses the game while open. Clicking a slot
+# selects it and shows the focus's description and what it does (Foci.effects). Ported from the
+# Viking demo's InventoryPanel, minus crafting mode. Aether isn't shown: it has its own meter.
 
 @export var slot_count := 12
 @export var slot_size := Vector2(72, 72)
+## Sprite sheet the item icons are cut from (see ItemIcon.ICONS).
+@export var icon_sheet: Texture2D
 
 var selected_item: StringName = &""
-## Assigned by the owning scene (the game state's inventory); shown while set.
-var inventory: Inventory:
+## Assigned by the owning scene (the game state's equipped foci); read again on each open, so
+## changes made with assign() show.
+var foci: Array[StringName] = []:
 	set(value):
-		if inventory != null and inventory.changed.is_connected(_refresh):
-			inventory.changed.disconnect(_refresh)
-		inventory = value
-		if inventory != null:
-			inventory.changed.connect(_refresh)
+		foci = value
 		if is_node_ready():
 			_refresh()
 
@@ -24,14 +24,16 @@ var _slot_group := ButtonGroup.new()
 
 @onready var _detail_icon: ItemIcon = %DetailIcon
 @onready var _name_label: Label = %NameLabel
-@onready var _count_label: Label = %CountLabel
+@onready var _status_label: Label = %StatusLabel
 @onready var _description_label: Label = %DescriptionLabel
+@onready var _effects_label: Label = %EffectsLabel
 @onready var _grid: GridContainer = %Grid
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS  # stays interactive while the game is paused
 	hide()
+	_detail_icon.icon_sheet = icon_sheet
 	_build_slots()
 	_refresh()
 
@@ -58,7 +60,7 @@ func open() -> void:
 	show()
 	get_tree().paused = true
 	_refresh()
-	# Focus the selected item's slot; with nothing owned there's no focusable slot.
+	# Focus the selected item's slot; with nothing equipped there's no focusable slot.
 	var focus_slot := _slot_for(selected_item)
 	if focus_slot:
 		focus_slot.grab_focus()
@@ -73,9 +75,10 @@ func close() -> void:
 
 func select(item: StringName) -> void:
 	selected_item = item
+	# set_pressed_no_signal doesn't release the rest of the button group, so set every slot.
 	var slot := _slot_for(item)
-	if slot:
-		slot.set_pressed_no_signal(true)
+	for other in _slots:
+		other.set_pressed_no_signal(other == slot)
 	_show_details()
 
 
@@ -98,44 +101,29 @@ func _build_slots() -> void:
 
 		var icon := ItemIcon.new()
 		icon.name = "Icon"
+		icon.icon_sheet = icon_sheet
 		icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		slot.add_child(icon)
-
-		var count := Label.new()
-		count.name = "Count"
-		count.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 4)
-		count.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-		count.grow_vertical = Control.GROW_DIRECTION_BEGIN
-		count.add_theme_font_size_override(&"font_size", 18)
-		count.add_theme_constant_override(&"outline_size", 6)
-		count.add_theme_color_override(&"font_outline_color", Color.BLACK)
-		count.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		slot.add_child(count)
 
 		_grid.add_child(slot)
 		_slots.append(slot)
 
 
-## Fills slots with every item the player has, in Items.ORDER; the rest stay empty.
+## Fills slots with the equipped foci, in equip order; the rest stay empty.
 func _refresh() -> void:
-	var owned: Array[StringName] = []
-	if inventory:
-		owned = inventory.owned()
-	# Keep a valid selection: default to the first item, or nothing if the inventory is empty.
-	if selected_item not in owned:
-		selected_item = owned[0] if not owned.is_empty() else &""
+	# Keep a valid selection: default to the first item, or nothing if none is equipped.
+	if selected_item not in foci:
+		selected_item = foci[0] if not foci.is_empty() else &""
 	for i in _slots.size():
 		var slot := _slots[i]
-		var item: StringName = owned[i] if i < owned.size() else &""
+		var item: StringName = foci[i] if i < foci.size() else &""
 		slot.set_meta(&"item", item)
 		slot.disabled = item.is_empty()
 		slot.focus_mode = Control.FOCUS_NONE if item.is_empty() else Control.FOCUS_ALL
-		slot.tooltip_text = Items.display_name(item) if not item.is_empty() else ""
+		slot.tooltip_text = Foci.display_name(item) if not item.is_empty() else ""
 		slot.set_pressed_no_signal(not item.is_empty() and item == selected_item)
 		(slot.get_node(^"Icon") as ItemIcon).item = item
-		var count := inventory.count(item) if inventory else 0
-		(slot.get_node(^"Count") as Label).text = str(count) if count > 1 else ""
 
 	_show_details()
 
@@ -143,10 +131,11 @@ func _refresh() -> void:
 func _show_details() -> void:
 	var has_item := not selected_item.is_empty()
 	_detail_icon.item = selected_item
-	_name_label.text = Items.display_name(selected_item) if has_item else "Nothing selected"
-	_count_label.text = "Carrying %d" % inventory.count(selected_item) if has_item else ""
-	_description_label.text = Items.description(selected_item) if has_item \
+	_name_label.text = Foci.display_name(selected_item) if has_item else "Nothing selected"
+	_status_label.text = "Equipped" if has_item else ""
+	_description_label.text = Foci.description(selected_item) if has_item \
 			else "Select an item to see what it is."
+	_effects_label.text = "\n".join(Foci.effects(selected_item)) if has_item else ""
 
 
 func _slot_for(item: StringName) -> Button:

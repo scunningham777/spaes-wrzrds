@@ -173,6 +173,13 @@ func _test_core_logic() -> void:
 	var none: Array[StringName] = []
 	_check(Foci.granting(both, &"extract") == Foci.STAFF and Foci.granting(none, &"extract") == &"",
 		"foci: granting finds the equipped focus for an action")
+	_check(Foci.effects(Foci.ORB) == ["Scry – range 2", "Scry on landing – range 2"]
+		and Foci.effects(Foci.SYMBIOTE) == ["Collect aether – up to 2 tiles a step, 1 each"]
+		and Foci.effects(Foci.STAFF) == ["Extract – reach 1, 2 of each shared element"]
+		and Foci.effects(&"").is_empty(), "foci: effects fill in each focus's stats")
+	_check(Foci.NAMES.keys().all(func(f: StringName) -> bool:
+			return not Foci.description(f).is_empty() and ItemIcon.has_icon(f))
+		and Foci.description(&"") == "", "foci: every focus has a description and an icon")
 	var staff_only: Array[StringName] = [Foci.STAFF]
 	_check(Foci.reveal_radius(both) == Foci.scry_radius(Foci.ORB) and Foci.reveal_radius(staff_only) == Foci.DEFAULT_REVEAL_RADIUS
 		and Foci.DEFAULT_REVEAL_RADIUS == 1, "foci: steps reveal out to the orb's scry radius, or 1 without one")
@@ -316,7 +323,7 @@ func _test_core_logic() -> void:
 	inv.changed.connect(func() -> void: inv_changes[0] += 1)
 	inv.add(&"stone")
 	inv.add(&"gold", 2)
-	_check(inv.owned() == [&"gold", &"stone"], "inventory: owned() follows Items.ORDER")
+	_check(inv.count(&"gold") == 2 and inv.count(&"stone") == 1 and inv.count(&"iron") == 0, "inventory: add counts")
 	_check(inv.spend(&"gold") and inv.count(&"gold") == 1 and not inv.spend(&"aether"), "inventory: spend")
 	# Aether: landing tops up to START, moves spend their cost, and the last one reports empty.
 	var purse := Inventory.new()
@@ -592,17 +599,22 @@ func _test_play_scene(pointy_top: bool) -> void:
 	_check(wizard.position == Vector2.ZERO, "%s: wizard starts at origin" % tag)
 	_check(sprite.region_rect == Rect2(1015, 66, 12, 12), "%s: in space the player is the ship, cell (78, 5)" % tag)
 
-	# Inventory default selection: nothing when empty, the first item once there is one.
+	# Inventory: the equipped foci, the first selected by default; resources (aether) aren't shown.
 	var panel: InventoryPanel = play.get_node("UI/InventoryPanel")
 	var name_label: Label = panel.get_node("%NameLabel")
-	_check(panel.selected_item == &"" and name_label.text == "Nothing selected",
-		"%s: empty inventory shows Nothing selected" % tag)
 	_game().state.inventory.add(&"stone")
-	_game().state.inventory.add(&"gold")
-	_check(panel.selected_item == &"stone" and name_label.text == "Stone",
-		"%s: first item gained is selected, and stays selected" % tag)
-	_game().state.inventory.spend(&"stone")
-	_check(panel.selected_item == &"gold", "%s: selection falls back to the first item" % tag)
+	_check(panel.shown_items() == [Foci.ORB, Foci.SYMBIOTE] and panel.selected_item == Foci.ORB
+		and name_label.text == "Orb", "%s: inventory shows the equipped foci, the orb selected" % tag)
+	_game().state.equipped_foci.assign([Foci.SYMBIOTE])
+	panel.open()
+	_check(panel.shown_items() == [Foci.SYMBIOTE] and panel.selected_item == Foci.SYMBIOTE,
+		"%s: equipping shows on the next open; selection falls back to the first focus" % tag)
+	panel.close()
+	_game().state.equipped_foci.clear()
+	panel.open()
+	_check(panel.selected_item == &"" and name_label.text == "Nothing selected",
+		"%s: nothing equipped shows Nothing selected" % tag)
+	panel.close()
 
 	# The ship faces the way it last stepped (the art faces up), starting at rest.
 	_check_rot(sprite, 0.0, "%s: initial sprite faces up" % tag)
@@ -776,7 +788,6 @@ func _test_enter_planet() -> void:
 	_check(is_equal_approx(board_screen_x, side_panel.get_global_rect().position.x / 2.0),
 		"planet: map centered left of the side panel (board at x=%s, panel at x=%s)"
 		% [board_screen_x, side_panel.get_global_rect().position.x])
-	_check(ItemIcon.color_for(&"wood") == Color(0.4, 0.6, 0.3), "inventory: wood is still a green square")
 
 	# Push: F opens the push phase, where the direction keys pick the neighbor to swap with and
 	# Enter swaps. Flat-top, so W picks N: (0,0) <-> (0,1).
@@ -981,17 +992,24 @@ func _test_enter_planet() -> void:
 	_check(not panel.visible, "inventory: hidden at start")
 	_press(KEY_I)
 	_check(panel.visible and paused, "inventory: I opens it and pauses")
-	_check(panel.shown_items() == [&"aether", &"iron"], "inventory: grid shows owned items (%s)" % [panel.shown_items()])
+	_check(panel.shown_items() == [Foci.STAFF, Foci.ORB], "inventory: grid shows equipped foci (%s)" % [panel.shown_items()])
 	var planet_wizard_coord: Vector2i = (current_scene.get_node("HexBoard/Wizard") as HexPlayerController).mover.coord
 	_press(KEY_W)
 	_check((current_scene.get_node("HexBoard/Wizard") as HexPlayerController).mover.coord == planet_wizard_coord,
 		"inventory: wizard can't move while it's open")
-	_check(panel.selected_item == &"aether" and (panel.get_node("%NameLabel") as Label).text == "Aether",
+	_check(panel.selected_item == Foci.STAFF and (panel.get_node("%NameLabel") as Label).text == "Staff",
 		"inventory: first item selected by default")
-	panel.select(&"iron")
-	_check((panel.get_node("%NameLabel") as Label).text == "Iron"
-		and (panel.get_node("%DescriptionLabel") as Label).text == Items.description(&"iron"),
-		"inventory: selecting shows name and description")
+	panel.select(Foci.ORB)
+	var detail_icon: ItemIcon = panel.get_node("%DetailIcon")
+	_check((panel.get_node("%NameLabel") as Label).text == "Orb"
+		and (panel.get_node("%DescriptionLabel") as Label).text == Foci.description(Foci.ORB)
+		and (panel.get_node("%EffectsLabel") as Label).text == "\n".join(Foci.effects(Foci.ORB))
+		and detail_icon.item == Foci.ORB and detail_icon.icon_sheet != null,
+		"inventory: selecting shows icon, name, description and effects")
+	var pressed_slots := (panel.get_node("%Grid") as GridContainer).get_children().filter(
+		func(slot: Button) -> bool: return slot.button_pressed)
+	_check(pressed_slots.size() == 1 and pressed_slots[0].get_meta(&"item") == Foci.ORB,
+		"inventory: selecting highlights only the selected slot")
 	_press(KEY_ESCAPE)
 	await process_frame
 	_check(not panel.visible and not paused, "inventory: Esc closes it and unpauses")
