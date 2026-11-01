@@ -23,15 +23,3 @@ func spend(item: StringName, amount: int = 1) -> bool:
 	items[item] -= amount
 	changed.emit()
 	return true
-
-
-# Items with a non-zero count, in Items.ORDER first, then anything without a definition.
-func owned() -> Array[StringName]:
-	var result: Array[StringName] = []
-	for item in Items.ORDER:
-		if count(item) > 0:
-			result.append(item)
-	for item: StringName in items:
-		if item not in result and count(item) > 0:
-			result.append(item)
-	return result

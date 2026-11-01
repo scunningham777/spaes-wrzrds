@@ -4,7 +4,8 @@ extends RefCounted
 # Static focus definitions. A focus is one of the wizard's equippable items; the equipped ones
 # (GameState.equipped_foci) each grant their own actions on top of the always-available ones, and
 # their stats tune others (e.g. the orb's how far steps reveal). Same structure as Items: ids here,
-# the equipped ids in GameState.
+# the equipped ids in GameState. The inventory shows the equipped ones, with their descriptions and
+# effects.
 
 const STAFF := &"staff"
 const ORB := &"orb"
@@ -14,6 +15,23 @@ const NAMES: Dictionary[StringName, String] = {
 	STAFF: "Staff",
 	ORB: "Orb",
 	SYMBIOTE: "Neural Gill Symbiote",
+}
+
+const DESCRIPTIONS: Dictionary[StringName, String] = {
+	STAFF: "A magical focus, concentrating interstitial resonances into experienced reality at the"
+		+ " will of a trained user.",
+	ORB: "A scrying orb, revealing transmundane knowledge of the world around you.",
+	SYMBIOTE: "An organism that subsists off the raw aether exposed on planetary surfaces, converting"
+		+ " it to the refined element required to maintain a magical presence in even the most alien"
+		+ " atmosphere.",
+}
+
+## What each focus does, one line per action or effect, for the inventory. {stat} fills in from
+## STATS (see effects), so the lines follow the numbers.
+const EFFECTS: Dictionary[StringName, Array] = {
+	STAFF: ["Extract – reach {distance}, {extract_amount} of each shared element"],
+	ORB: ["Scry – range {scry_radius}", "Scry on landing – range {landing_radius}"],
+	SYMBIOTE: ["Collect aether – up to {max_collect_tiles} tiles a step, {collect_per_tile} each"],
 }
 
 ## Action ids (input action names) each focus grants.
@@ -47,6 +65,18 @@ const DEFAULT_COLLECT_PER_TILE := 1
 
 static func display_name(focus: StringName) -> String:
 	return NAMES.get(focus, String(focus).capitalize())
+
+
+static func description(focus: StringName) -> String:
+	return DESCRIPTIONS.get(focus, "")
+
+
+# focus's EFFECTS lines with its stats filled in, e.g. "Scry – range 2"; [] if it has none.
+static func effects(focus: StringName) -> Array[String]:
+	var result: Array[String] = []
+	for line: String in EFFECTS.get(focus, []):
+		result.append(line.format(STATS.get(focus, {})))
+	return result
 
 
 static func actions(focus: StringName) -> Array[StringName]:

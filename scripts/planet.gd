@@ -45,7 +45,7 @@ var _surface: PlanetSurface
 
 
 func _ready() -> void:
-	($UI/InventoryPanel as InventoryPanel).inventory = Game.state.inventory
+	($UI/InventoryPanel as InventoryPanel).foci = Game.state.equipped_foci
 	# Moving costs aether (see the end of _ready); the visit starts with at least Aether.START.
 	Aether.land(Game.state.inventory)
 	Game.state.inventory.changed.connect(_update_aether)
