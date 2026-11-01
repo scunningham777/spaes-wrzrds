@@ -1236,8 +1236,8 @@ func _test_enter_planet() -> void:
 		and tiles.ley_color == Color(0.38, 0.03, 0.41) and tiles.fill_color(Vector2i(1, 0)) == tiles.hex_color,
 		"ley: an iron run along the line turns plum")
 	tiles.grid.set_kind_known(iron, false)
-	_check(tiles.fill_color(Vector2i.ZERO) == tiles.hex_color and tiles.fill_color(Vector2i(0, -1)) == tiles.hex_color,
-		"ley: unknown iron doesn't turn plum")
+	_check(tiles.fill_color(Vector2i.ZERO) == tiles.unknown_color and tiles.fill_color(Vector2i(0, -1)) == tiles.unknown_color
+		and tiles.unknown_color == Color("#333333"), "ley: unknown iron doesn't turn plum, it's unknown grey")
 	tiles.grid.set_kind_known(iron)
 	# Standing on a resonating tile, the tile info says so, in a plum badge under the elements.
 	var ley_info: TileInfo = current_scene.get_node("%TileInfo")

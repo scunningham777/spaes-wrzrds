@@ -3,7 +3,8 @@ extends Node2D
 
 # Draws a TileGrid as filled hexes, ported from Unity's TileVisualManager/TileVisual. Must be a
 # child of a HexBoard. Draws nothing until a grid is assigned. Every tile is a filled hex
-# (hex_color, or ley_color where it resonates with a ley line or is on an activated one); kinds
+# (hex_color, unknown_color while its elements are unknown, or ley_color where it resonates with a
+# ley line or is on an activated one); kinds
 # whose icon has an entry in ICONS draw that sprite-sheet icon over it. Icons with an entry in ICON_ANIMS step through it, all in sync off one clock. Tile size comes
 # from the board's tile_scale. Tiles whose elements are unknown draw their icon in unknown_icon_color,
 # holding still. In detect mode (detection) tiles outside its area shrink and hold still, tiles
@@ -21,6 +22,8 @@ extends Node2D
 @export var icon_sheet: Texture2D
 ## Fill of every hex; opaque so icons keep their contrast.
 @export var hex_color: Color = Color.BLACK
+## Fill of tiles whose elements aren't known yet (TileGrid.is_known), in place of hex_color.
+@export var unknown_color: Color = Color("#333333")
 ## Fill of tiles resonating with a ley line (LeyLines.is_resonant) or on an activated one
 ## (LeyLines.is_active). Deep plum: dark enough that light icons stand out, and a different hue
 ## from every icon so the dark ones (rust iron, green sapling, grey tower) do too.
@@ -424,10 +427,10 @@ func _draw_overlay() -> void:
 
 
 # Hex fill for the tile at coord: partly right or wrong tiles in detect mode, then resonant tiles, stand
-# out; everything else is hex_color. A correct-guess flash blends over it. The ley lines themselves
-# are never drawn.
+# out, then unknown tiles; everything else is hex_color. A correct-guess flash blends over it. The ley
+# lines themselves are never drawn.
 func fill_color(coord: Vector2i) -> Color:
-	var fill := hex_color
+	var fill := hex_color if grid.is_known(coord) else unknown_color
 	if detection != null and detection.is_partial(coord):
 		fill = partial_color
 	elif detection != null and detection.is_wrong(coord):
