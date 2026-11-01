@@ -10,8 +10,9 @@ var current_location: Enterable = null
 ## Planet surfaces by Enterable.id, made on first visit so revisits keep what was revealed.
 var location_surfaces: Dictionary[StringName, PlanetSurface] = {}
 var inventory := Inventory.new()
-## The foci the wizard has equipped (Foci ids); they grant extra actions and tune others.
-var equipped_foci: Array[StringName] = [Foci.STAFF, Foci.ORB, Foci.SYMBIOTE]
+## The foci the wizard has equipped (Foci ids); they grant extra actions and tune others. The
+## staff (and its Extract) isn't among them to start.
+var equipped_foci: Array[StringName] = [Foci.ORB, Foci.SYMBIOTE]
 
 
 # Arguments as in PlanetSurface.new; they only apply on the first visit.

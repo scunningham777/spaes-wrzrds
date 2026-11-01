@@ -159,8 +159,8 @@ func _test_core_logic() -> void:
 	# Foci: the staff grants extract, unknown foci grant nothing.
 	_check(Foci.display_name(Foci.STAFF) == "Staff" and Foci.grants(Foci.STAFF, &"extract")
 		and not Foci.grants(Foci.STAFF, &"push") and Foci.actions(&"").is_empty(), "foci: staff grants extract")
-	_check(GameState.new().equipped_foci == [Foci.STAFF, Foci.ORB, Foci.SYMBIOTE],
-		"foci: staff, orb and neural gill symbiote equipped by default")
+	_check(GameState.new().equipped_foci == [Foci.ORB, Foci.SYMBIOTE],
+		"foci: orb and neural gill symbiote equipped by default, not the staff")
 	var gills: Array[StringName] = [Foci.SYMBIOTE]
 	var no_foci: Array[StringName] = []
 	_check(Foci.display_name(Foci.SYMBIOTE) == "Neural Gill Symbiote" and Foci.actions(Foci.SYMBIOTE).is_empty()
@@ -644,6 +644,8 @@ func _test_play_scene(pointy_top: bool) -> void:
 # Walk onto Planet A in space, enter it, check the planet scene, then Esc back out.
 func _test_enter_planet() -> void:
 	_game().state = GameState.new()
+	# The staff isn't equipped to start; these checks extract, so equip it.
+	_game().state.equipped_foci.assign([Foci.STAFF, Foci.ORB, Foci.SYMBIOTE])
 	var play: Node = load("res://scenes/play.tscn").instantiate()
 	root.add_child(play)
 	current_scene = play

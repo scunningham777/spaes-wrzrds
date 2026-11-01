@@ -10,7 +10,7 @@ Controls (flat-top hexes): **Q/W/E/Z/X/C** or numpad move · **Enter** enter a p
 **Esc** back. In space the ship faces the way it last moved.
 
 On a planet, the action bar along the bottom of the map shows what you can do where you stand, each tile
-with its key (or click it): **M** Move, **F** Push, **R** Extract (needs the staff), **S** Detect (next to
+with its key (or click it): **M** Move, **F** Push, **R** Extract (needs the staff, which you don't start with), **S** Detect (next to
 unknown tiles), **N** Mark Node and **B** Build (see below). Move comes first and is where you start: the
 side panel shows the direction keys laid out like the hexes they move to. Picking another action opens its
 phase in the side panel, where you stay put and the direction keys pick what it aims at instead:
