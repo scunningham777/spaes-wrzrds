@@ -6,13 +6,15 @@ extends RefCounted
 # costs the move cost of the tile it steps onto (TileGrid.move_cost).
 #
 # Stepping onto a tile known to yield aether collects some by itself (collect), as long as a
-# neighbor is one too, and more from aether tiles around them as far as the equipped foci reach
-# (Foci.collect_distance): whoever runs the moves collects before paying for them, so a step onto
-# an aether tile with the last aether in the pool doesn't end the visit.
+# neighbor is one too, and more from aether tiles next to them, up to as many tiles as the equipped
+# foci allow (Foci.max_collect_tiles): whoever runs the moves collects before paying for them, so a
+# step onto an aether tile with the last aether in the pool doesn't end the visit.
 
 const ITEM := &"aether"
 ## Aether a planet visit starts with at least: landing tops the inventory up to this.
 const START := 10
+## Fewest tiles collecting takes: the one stepped onto and an aether neighbor.
+const MIN_COLLECT_TILES := 2
 
 
 static func land(inventory: Inventory) -> void:
@@ -29,11 +31,12 @@ static func pay_move(inventory: Inventory, cost: int) -> bool:
 
 # Collects aether on stepping onto coord. Collectable tiles are known to yield aether and untapped.
 # If coord's tile and at least one neighbor are, it takes them (the first such neighbor, in
-# Hex.hexagon order) plus every collectable tile within distance of either, taps them all (as
-# extracting does, TileGrid.try_extract) and adds per_tile aether for each to inventory. Returns
-# the stored copies of the tapped tiles, or [] (and changes nothing) if there was nothing to collect.
-static func collect(grid: TileGrid, inventory: Inventory, coord: Vector2i, distance: int = 0,
-		per_tile: int = 1) -> Array[Vector2i]:
+# Hex.hexagon order) plus collectable tiles next to either (coord's neighbors first), up to
+# max_tiles in all (never fewer than MIN_COLLECT_TILES). It taps them (as extracting does,
+# TileGrid.try_extract) and adds per_tile aether for each to inventory. Returns the stored copies of
+# the tapped tiles, or [] (and changes nothing) if there was nothing to collect.
+static func collect(grid: TileGrid, inventory: Inventory, coord: Vector2i,
+		max_tiles: int = MIN_COLLECT_TILES, per_tile: int = 1) -> Array[Vector2i]:
 	var coords: Array[Vector2i] = []
 	if not _collectable(grid, coord):
 		return coords
@@ -47,9 +50,9 @@ static func collect(grid: TileGrid, inventory: Inventory, coord: Vector2i, dista
 		coords.clear()
 		return coords
 	for center in coords.duplicate():
-		for offset in Hex.hexagon(distance):
+		for offset in Hex.hexagon(1):
 			var c := grid.canonical(center + offset)
-			if not c in coords and _collectable(grid, c):
+			if coords.size() < max_tiles and not c in coords and _collectable(grid, c):
 				coords.append(c)
 	grid.try_extract(coords)
 	inventory.add(ITEM, per_tile * coords.size())

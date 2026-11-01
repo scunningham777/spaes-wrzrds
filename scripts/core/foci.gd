@@ -26,21 +26,22 @@ const ACTIONS: Dictionary[StringName, Array] = {
 ## Per-focus stats. Staff: distance, tiles ahead of the player that extraction also needs (all
 ## sharing an element with the player's tile); extract_amount, items gained of each shared element.
 ## Orb: scry_radius, how far around the player each step reveals (see reveal_radius); landing_radius,
-## how far around the landing tile is revealed on landing. Neural Gill Symbiote: collect_distance and
-## collect_per_tile, for collecting aether on a step (see Aether.collect).
+## how far around the landing tile is revealed on landing. Neural Gill Symbiote: max_collect_tiles,
+## the most tiles a step collects aether from (the one stepped onto included), and collect_per_tile,
+## the aether each gives (see Aether.collect).
 const STATS: Dictionary[StringName, Dictionary] = {
 	STAFF: {"distance": 1, "extract_amount": 2},
 	ORB: {"scry_radius": 2, "landing_radius": 2},
-	SYMBIOTE: {"collect_distance": 1, "collect_per_tile": 1},
+	SYMBIOTE: {"max_collect_tiles": 2, "collect_per_tile": 1},
 }
 
 ## How far around the landing tile is revealed when no equipped focus says (see landing_radius).
 const DEFAULT_LANDING_RADIUS := 1
 ## How far around the player each step reveals when no equipped focus scries (see reveal_radius).
 const DEFAULT_REVEAL_RADIUS := 1
-## Collecting aether when no equipped focus says (see collect_distance and collect_per_tile): no
-## tiles past the one neighbor it needs, and 1 aether a tile.
-const DEFAULT_COLLECT_DISTANCE := 0
+## Collecting aether when no equipped focus says (see max_collect_tiles and collect_per_tile): just
+## the tile stepped onto and the one neighbor it needs, and 1 aether a tile.
+const DEFAULT_MAX_COLLECT_TILES := 2
 const DEFAULT_COLLECT_PER_TILE := 1
 
 
@@ -90,10 +91,10 @@ static func reveal_radius(foci: Array[StringName]) -> int:
 	return _widest(foci, "scry_radius", DEFAULT_REVEAL_RADIUS)
 
 
-# How far past the tile stepped onto and its first aether neighbor collecting reaches for more
-# aether tiles with foci equipped: the farthest any gives, or DEFAULT_COLLECT_DISTANCE.
-static func collect_distance(foci: Array[StringName]) -> int:
-	return _widest(foci, "collect_distance", DEFAULT_COLLECT_DISTANCE)
+# The most tiles a step collects aether from with foci equipped (the one stepped onto included):
+# the most any gives, or DEFAULT_MAX_COLLECT_TILES.
+static func max_collect_tiles(foci: Array[StringName]) -> int:
+	return _widest(foci, "max_collect_tiles", DEFAULT_MAX_COLLECT_TILES)
 
 
 # Aether collected per tile with foci equipped: the most any gives, or DEFAULT_COLLECT_PER_TILE.

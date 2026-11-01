@@ -164,9 +164,9 @@ func _test_core_logic() -> void:
 	var gills: Array[StringName] = [Foci.SYMBIOTE]
 	var no_foci: Array[StringName] = []
 	_check(Foci.display_name(Foci.SYMBIOTE) == "Neural Gill Symbiote" and Foci.actions(Foci.SYMBIOTE).is_empty()
-		and Foci.collect_distance(gills) == 1 and Foci.collect_per_tile(gills) == 1
-		and Foci.collect_distance(no_foci) == 0 and Foci.collect_per_tile(no_foci) == 1,
-		"foci: the symbiote collects aether 1 tile further, 1 a tile; without it, no further, still 1 a tile")
+		and Foci.max_collect_tiles(gills) == 2 and Foci.collect_per_tile(gills) == 1
+		and Foci.max_collect_tiles(no_foci) == 2 and Foci.collect_per_tile(no_foci) == 1,
+		"foci: the starting symbiote collects from up to 2 tiles, 1 a tile; the same without it")
 	_check(Foci.display_name(Foci.ORB) == "Orb" and Foci.actions(Foci.ORB).is_empty()
 		and Foci.scry_radius(Foci.ORB) >= 1 and Foci.scry_radius(Foci.STAFF) == 0, "foci: the orb grants no actions, just a scry radius")
 	var both: Array[StringName] = [Foci.STAFF, Foci.ORB]
@@ -353,22 +353,28 @@ func _test_core_logic() -> void:
 		ag.tick_cooldowns()
 	_check(Aether.collect(ag, pool, Vector2i.ZERO).size() == 2 and pool.count(Aether.ITEM) == 4
 		and ag.is_tapped(Vector2i(-1, 0)) != ag.is_tapped(Vector2i(1, 0)),
-		"collect: with no reach past the first neighbor, a second one isn't taken")
-	# Reach: with distance 1, every aether tile next to the tile or its first neighbor counts too, 1
-	# more each; one 2 away from both doesn't. Here the first neighbor is (-1, 0) (Hex.hexagon order).
+		"collect: capped at 2 tiles, a second neighbor isn't taken")
+	# A higher cap takes more aether tiles next to the tile or its first neighbor, 1 more each, up to
+	# the cap; one 2 away from both never counts. Here the first neighbor is (-1, 0) (Hex.hexagon order).
 	var reach := TileGrid.new(null, [spring] as Array[TileKind])
 	reach.set_kind_known(spring)
 	for c in [Vector2i.ZERO, Vector2i(-1, 0), Vector2i(1, 0), Vector2i(-2, 1), Vector2i(3, 0)]:
 		reach.add_tile(c, spring)
 	var haul := Inventory.new()
-	var taken := Aether.collect(reach, haul, Vector2i.ZERO, 1, 1)
+	var taken := Aether.collect(reach, haul, Vector2i.ZERO, 10, 1)
 	_check(taken.size() == 4 and Vector2i(1, 0) in taken and Vector2i(-2, 1) in taken and not Vector2i(3, 0) in taken
 		and haul.count(Aether.ITEM) == 4 and not reach.is_tapped(Vector2i(3, 0)),
-		"collect: reaching 1 further takes aether next to the tile or its first neighbor, 1 each (%s)" % [taken])
-	for i in reach.tap_cooldown:
-		reach.tick_cooldowns()
-	_check(Aether.collect(reach, haul, Vector2i.ZERO, 1, 3).size() == 4 and haul.count(Aether.ITEM) == 4 + 12,
-		"collect: per_tile sets the aether each tile gives")
+		"collect: a high cap takes every aether tile next to the tile or its first neighbor, 1 each (%s)" % [taken])
+	var untap_reach := func() -> void:
+		for i in reach.tap_cooldown:
+			reach.tick_cooldowns()
+	untap_reach.call()
+	taken = Aether.collect(reach, haul, Vector2i.ZERO, 3, 1)
+	_check(taken == [Vector2i.ZERO, Vector2i(-1, 0), Vector2i(1, 0)] and haul.count(Aether.ITEM) == 4 + 3
+		and not reach.is_tapped(Vector2i(-2, 1)), "collect: a cap of 3 stops at 3 tiles, the tile's own neighbors first")
+	untap_reach.call()
+	_check(Aether.collect(reach, haul, Vector2i.ZERO, 1, 3).size() == 2 and haul.count(Aether.ITEM) == 7 + 6,
+		"collect: a cap under 2 still takes 2 tiles; per_tile sets the aether each gives")
 	_check(inv_changes[0] == 3, "inventory: changed fires on add/spend")
 
 	var state := GameState.new()
@@ -1012,8 +1018,6 @@ func _test_enter_planet() -> void:
 	# before the step is paid for, so it doesn't end the visit; both tiles are tapped and flash.
 	var spring := tiles.grid.find_kind(&"aether_spring")
 	var aether_before_collect: int = aether.call()
-	# Without the symbiote, so tiles revealed around (0, 1) don't add to the count.
-	_game().state.equipped_foci.assign([Foci.STAFF, Foci.ORB])
 	tiles.grid.set_tile(Vector2i(0, 1), spring)
 	tiles.grid.set_tile(Vector2i(1, 1), spring)
 	inv.spend(Aether.ITEM, aether.call() - 1)
@@ -1033,7 +1037,6 @@ func _test_enter_planet() -> void:
 	tiles.grid.set_tile(Vector2i(0, 1), iron)
 	tiles.grid.set_tile(Vector2i(1, 1), gold)
 	inv.add(Aether.ITEM, aether_before_collect - aether.call())
-	_game().state.equipped_foci.assign([Foci.STAFF, Foci.ORB, Foci.SYMBIOTE])
 
 	tiles_snapshot = tiles.grid.tiles.duplicate()  # pushed/extracted state should survive a revisit
 
